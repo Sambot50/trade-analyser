@@ -3,7 +3,7 @@ import {
   Upload, Sparkles, TrendingUp, TrendingDown,
   Target, RefreshCw, Key, CheckCircle2,
   Copy, Zap, ShieldAlert, AlertCircle, Layers,
-  BarChart2, ArrowUpRight, Eye, EyeOff, Cpu, Settings,
+  BarChart2, ArrowUpRight, Eye, EyeOff, Cpu, Settings, Ruler,
 } from 'lucide-react';
 
 import { SAMPLES } from './samples.js';
@@ -361,6 +361,10 @@ export default function App() {
                 </span>
               </div>
 
+              {analysis.source === 'api' && analysis.scale && (
+                <ScaleCard scale={analysis.scale} />
+              )}
+
               <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4">
                 <p className="text-xs font-semibold text-slate-400 flex items-center gap-1.5 mb-2.5">
                   <Zap className="w-3.5 h-3.5 text-indigo-400" /> Confluences Price Action &amp; SMC
@@ -573,6 +577,40 @@ function EngineSettings({ engine, setEngine, apiKey, setApiKey, showKeyValue, se
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Affiche le repère que le modèle a relevé sur l'axe.
+ *
+ * C'est la seule chose vérifiable à l'oeil sur une capture réelle : si ces
+ * deux prix ne sont pas ceux des graduations extrêmes du graphique, la
+ * projection est fausse, quelle que soit la plausibilité des niveaux.
+ */
+function ScaleCard({ scale }) {
+  const pct = (r) => `${(r * 100).toFixed(1)} %`;
+  return (
+    <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4">
+      <p className="text-xs font-semibold text-slate-400 flex items-center gap-1.5 mb-2.5">
+        <Ruler className="w-3.5 h-3.5 text-indigo-400" /> Repère lu sur l'axe
+      </p>
+      <div className="grid grid-cols-2 gap-2 text-[11px]">
+        <div>
+          <span className="text-slate-500">Graduation haute</span>
+          <p className="text-slate-200 font-semibold tabular-nums">{scale.priceTop}</p>
+          <p className="text-slate-600">à {pct(scale.plotTopRatio)} de la hauteur</p>
+        </div>
+        <div>
+          <span className="text-slate-500">Graduation basse</span>
+          <p className="text-slate-200 font-semibold tabular-nums">{scale.priceBottom}</p>
+          <p className="text-slate-600">à {pct(scale.plotBottomRatio)} de la hauteur</p>
+        </div>
+      </div>
+      <p className="text-[10px] text-slate-600 mt-2.5 leading-relaxed">
+        Compare ces deux prix aux graduations extrêmes de ta capture. S'ils ne correspondent
+        pas, les traits sont mal placés même si les niveaux semblent crédibles.
+      </p>
     </div>
   );
 }
