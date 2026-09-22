@@ -3,13 +3,15 @@ import {
   Upload, Sparkles, TrendingUp, TrendingDown,
   Target, RefreshCw, Key, CheckCircle2,
   Copy, Zap, ShieldAlert, AlertCircle, Layers,
-  BarChart2, ArrowUpRight, Eye, EyeOff, Cpu, Settings, Ruler,
+  BarChart2, ArrowUpRight, Eye, EyeOff, Cpu, Settings, Ruler, NotebookPen, LineChart,
 } from 'lucide-react';
 
 import { SAMPLES } from './samples.js';
 import { PROVIDERS, analyzeChart, blockingReason, getProvider, listInstalledModels } from './lib/providers/index.js';
 import { loadSettings, saveSettings } from './lib/settings.js';
 import { toPngDataUrl } from './lib/image.js';
+import JournalView from './JournalView.jsx';
+import { enregistrerAnalyse, dossierMemorise, resoudreEnAttente } from './lib/journal/index.js';
 import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines, rrVerdict, breakEvenRate } from './lib/analysis.js';
 
 const LEVEL_LABELS = { entry: 'ENTRÉE', sl: 'STOP LOSS', tp1: 'TP 1', tp2: 'TP 2' };
@@ -30,14 +32,44 @@ export default function App() {
 
   const [visibleLevels, setVisibleLevels] = useState({ entry: true, sl: true, tp1: true, tp2: true });
 
+  const [onglet, setOnglet] = useState('analyse');
+  const [dossierJournal, setDossierJournal] = useState(null);
+  const [noteJournal, setNoteJournal] = useState('');
+
   const fileInputRef = useRef(null);
   const canvasRef = useRef(null);
+  // L'overlay n'existe qu'une fois le canvas dessiné : on diffère
+  // l'enregistrement jusque-là pour pouvoir y joindre l'image réellement vue.
+  const enAttenteJournal = useRef(null);
 
   const provider = getProvider(engine.provider);
   const config = { ...engine, apiKey };
   const blocked = blockingReason(engine.provider, config);
 
   useEffect(() => { saveSettings(engine); }, [engine]);
+
+  // Au démarrage : retrouver le dossier autorisé, puis tenter de constater les
+  // issues en attente. C'est ce qui fait que le journal se remplit tout seul
+  // quand on rouvre l'outil le lendemain.
+  useEffect(() => {
+    let annule = false;
+    (async () => {
+      const handle = await dossierMemorise().catch(() => null);
+      if (annule) return;
+      if (handle) setDossierJournal(handle);
+
+      const rapport = await resoudreEnAttente({ racine: handle }).catch(() => []);
+      if (annule) return;
+
+      const tranchees = rapport.filter(
+        (r) => !['en_cours', 'echec', 'non_resolvable'].includes(r.issue)
+      );
+      if (tranchees.length) {
+        setNoteJournal(`${tranchees.length} issue(s) constatée(s) depuis la dernière session.`);
+      }
+    })();
+    return () => { annule = true; };
+  }, []);
 
   const resetAnalysis = useCallback(() => {
     setAnalysis(null);
@@ -114,6 +146,31 @@ export default function App() {
       for (const line of lines) drawLevel(ctx, canvas.width, line);
 
       setOverlayWarning(offScreen.length ? `Hors cadre visible, non tracé : ${offScreen.join(', ')}.` : '');
+
+      // Enregistrement du journal : ici et pas dans runAnalysis, parce que
+      // c'est le seul endroit où l'overlay existe réellement.
+      const demande = enAttenteJournal.current;
+      if (demande && demande.analyse === analysis) {
+        enAttenteJournal.current = null;
+        enregistrerAnalyse({
+          analyse: demande.analyse,
+          moteur: { fournisseur: engine.provider, modele: engine.model, dureeMs: demande.dureeMs },
+          captureDataUrl: imageSrc,
+          overlayDataUrl: canvas.toDataURL('image/png'),
+          dimensions: { largeur: canvas.width, hauteur: canvas.height },
+          dossierRacine: dossierJournal,
+        })
+          .then(({ erreurDisque }) => {
+            setNoteJournal(
+              erreurDisque
+                ? `Analyse enregistrée en mémoire, mais pas sur disque : ${erreurDisque}`
+                : dossierJournal
+                  ? 'Analyse enregistrée dans le journal.'
+                  : 'Analyse enregistrée en mémoire du navigateur — connecte un dossier pour la garder.'
+            );
+          })
+          .catch((err) => setNoteJournal(`Échec de l'enregistrement au journal : ${err.message}`));
+      }
     };
 
     img.onerror = () => {
@@ -122,7 +179,7 @@ export default function App() {
 
     img.src = imageSrc;
     return () => { cancelled = true; };
-  }, [imageSrc, analysis, visibleLevels]);
+  }, [imageSrc, analysis, visibleLevels, engine.provider, engine.model, dossierJournal]);
 
   const loadSample = async (sample) => {
     setErrorMsg('');
@@ -140,6 +197,10 @@ export default function App() {
     setAnalysis(normalizeAnalysis(sample.analysis, 'demo'));
   };
 
+  const journaliser = (analyseNormalisee, dureeMs) => {
+    enAttenteJournal.current = { analyse: analyseNormalisee, dureeMs };
+  };
+
   const runAnalysis = async () => {
     if (!imageSrc || loading) return;
 
@@ -152,6 +213,7 @@ export default function App() {
     setLoading(true);
     setErrorMsg('');
     setOverlayWarning('');
+    const debut = Date.now();
 
     try {
       const raw = await analyzeChart(imageSrc, config);
@@ -163,7 +225,9 @@ export default function App() {
         return;
       }
 
-      setAnalysis(normalizeAnalysis(raw, 'api'));
+      const normalisee = normalizeAnalysis(raw, 'api');
+      setAnalysis(normalisee);
+      journaliser(normalisee, Date.now() - debut);
     } catch (err) {
       console.error(err);
       setAnalysis(null);
@@ -208,7 +272,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 antialiased">
       <header className="border-b border-slate-800/80 bg-slate-950/80 backdrop-blur sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-5 py-3.5 flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto px-5 py-3.5 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-indigo-600/20 border border-indigo-500/30 grid place-items-center">
               <BarChart2 className="w-5 h-5 text-indigo-400" />
@@ -217,6 +281,23 @@ export default function App() {
               <h1 className="text-sm font-semibold tracking-tight">AI Trade Analyser</h1>
               <p className="text-[11px] text-slate-500">Lecture de graphique assistée — moteur SMC Vision</p>
             </div>
+          </div>
+
+          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+            {[
+              { id: 'analyse', label: 'Analyse', Icone: LineChart },
+              { id: 'journal', label: 'Journal', Icone: NotebookPen },
+            ].map(({ id, label, Icone }) => (
+              <button
+                key={id}
+                onClick={() => setOnglet(id)}
+                className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md transition ${
+                  onglet === id ? 'bg-slate-800 text-slate-100' : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                <Icone className="w-3.5 h-3.5" /> {label}
+              </button>
+            ))}
           </div>
 
           <button
@@ -234,6 +315,17 @@ export default function App() {
         </div>
       </header>
 
+      {noteJournal && (
+        <div className="max-w-7xl mx-auto px-5 pt-4">
+          <Notice tone="amber" icon={NotebookPen}>{noteJournal}</Notice>
+        </div>
+      )}
+
+      {onglet === 'journal' ? (
+        <main className="max-w-7xl mx-auto px-5 py-6">
+          <JournalView racine={dossierJournal} setRacine={setDossierJournal} />
+        </main>
+      ) : (
       <main className="max-w-7xl mx-auto px-5 py-6 grid lg:grid-cols-[1.35fr_1fr] gap-6 items-start">
         <section className="flex flex-col gap-4">
           <div className="flex items-center gap-2 overflow-x-auto pb-1">
@@ -391,6 +483,7 @@ export default function App() {
           )}
         </aside>
       </main>
+      )}
 
       {showSettings && (
         <EngineSettings
