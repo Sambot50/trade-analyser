@@ -38,31 +38,33 @@ Qwen2.5-VL est recommandé : c'est le plus solide des modèles compacts sur la
 lecture de texte fin, et l'axe des prix est précisément du texte fin.
 `qwen2.5vl:3b` suffit sur une machine modeste, au prix de la précision.
 
-**3. Autoriser la page web à parler à Ollama**
+**3. Vérifier — il n'y a normalement rien à autoriser**
 
-Ollama refuse par défaut les requêtes venant d'un navigateur. Il faut déclarer
-l'origine autorisée, une seule fois.
-
-Windows (PowerShell) :
-
-```powershell
-setx OLLAMA_ORIGINS "http://localhost:5173"
-```
-
-macOS / Linux :
+Ollama accepte les requêtes navigateur depuis n'importe quel port local par
+défaut. Sa liste d'origines inclut `http://localhost:*`, ce qui couvre le
+serveur de développement. Lance simplement :
 
 ```bash
-launchctl setenv OLLAMA_ORIGINS "http://localhost:5173"   # macOS
-export OLLAMA_ORIGINS="http://localhost:5173"             # Linux
+ollama serve
 ```
 
-Puis **redémarre Ollama** — quitter l'icône de la barre des tâches et le
-relancer suffit. Sans cette étape, l'interface affiche « Ollama ne répond
-pas » alors que le serveur tourne : c'est le navigateur qui est bloqué, pas
-Ollama.
+L'écran de configuration de l'application sonde le serveur à l'ouverture et
+liste les modèles réellement installés — un modèle absent est grisé. S'il
+affiche « Ollama répond », tout est en place.
 
-L'écran de configuration sonde le serveur à l'ouverture et liste les modèles
-réellement installés — un modèle absent est grisé.
+**Seulement si la sonde échoue** alors qu'`ollama serve` tourne, c'est que la
+liste d'origines a été restreinte sur cette machine. Vérifie-la dans les logs
+de démarrage (ligne `server config`, champ `OLLAMA_ORIGINS`), et rétablis un
+réglage permissif plutôt que d'y mettre une seule URL :
+
+```powershell
+# Windows — supprime une restriction posée precedemment
+[Environment]::SetEnvironmentVariable("OLLAMA_ORIGINS", $null, "User")
+```
+
+Définir `OLLAMA_ORIGINS` **remplace** la liste par défaut au lieu de s'y
+ajouter : y mettre la seule URL de cette application couperait l'accès aux
+autres clients Ollama de la machine.
 
 ## Moteur distant — Gemini
 
