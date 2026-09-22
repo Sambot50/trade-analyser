@@ -3,11 +3,13 @@ import {
   Upload, Sparkles, TrendingUp, TrendingDown,
   Target, RefreshCw, Key, CheckCircle2,
   Copy, Zap, ShieldAlert, AlertCircle, Layers,
-  BarChart2, ArrowUpRight, ArrowDownRight, Eye, EyeOff,
+  BarChart2, ArrowUpRight, Eye, EyeOff, Cpu, Settings,
 } from 'lucide-react';
 
 import { SAMPLES } from './samples.js';
-import { analyzeChart } from './lib/gemini.js';
+import { PROVIDERS, analyzeChart, blockingReason, getProvider, listInstalledModels } from './lib/providers/index.js';
+import { loadSettings, saveSettings } from './lib/settings.js';
+import { toPngDataUrl } from './lib/image.js';
 import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines } from './lib/analysis.js';
 
 const LEVEL_LABELS = { entry: 'ENTRÉE', sl: 'STOP LOSS', tp1: 'TP 1', tp2: 'TP 2' };
@@ -15,20 +17,27 @@ const LEVEL_LABELS = { entry: 'ENTRÉE', sl: 'STOP LOSS', tp1: 'TP 1', tp2: 'TP 
 export default function App() {
   const [imageSrc, setImageSrc] = useState(null);
   const [loading, setLoading] = useState(false);
-  // Pré-rempli depuis .env.local (VITE_GEMINI_API_KEY) pour éviter de ressaisir
-  // la clé à chaque rechargement. Jamais persistée par l'application elle-même.
-  const [apiKey, setApiKey] = useState(import.meta.env.VITE_GEMINI_API_KEY || '');
-  const [showKeyModal, setShowKeyModal] = useState(false);
-  const [showKeyValue, setShowKeyValue] = useState(false);
   const [copied, setCopied] = useState(false);
   const [analysis, setAnalysis] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [overlayWarning, setOverlayWarning] = useState('');
 
+  const [engine, setEngine] = useState(loadSettings);
+  // La clé vit en mémoire seulement. Pré-remplie depuis .env.local si présente.
+  const [apiKey, setApiKey] = useState(import.meta.env.VITE_GEMINI_API_KEY || '');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showKeyValue, setShowKeyValue] = useState(false);
+
   const [visibleLevels, setVisibleLevels] = useState({ entry: true, sl: true, tp1: true, tp2: true });
 
   const fileInputRef = useRef(null);
   const canvasRef = useRef(null);
+
+  const provider = getProvider(engine.provider);
+  const config = { ...engine, apiKey };
+  const blocked = blockingReason(engine.provider, config);
+
+  useEffect(() => { saveSettings(engine); }, [engine]);
 
   const resetAnalysis = useCallback(() => {
     setAnalysis(null);
@@ -46,8 +55,8 @@ export default function App() {
     reader.readAsDataURL(file);
   }, [resetAnalysis]);
 
-  // Collage global : un gestionnaire sur un div ne reçoit l'évènement que
-  // si ce div a le focus, ce qui n'est presque jamais le cas au chargement.
+  // Collage global : un gestionnaire sur un div ne reçoit l'évènement que si
+  // ce div a le focus, ce qui n'est presque jamais le cas au chargement.
   useEffect(() => {
     const onPaste = (e) => {
       const items = e.clipboardData?.items;
@@ -93,8 +102,7 @@ export default function App() {
       // L'overlay n'est tracé que si le repère de prix est exploitable.
       // Le tracer à des hauteurs arbitraires produirait une image qui a
       // l'apparence d'une mesure sans en être une.
-      const scaleCheck = validateScale(analysis.scale);
-      if (!scaleCheck.ok) {
+      if (!validateScale(analysis.scale).ok) {
         setOverlayWarning(
           "Overlay non tracé : le modèle n'a pas su situer l'axe des prix de façon fiable. " +
           'Les niveaux restent lisibles dans le panneau de droite.'
@@ -105,11 +113,7 @@ export default function App() {
       const { lines, offScreen } = buildOverlayLines(analysis, analysis.scale, canvas.height, visibleLevels);
       for (const line of lines) drawLevel(ctx, canvas.width, line);
 
-      setOverlayWarning(
-        offScreen.length
-          ? `Hors cadre visible, non tracé : ${offScreen.join(', ')}.`
-          : ''
-      );
+      setOverlayWarning(offScreen.length ? `Hors cadre visible, non tracé : ${offScreen.join(', ')}.` : '');
     };
 
     img.onerror = () => {
@@ -120,25 +124,28 @@ export default function App() {
     return () => { cancelled = true; };
   }, [imageSrc, analysis, visibleLevels]);
 
-  const loadSample = (sample) => {
-    setImageSrc(sample.src);
+  const loadSample = async (sample) => {
     setErrorMsg('');
     setOverlayWarning('');
+
+    // Rasterisé en PNG : la démo suit exactement le même chemin qu'une capture
+    // importée, donc le bouton d'analyse fonctionne aussi sur elle.
+    try {
+      setImageSrc(await toPngDataUrl(sample.src));
+    } catch (err) {
+      setImageSrc(sample.src); // affichable, mais pas analysable
+      setErrorMsg(`${err.message} La démo reste visible, l'analyse réelle ne pourra pas s'y appliquer.`);
+    }
+
     setAnalysis(normalizeAnalysis(sample.analysis, 'demo'));
   };
 
   const runAnalysis = async () => {
     if (!imageSrc || loading) return;
 
-    // Sans clé, l'ancienne version renvoyait l'analyse BTC de démonstration
-    // quelle que soit l'image importée. On refuse explicitement plutôt que
-    // de produire un signal sans rapport avec le graphique fourni.
-    if (!apiKey.trim()) {
-      setErrorMsg(
-        "Aucune clé API renseignée : impossible d'analyser cette image. " +
-        'Renseigne ta clé Gemini, ou charge un graphique de démonstration pour explorer l’interface.'
-      );
-      setShowKeyModal(true);
+    if (blocked) {
+      setErrorMsg(blocked);
+      setShowSettings(true);
       return;
     }
 
@@ -147,7 +154,7 @@ export default function App() {
     setOverlayWarning('');
 
     try {
-      const raw = await analyzeChart(imageSrc, apiKey);
+      const raw = await analyzeChart(imageSrc, config);
 
       const check = validateAnalysis(raw);
       if (!check.ok) {
@@ -213,11 +220,16 @@ export default function App() {
           </div>
 
           <button
-            onClick={() => setShowKeyModal(true)}
-            className="flex items-center gap-2 text-xs bg-slate-900 hover:bg-slate-800 text-slate-300 px-3.5 py-2 rounded-lg border border-slate-700/80 transition"
+            onClick={() => setShowSettings(true)}
+            className={`flex items-center gap-2 text-xs px-3.5 py-2 rounded-lg border transition ${
+              blocked
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                : 'bg-slate-900 hover:bg-slate-800 border-slate-700/80 text-slate-300'
+            }`}
           >
-            <Key className="w-3.5 h-3.5" />
-            {apiKey ? 'API Gemini active' : 'Clé API non renseignée'}
+            {provider.needsApiKey ? <Key className="w-3.5 h-3.5" /> : <Cpu className="w-3.5 h-3.5" />}
+            <span>{provider.label}</span>
+            <span className="text-slate-500 hidden sm:inline">· {engine.model}</span>
           </button>
         </div>
       </header>
@@ -285,19 +297,8 @@ export default function App() {
             </div>
           )}
 
-          {overlayWarning && (
-            <div className="flex items-start gap-2 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3.5 py-2.5">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
-              <span>{overlayWarning}</span>
-            </div>
-          )}
-
-          {errorMsg && (
-            <div className="flex items-start gap-2 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/20 rounded-xl px-3.5 py-2.5">
-              <ShieldAlert className="w-4 h-4 shrink-0 mt-px" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
+          {overlayWarning && <Notice tone="amber" icon={AlertCircle}>{overlayWarning}</Notice>}
+          {errorMsg && <Notice tone="rose" icon={ShieldAlert}>{errorMsg}</Notice>}
 
           <button
             onClick={runAnalysis}
@@ -305,7 +306,7 @@ export default function App() {
             className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-sm font-semibold py-3 rounded-xl transition"
           >
             {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            {loading ? 'Analyse en cours…' : "Lancer l'analyse AI"}
+            {loading ? `Analyse en cours via ${provider.label}…` : "Lancer l'analyse AI"}
           </button>
         </section>
 
@@ -313,13 +314,10 @@ export default function App() {
           {analysis ? (
             <div className="flex flex-col gap-3.5">
               {isDemo && (
-                <div className="flex items-start gap-2 text-xs font-semibold text-amber-200 bg-amber-500/15 border border-amber-400/40 rounded-xl px-3.5 py-2.5">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
-                  <span>
-                    SIMULATION — exemple préenregistré sur un graphique synthétique.
-                    Aucun appel au modèle n'a eu lieu, ce signal est fictif.
-                  </span>
-                </div>
+                <Notice tone="amber" icon={AlertCircle} strong>
+                  SIMULATION — exemple préenregistré sur un graphique synthétique.
+                  Aucun appel au modèle n'a eu lieu, ce signal est fictif.
+                </Notice>
               )}
 
               <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4">
@@ -403,54 +401,191 @@ export default function App() {
         </aside>
       </main>
 
-      {showKeyModal && (
-        <div
-          className="fixed inset-0 z-30 bg-slate-950/80 backdrop-blur-sm grid place-items-center p-5"
-          onClick={() => setShowKeyModal(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-5"
-          >
-            <h2 className="text-sm font-semibold flex items-center gap-2">
-              <Key className="w-4 h-4 text-indigo-400" /> Configuration de l'API Gemini Vision
-            </h2>
-            <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-              La clé est conservée en mémoire pour la durée de la session uniquement : elle n'est
-              écrite ni dans le navigateur, ni sur disque. Pour éviter de la ressaisir, place-la dans
-              un fichier <code className="text-slate-400">.env.local</code> sous la clé{' '}
-              <code className="text-slate-400">VITE_GEMINI_API_KEY</code>.
-            </p>
-
-            <div className="relative mt-3.5">
-              <input
-                type={showKeyValue ? 'text' : 'password'}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder="AIza…"
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 pr-10 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition"
-              />
-              <button
-                type="button"
-                onClick={() => setShowKeyValue((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-                aria-label={showKeyValue ? 'Masquer la clé' : 'Afficher la clé'}
-              >
-                {showKeyValue ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={() => setShowKeyModal(false)}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition"
-              >
-                Enregistrer
-              </button>
-            </div>
-          </div>
-        </div>
+      {showSettings && (
+        <EngineSettings
+          engine={engine}
+          setEngine={setEngine}
+          apiKey={apiKey}
+          setApiKey={setApiKey}
+          showKeyValue={showKeyValue}
+          setShowKeyValue={setShowKeyValue}
+          onClose={() => setShowSettings(false)}
+        />
       )}
+    </div>
+  );
+}
+
+function EngineSettings({ engine, setEngine, apiKey, setApiKey, showKeyValue, setShowKeyValue, onClose }) {
+  const provider = getProvider(engine.provider);
+  const [probe, setProbe] = useState(null);
+
+  // Sonde Ollama à l'ouverture : savoir tout de suite si le serveur répond et
+  // quels modèles sont réellement installés évite un échec au moment du clic.
+  useEffect(() => {
+    if (provider.needsApiKey) { setProbe(null); return; }
+
+    let cancelled = false;
+    setProbe({ state: 'checking' });
+
+    listInstalledModels(engine.baseUrl)
+      .then((models) => { if (!cancelled) setProbe({ state: 'ok', models }); })
+      .catch((err) => { if (!cancelled) setProbe({ state: 'error', message: err.message }); });
+
+    return () => { cancelled = true; };
+  }, [provider.needsApiKey, engine.baseUrl]);
+
+  const selectProvider = (id) => {
+    const next = getProvider(id);
+    setEngine({
+      provider: id,
+      model: next.defaultModel,
+      baseUrl: next.defaultBaseUrl || '',
+    });
+  };
+
+  const installed = probe?.state === 'ok' ? probe.models : null;
+
+  return (
+    <div className="fixed inset-0 z-30 bg-slate-950/80 backdrop-blur-sm grid place-items-center p-5" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-5 max-h-[90vh] overflow-y-auto"
+      >
+        <h2 className="text-sm font-semibold flex items-center gap-2">
+          <Settings className="w-4 h-4 text-indigo-400" /> Moteur d'analyse
+        </h2>
+
+        <div className="grid sm:grid-cols-2 gap-2.5 mt-4">
+          {Object.values(PROVIDERS).map((p) => (
+            <button
+              key={p.id}
+              onClick={() => selectProvider(p.id)}
+              className={`text-left p-3 rounded-xl border transition ${
+                p.id === engine.provider
+                  ? 'bg-indigo-600/15 border-indigo-500/50'
+                  : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+              }`}
+            >
+              <span className="text-xs font-semibold flex items-center gap-1.5">
+                {p.needsApiKey ? <Key className="w-3 h-3" /> : <Cpu className="w-3 h-3" />}
+                {p.label}
+              </span>
+              <span className="block text-[10px] text-slate-500 mt-1 leading-snug">{p.blurb}</span>
+            </button>
+          ))}
+        </div>
+
+        {provider.configurableEndpoint && (
+          <label className="block mt-4">
+            <span className="text-[11px] text-slate-500">Adresse du serveur Ollama</span>
+            <input
+              value={engine.baseUrl}
+              onChange={(e) => setEngine({ ...engine, baseUrl: e.target.value })}
+              placeholder="http://localhost:11434"
+              className="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition"
+            />
+          </label>
+        )}
+
+        {probe && (
+          <div className="mt-2.5">
+            {probe.state === 'checking' && <p className="text-[11px] text-slate-500">Recherche du serveur…</p>}
+            {probe.state === 'ok' && (
+              <p className="text-[11px] text-emerald-400">
+                Ollama répond — {probe.models.length} modèle{probe.models.length > 1 ? 's' : ''} installé{probe.models.length > 1 ? 's' : ''}.
+              </p>
+            )}
+            {probe.state === 'error' && (
+              <p className="text-[11px] text-amber-400 leading-snug">
+                Ollama ne répond pas. Lance <code className="text-slate-300">ollama serve</code> et
+                autorise cette page via <code className="text-slate-300">OLLAMA_ORIGINS</code> — voir le README.
+              </p>
+            )}
+          </div>
+        )}
+
+        <label className="block mt-4">
+          <span className="text-[11px] text-slate-500">Modèle</span>
+          <input
+            value={engine.model}
+            onChange={(e) => setEngine({ ...engine, model: e.target.value })}
+            className="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition"
+          />
+        </label>
+
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {provider.suggestedModels.map((m) => {
+            const missing = installed && !installed.some((name) => name === m.id || name.startsWith(`${m.id}:`));
+            return (
+              <button
+                key={m.id}
+                onClick={() => setEngine({ ...engine, model: m.id })}
+                title={missing ? `Non installé — ollama pull ${m.id}` : m.note}
+                className={`text-[10px] px-2 py-1 rounded-md border transition ${
+                  engine.model === m.id
+                    ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                } ${missing ? 'opacity-50' : ''}`}
+              >
+                {m.label}{missing ? ' ·  à installer' : ''}
+              </button>
+            );
+          })}
+        </div>
+
+        {provider.needsApiKey && (
+          <>
+            <label className="block mt-4">
+              <span className="text-[11px] text-slate-500">Clé API</span>
+              <div className="relative mt-1">
+                <input
+                  type={showKeyValue ? 'text' : 'password'}
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                  placeholder="AIza…"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 pr-10 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowKeyValue(!showKeyValue)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+                  aria-label={showKeyValue ? 'Masquer la clé' : 'Afficher la clé'}
+                >
+                  {showKeyValue ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+            </label>
+            <p className="text-[10px] text-slate-600 mt-1.5 leading-relaxed">
+              Gardée en mémoire pour la session seulement, jamais écrite sur disque ni dans le
+              navigateur. Pour éviter de la ressaisir, place-la dans <code>.env.local</code> sous
+              <code> VITE_GEMINI_API_KEY</code>.
+            </p>
+          </>
+        )}
+
+        <div className="flex justify-end mt-5">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Notice({ tone, icon: Icon, strong, children }) {
+  const tones = {
+    amber: 'text-amber-300 bg-amber-500/10 border-amber-500/20',
+    rose: 'text-rose-300 bg-rose-500/10 border-rose-500/20',
+  };
+  return (
+    <div className={`flex items-start gap-2 text-xs border rounded-xl px-3.5 py-2.5 ${tones[tone]} ${strong ? 'font-semibold' : ''}`}>
+      <Icon className="w-4 h-4 shrink-0 mt-px" />
+      <span>{children}</span>
     </div>
   );
 }
@@ -483,8 +618,7 @@ function drawLevel(ctx, width, { y, color, label, price }) {
   ctx.textBaseline = 'middle';
 
   const text = `${label} : ${price}`;
-  const textWidth = ctx.measureText(text).width;
-  const boxWidth = textWidth + 20;
+  const boxWidth = ctx.measureText(text).width + 20;
 
   ctx.fillStyle = color;
   ctx.fillRect(width - boxWidth - 8, y - 15, boxWidth, 30);
