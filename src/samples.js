@@ -16,7 +16,7 @@ export const SAMPLES = [
     id: 'btc-m15',
     name: 'BTC/USDT (M15)',
     type: 'Crypto',
-    src: `${import.meta.env.BASE_URL}samples/btc-m15.svg`,
+    src: `${import.meta.env.BASE_URL}samples/btc-m15.png`,
     analysis: {
       symbol: 'BTC / USDT',
       timeframe: 'M15',
@@ -44,7 +44,7 @@ export const SAMPLES = [
     id: 'eurusd-h1',
     name: 'EUR/USD (H1)',
     type: 'Forex',
-    src: `${import.meta.env.BASE_URL}samples/eurusd-h1.svg`,
+    src: `${import.meta.env.BASE_URL}samples/eurusd-h1.png`,
     analysis: {
       symbol: 'EUR / USD',
       timeframe: 'H1',

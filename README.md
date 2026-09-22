@@ -98,10 +98,39 @@ sera rejeté plus souvent, au lieu d'afficher des niveaux inventés.
 Le ratio risque/rendement est recalculé en JavaScript et jamais lu dans la
 réponse du modèle.
 
-## Calibrer ton moteur
+## Choisir ton modele — banc d'essai
 
-Les graphiques de démonstration sont rasterisés en PNG au chargement, donc
-analysables comme une vraie capture. Leur échelle exacte est connue
+Avant de faire confiance a un modele, mesure-le :
+
+```bash
+node scripts/bench-vision.mjs
+```
+
+Le script detecte tes modeles de vision installes, leur envoie un graphique de
+reference dont l'echelle exacte est connue, et classe le resultat par
+**derive** : de combien de pixels une ligne de niveau serait mal placee si tu
+faisais confiance a ce modele.
+
+```
+< 10 px    utilisable
+10-40 px   approximatif
+> 40 px    inexploitable
+```
+
+Options utiles :
+
+```bash
+node scripts/bench-vision.mjs --models qwen2.5vl:7b,llava:13b
+node scripts/bench-vision.mjs --image public/samples/eurusd-h1.png
+```
+
+Un modele qui renvoie un repere incoherent ou du texte au lieu de JSON apparait
+en echec — c'est une information, pas un bug : ce modele ne convient pas.
+
+## Calibrer dans l'interface
+
+Les graphiques de démonstration sont servis en PNG et convertis en data-URI au
+chargement, donc analysables comme une vraie capture. Leur échelle exacte est connue
 (`scripts/make-samples.mjs`), ce qui en fait un banc d'essai :
 
 1. charge `BTC/USDT (M15)` — l'overlay affiché est le repère exact ;
@@ -113,7 +142,8 @@ analysables comme une vraie capture. Leur échelle exacte est connue
 
 ```
 src/lib/analysis.js          validation, ratio, projection prix → pixel (pur)
-src/lib/image.js             rasterisation en data-URI PNG
+src/lib/image.js             conversion en data-URI PNG
+scripts/bench-vision.mjs     banc d'essai des modèles de vision
 src/lib/settings.js          préférences de moteur (jamais la clé API)
 src/lib/providers/
   schema.js                  schéma et invite partagés, conversion Gemini
