@@ -91,11 +91,15 @@ function clamp(n, lo, hi) {
 }
 
 /**
- * Repère de projection prix -> pixel, tel que renvoyé par le modèle.
+ * Couple de référence définissant la projection prix -> pixel.
  *
- * plotTopRatio / plotBottomRatio délimitent la zone de tracé dans l'image
- * (hors barre d'outils en haut, hors axe des dates en bas).
- * priceTop / priceBottom sont les prix lus sur l'axe vertical à ces deux bords.
+ * priceTop / priceBottom sont deux prix lus sur l'axe, plotTopRatio /
+ * plotBottomRatio les hauteurs auxquelles ils se trouvent dans l'image.
+ *
+ * Ce couple ne délimite PAS le visible : les modèles s'ancrent naturellement
+ * sur les graduations chiffrées extrêmes, qui sont à l'intérieur du cadre.
+ * Un prix au-delà de la référence reste donc souvent affichable — c'est
+ * l'ordonnée calculée, et elle seule, qui décide.
  */
 export function validateScale(scale) {
   if (!scale || typeof scale !== 'object') return { ok: false, errors: ['Repère de prix absent.'] };
@@ -118,18 +122,22 @@ export function validateScale(scale) {
 
 /**
  * Convertit un prix en ordonnée pixel.
- * Renvoie null si le prix sort de la fenêtre visible : dans ce cas on ne
- * trace rien, plutôt que de coller la ligne contre un bord.
+ *
+ * Renvoie null si le trait tomberait hors de l'image — c'est le seul critère
+ * de rejet. Borner sur le couple de référence écarterait des niveaux
+ * pourtant visibles, la référence étant généralement calée sur les
+ * graduations chiffrées, à l'intérieur du cadre.
  */
 export function priceToY(price, scale, imageHeight) {
   if (typeof price !== 'number' || !Number.isFinite(price)) return null;
 
   const { priceTop, priceBottom, plotTopRatio, plotBottomRatio } = scale;
-  if (price > priceTop || price < priceBottom) return null;
 
   const priceRatio = (priceTop - price) / (priceTop - priceBottom);
-  const yRatio = plotTopRatio + priceRatio * (plotBottomRatio - plotTopRatio);
-  return yRatio * imageHeight;
+  const y = (plotTopRatio + priceRatio * (plotBottomRatio - plotTopRatio)) * imageHeight;
+
+  if (!Number.isFinite(y) || y < 0 || y > imageHeight) return null;
+  return y;
 }
 
 /**

@@ -2,16 +2,17 @@ import { base64FromDataUrl, mimeFromDataUrl } from '../analysis.js';
 import { ANALYSIS_SCHEMA, ANALYSIS_PROMPT, parseAnalysisJson } from './schema.js';
 
 export const DEFAULT_BASE_URL = 'http://localhost:11434';
-export const DEFAULT_MODEL = 'qwen2.5vl:7b';
+export const DEFAULT_MODEL = 'qwen3.8:27b';
 
-// Modèles de vision courants, par capacité décroissante de lecture de texte
-// fin — c'est le critère qui compte ici, l'axe des prix étant en petits
-// caractères. Qwen2.5-VL est nettement devant sur cette tâche précise.
+// Suggestions, et non palmarès : le seul classement qui vaut est celui que
+// `node scripts/bench-vision.mjs` produit sur TA machine, avec TES modèles.
+// Les notes chiffrées viennent de cette mesure, pas d'une réputation.
+// Rappel : qwen2.5vl:7b, longtemps recommandé ici, a échoué à la mesure.
 export const SUGGESTED_MODELS = [
-  { id: 'qwen2.5vl:7b', label: 'Qwen2.5-VL 7B', note: 'Meilleure lecture de texte fin' },
-  { id: 'qwen2.5vl:3b', label: 'Qwen2.5-VL 3B', note: 'Plus léger, moins précis' },
-  { id: 'llama3.2-vision:11b', label: 'Llama 3.2 Vision 11B', note: 'Alternative plus lourde' },
-  { id: 'minicpm-v', label: 'MiniCPM-V', note: 'Compact' },
+  { id: 'qwen3.8:27b', label: 'Qwen3.8 27B', note: 'Mesuré : dérive 2,3 px, ~21 s' },
+  { id: 'qwen3.8:27b-32k', label: 'Qwen3.8 27B 32k', note: 'Mesuré : 3,7 px, ~40 s' },
+  { id: 'qwen2.5vl:7b', label: 'Qwen2.5-VL 7B', note: 'Plus léger — à mesurer' },
+  { id: 'llama3.2-vision:11b', label: 'Llama 3.2 Vision 11B', note: 'À mesurer' },
 ];
 
 /**

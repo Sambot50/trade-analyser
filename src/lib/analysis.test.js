@@ -94,6 +94,45 @@ describe('validateScale', () => {
   });
 });
 
+// Repère tel que les modèles le renvoient réellement : calé sur les graduations
+// chiffrées extrêmes (65600 et 63600), qui sont À L'INTÉRIEUR du cadre — le bord
+// haut réel étant à 65800, sans étiquette.
+const GRID_SCALE = {
+  priceTop: 65600, priceBottom: 63600,
+  plotTopRatio: 0.132429, plotBottomRatio: 0.885714,
+};
+
+describe('priceToY avec un repère calé sur les graduations', () => {
+  it('place les deux graduations de référence à leur hauteur', () => {
+    expect(priceToY(65600, GRID_SCALE, 700)).toBeCloseTo(92.7, 1);
+    expect(priceToY(63600, GRID_SCALE, 700)).toBeCloseTo(620.0, 1);
+  });
+
+  it('trace un prix situé AU-DESSUS de la graduation haute mais dans le cadre', () => {
+    // 65700 dépasse priceTop : l'ancienne borne par prix le rejetait à tort.
+    const y = priceToY(65700, GRID_SCALE, 700);
+    expect(y).not.toBeNull();
+    expect(y).toBeGreaterThan(0);
+    expect(y).toBeLessThan(92.7);
+  });
+
+  it('retrouve la même position que le repère bord-à-bord', () => {
+    // Les deux repères décrivent la même image : ils doivent coïncider.
+    const edgeScale = { priceTop: 65800, priceBottom: 63600, plotTopRatio: 0.057143, plotBottomRatio: 0.885714 };
+    for (const price of [63850, 64200, 64900, 65600]) {
+      expect(priceToY(price, GRID_SCALE, 700)).toBeCloseTo(priceToY(price, edgeScale, 700), 0);
+    }
+  });
+
+  it('rejette ce qui tomberait au-dessus de l\u2019image', () => {
+    expect(priceToY(70000, GRID_SCALE, 700)).toBeNull();
+  });
+
+  it('rejette ce qui tomberait sous l\u2019image', () => {
+    expect(priceToY(60000, GRID_SCALE, 700)).toBeNull();
+  });
+});
+
 describe('priceToY', () => {
   it('place le prix haut sur le bord supérieur de la zone', () => {
     expect(priceToY(65000, SCALE, 1000)).toBeCloseTo(50);
@@ -104,7 +143,7 @@ describe('priceToY', () => {
   it('place le milieu au milieu', () => {
     expect(priceToY(64000, SCALE, 1000)).toBeCloseTo(475);
   });
-  it('refuse un prix hors de la fenêtre visible', () => {
+  it('refuse un prix qui tomberait hors de l\u2019image', () => {
     expect(priceToY(70000, SCALE, 1000)).toBeNull();
     expect(priceToY(60000, SCALE, 1000)).toBeNull();
   });

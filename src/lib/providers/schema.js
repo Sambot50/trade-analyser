@@ -59,17 +59,20 @@ export const ANALYSIS_PROMPT = `Tu es un analyste technique (Price Action et Sma
 Analyse la capture de graphique fournie et produis un plan de trade.
 
 Le champ "scale" est le plus important et conditionne tout le reste. Il sert à
-reprojeter les prix sur l'image, donc il doit décrire ce que tu vois, pas ce que
-tu déduis :
-- plotTopRatio / plotBottomRatio : la hauteur, en fraction de la hauteur totale
-  de l'image (0 = tout en haut, 1 = tout en bas), des bords haut et bas de la
-  zone de tracé des bougies. Exclus la barre d'outils supérieure et l'axe des
-  dates inférieur.
-- priceTop / priceBottom : les prix lus sur l'axe vertical à ces deux hauteurs
-  exactes. Extrapole depuis les graduations chiffrées les plus proches.
+reprojeter les prix sur l'image. Ne déduis rien, relève :
 
-Les niveaux entry, stopLoss, tp1 et tp2 doivent tous tomber entre priceBottom et
-priceTop : ne propose pas d'objectif situé hors du cadre visible.
+- priceTop : le prix de la graduation chiffrée la plus HAUTE de l'axe vertical.
+- plotTopRatio : la hauteur de CETTE graduation dans l'image, en fraction de la
+  hauteur totale (0 = tout en haut, 1 = tout en bas).
+- priceBottom : le prix de la graduation chiffrée la plus BASSE.
+- plotBottomRatio : la hauteur de CETTE graduation, même convention.
+
+Ces deux graduations doivent être aussi éloignées que possible l'une de
+l'autre : c'est ce qui rend la projection précise. Recopie les chiffres tels
+qu'ils sont imprimés, sans arrondir ni extrapoler entre deux graduations.
+
+Les niveaux entry, stopLoss, tp1 et tp2 doivent rester dans le cadre visible du
+graphique.
 
 Contraintes de cohérence, sans exception :
 - BUY  : stopLoss < entry < tp1 < tp2
