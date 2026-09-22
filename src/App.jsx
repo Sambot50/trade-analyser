@@ -10,7 +10,7 @@ import { SAMPLES } from './samples.js';
 import { PROVIDERS, analyzeChart, blockingReason, getProvider, listInstalledModels } from './lib/providers/index.js';
 import { loadSettings, saveSettings } from './lib/settings.js';
 import { toPngDataUrl } from './lib/image.js';
-import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines } from './lib/analysis.js';
+import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines, rrVerdict, breakEvenRate } from './lib/analysis.js';
 
 const LEVEL_LABELS = { entry: 'ENTRÉE', sl: 'STOP LOSS', tp1: 'TP 1', tp2: 'TP 2' };
 
@@ -346,20 +346,7 @@ export default function App() {
                 <LevelCard icon={ArrowUpRight} label="Take Profit 2" value={analysis.tp2} tone="text-emerald-500" />
               </div>
 
-              <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-4 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs text-slate-500">Ratio risque / rendement (TP1)</p>
-                  <p className="text-lg font-bold text-slate-100">1 : {analysis.rr ?? '—'}</p>
-                  <p className="text-[10px] text-slate-600 mt-0.5">Jusqu'au TP2 : 1 : {analysis.rrTp2 ?? '—'}</p>
-                </div>
-                <span className={`text-[10px] px-2.5 py-1 rounded-lg shrink-0 ${
-                  (analysis.rr ?? 0) >= 2
-                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                }`}>
-                  {(analysis.rr ?? 0) >= 2 ? 'Bonne asymétrie' : 'Ratio modéré'}
-                </span>
-              </div>
+              <RiskCard analysis={analysis} />
 
               {analysis.source === 'api' && analysis.scale && (
                 <ScaleCard scale={analysis.scale} />
@@ -611,6 +598,57 @@ function ScaleCard({ scale }) {
         Compare ces deux prix aux graduations extrêmes de ta capture. S'ils ne correspondent
         pas, les traits sont mal placés même si les niveaux semblent crédibles.
       </p>
+    </div>
+  );
+}
+
+/**
+ * Ratio risque/rendement, avec les montants qui le composent.
+ *
+ * Un ratio seul est abstrait ; voir « risque 256,73 pour viser 223,27 » dit
+ * immédiatement si la proposition tient debout.
+ */
+function RiskCard({ analysis }) {
+  const verdict = rrVerdict(analysis.rr);
+  const breakEven = breakEvenRate(analysis.rr);
+
+  const risk = Math.abs(analysis.entry - analysis.stopLoss);
+  const reward = Math.abs(analysis.tp1 - analysis.entry);
+  const decimals = Math.min(8, (String(analysis.entry).split('.')[1] || '').length || 2);
+  const fmt = (n) => n.toFixed(decimals);
+
+  const tones = {
+    good: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    weak: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    bad: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
+    neutral: 'bg-slate-800 text-slate-400 border-slate-700',
+  };
+
+  return (
+    <div className={`rounded-2xl p-4 border ${
+      verdict.tone === 'bad' ? 'bg-rose-500/5 border-rose-500/25' : 'bg-slate-900/40 border-slate-800'
+    }`}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs text-slate-500">Ratio risque / rendement (TP1)</p>
+          <p className="text-lg font-bold text-slate-100">1 : {analysis.rr ?? '—'}</p>
+          <p className="text-[10px] text-slate-600 mt-0.5">Jusqu'au TP2 : 1 : {analysis.rrTp2 ?? '—'}</p>
+        </div>
+        <span className={`text-[10px] px-2.5 py-1 rounded-lg shrink-0 border ${tones[verdict.tone]}`}>
+          {verdict.label}
+        </span>
+      </div>
+
+      <p className="text-[11px] text-slate-400 mt-3 tabular-nums">
+        Tu risques <span className="text-rose-300 font-semibold">{fmt(risk)}</span> pour viser{' '}
+        <span className="text-emerald-300 font-semibold">{fmt(reward)}</span>.
+      </p>
+
+      {breakEven !== null && (
+        <p className={`text-[11px] mt-1 ${verdict.tone === 'bad' ? 'text-rose-300' : 'text-slate-500'}`}>
+          Il te faut {(breakEven * 100).toFixed(0)} % de trades gagnants rien que pour être à l'équilibre.
+        </p>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   mimeFromDataUrl, computeRR, validateAnalysis,
-  validateScale, priceToY, buildOverlayLines, normalizeAnalysis,
+  validateScale, priceToY, buildOverlayLines, normalizeAnalysis, rrVerdict, breakEvenRate,
 } from './analysis.js';
 
 const SCALE = { priceTop: 65000, priceBottom: 63000, plotTopRatio: 0.05, plotBottomRatio: 0.9 };
@@ -168,5 +168,46 @@ describe('buildOverlayLines', () => {
     const y = Object.fromEntries(lines.map(l => [l.key, l.y]));
     expect(y.tp1).toBeLessThan(y.entry);
     expect(y.entry).toBeLessThan(y.sl);
+  });
+});
+
+describe('rrVerdict', () => {
+  it('signale un ratio perdant', () => {
+    expect(rrVerdict(0.87).tone).toBe('bad');
+    expect(rrVerdict(0.87).label).toMatch(/défavorable/);
+  });
+
+  it('place la frontière à 1, pas ailleurs', () => {
+    expect(rrVerdict(0.999).tone).toBe('bad');
+    expect(rrVerdict(1).tone).toBe('weak');
+  });
+
+  it('distingue le modéré de la bonne asymétrie', () => {
+    expect(rrVerdict(1.65).tone).toBe('weak');
+    expect(rrVerdict(2).tone).toBe('good');
+    expect(rrVerdict(3.7).tone).toBe('good');
+  });
+
+  it('gère un ratio incalculable', () => {
+    expect(rrVerdict(null).tone).toBe('neutral');
+  });
+});
+
+describe('breakEvenRate', () => {
+  it('chiffre ce qu’exige un ratio défavorable', () => {
+    // 1:0.87 -> il faut gagner plus d'un trade sur deux pour ne rien perdre.
+    expect(breakEvenRate(0.87)).toBeCloseTo(0.5348, 3);
+  });
+
+  it('donne 50 % à l’équilibre exact', () => {
+    expect(breakEvenRate(1)).toBeCloseTo(0.5, 5);
+  });
+
+  it('chute quand l’asymétrie est bonne', () => {
+    expect(breakEvenRate(3)).toBeCloseTo(0.25, 5);
+  });
+
+  it('refuse un ratio absent', () => {
+    expect(breakEvenRate(null)).toBeNull();
   });
 });

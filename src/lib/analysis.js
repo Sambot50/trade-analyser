@@ -164,3 +164,29 @@ export function buildOverlayLines(analysis, scale, imageHeight, visible) {
 
   return { lines, offScreen };
 }
+
+/**
+ * Qualifie un ratio risque/rendement.
+ *
+ * Le seuil qui compte est 1 : en dessous, le trade perd de l'argent à taux de
+ * réussite égal, quelle que soit la qualité de l'analyse. Confondre ce cas
+ * avec un ratio simplement médiocre, sous une étiquette unique, revient à
+ * présenter une proposition perdante comme acceptable.
+ */
+export function rrVerdict(rr) {
+  if (typeof rr !== 'number' || !Number.isFinite(rr)) {
+    return { tone: 'neutral', label: 'Ratio indisponible' };
+  }
+  if (rr < 1) return { tone: 'bad', label: 'Ratio défavorable' };
+  if (rr < 2) return { tone: 'weak', label: 'Ratio modéré' };
+  return { tone: 'good', label: 'Bonne asymétrie' };
+}
+
+/**
+ * Taux de réussite minimal pour être à l'équilibre avec ce ratio.
+ * Rend concret ce qu'un ratio inférieur à 1 exige réellement.
+ */
+export function breakEvenRate(rr) {
+  if (typeof rr !== 'number' || !Number.isFinite(rr) || rr <= 0) return null;
+  return 1 / (1 + rr);
+}
