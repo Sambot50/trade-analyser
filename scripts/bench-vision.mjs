@@ -13,6 +13,7 @@
 
 import { readFileSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { ANALYSIS_SCHEMA, ANALYSIS_PROMPT, parseAnalysisJson } from '../src/lib/providers/schema.js';
 
 const PLOT_TOP = 0.057143;
@@ -20,79 +21,88 @@ const PLOT_BOTTOM = 0.885714;
 const HEIGHT = 700;
 
 // Repere reel de chaque image de reference.
-const TRUTH = {
+export const TRUTH = {
   'btc-m15.png':   { priceTop: 65800, priceBottom: 63600, levels: [63850, 64200, 64900, 65600] },
   'eurusd-h1.png': { priceTop: 1.092, priceBottom: 1.069, levels: [1.072, 1.079, 1.085, 1.0885] },
 };
 
-const args = parseArgs(process.argv.slice(2));
-const baseUrl = (args.baseUrl || 'http://localhost:11434').replace(/\/+$/, '');
-const imagePath = resolve(args.image || 'public/samples/btc-m15.png');
-const imageName = basename(imagePath);
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const baseUrl = (args.baseUrl || 'http://localhost:11434').replace(/\/+$/, '');
+  const imagePath = resolve(args.image || 'public/samples/btc-m15.png');
+  const imageName = basename(imagePath);
 
-const truth = TRUTH[imageName];
-if (!truth) {
-  fail(`Pas de reference connue pour "${imageName}". Utilise btc-m15.png ou eurusd-h1.png.`);
-}
-
-const b64 = readFileSync(imagePath).toString('base64');
-
-console.log(`\nImage de reference : ${imageName}`);
-console.log(`Verite terrain     : haut ${truth.priceTop}  bas ${truth.priceBottom}\n`);
-
-const models = args.models ? args.models.split(',').map((s) => s.trim()) : await detectVisionModels();
-if (!models.length) {
-  fail('Aucun modele de vision detecte. Force la liste avec --models ton-modele');
-}
-
-const results = [];
-
-for (const model of models) {
-  process.stdout.write(`-> ${model.padEnd(28)}`);
-  const started = Date.now();
-
-  let raw;
-  try {
-    raw = await askModel(model, b64);
-  } catch (err) {
-    console.log(`ECHEC : ${err.message}`);
-    results.push({ model, note: err.message });
-    continue;
+  const truth = TRUTH[imageName];
+  if (!truth) {
+    fail(`Pas de reference connue pour "${imageName}". Utilise btc-m15.png ou eurusd-h1.png.`);
   }
 
-  const seconds = ((Date.now() - started) / 1000).toFixed(1);
+  const b64 = readFileSync(imagePath).toString('base64');
 
-  let data;
-  try {
-    data = parseAnalysisJson(raw);
-  } catch {
-    console.log(`JSON illisible          (${seconds}s)`);
-    results.push({ model, seconds, note: 'JSON illisible' });
-    continue;
+  console.log(`\nImage de reference : ${imageName}`);
+  console.log(`Verite terrain     : haut ${truth.priceTop}  bas ${truth.priceBottom}\n`);
+
+  const models = args.models ? args.models.split(',').map((s) => s.trim()) : await detectVisionModels(baseUrl);
+  if (!models.length) {
+    fail('Aucun modele de vision detecte. Force la liste avec --models ton-modele');
   }
 
-  const drift = computeDrift(data.scale, truth);
-  if (drift === null) {
-    console.log(`repere de prix invalide (${seconds}s)`);
-    results.push({ model, seconds, note: 'repere invalide' });
-    continue;
+  const results = [];
+
+  for (const model of models) {
+    process.stdout.write(`-> ${model.padEnd(28)}`);
+    const started = Date.now();
+
+    let raw;
+    try {
+      raw = await askModel(model, b64, baseUrl);
+    } catch (err) {
+      console.log(`ECHEC : ${err.message}`);
+      results.push({ model, note: err.message });
+      continue;
+    }
+
+    const seconds = ((Date.now() - started) / 1000).toFixed(1);
+
+    let data;
+    try {
+      data = parseAnalysisJson(raw);
+    } catch {
+      console.log(`JSON illisible          (${seconds}s)`);
+      results.push({ model, seconds, note: 'JSON illisible' });
+      continue;
+    }
+
+    const drift = computeDrift(data.scale, truth);
+    if (drift === null) {
+      console.log(`repere de prix invalide (${seconds}s)`);
+      results.push({ model, seconds, note: 'repere invalide' });
+      continue;
+    }
+
+    const coherent = isCoherent(data);
+    console.log(`derive ${drift.toFixed(1).padStart(7)} px  (${seconds}s)`);
+    console.log(
+      `   ${' '.repeat(28)}lu : haut ${data.scale.priceTop}  bas ${data.scale.priceBottom}` +
+      `  |  coherent : ${coherent ? 'oui' : 'NON'}`
+    );
+
+    results.push({ model, seconds, drift, coherent, lu: `${data.scale.priceTop} / ${data.scale.priceBottom}` });
   }
 
-  const coherent = isCoherent(data);
-  console.log(`derive ${drift.toFixed(1).padStart(7)} px  (${seconds}s)`);
-  console.log(
-    `   ${' '.repeat(28)}lu : haut ${data.scale.priceTop}  bas ${data.scale.priceBottom}` +
-    `  |  coherent : ${coherent ? 'oui' : 'NON'}`
-  );
-
-  results.push({ model, seconds, drift, coherent, lu: `${data.scale.priceTop} / ${data.scale.priceBottom}` });
+  report(results);
 }
 
-report(results);
+
+// Exécuté seulement en ligne de commande : importé par les tests, ce module
+// ne doit rien lancer.
+if (import.meta.url === pathToFileURL(process.argv[1] || '').href) {
+  await main();
+}
 
 // ---------------------------------------------------------------------------
 
-function computeDrift(scale, truth) {
+export function computeDrift(scale, truth) {
   if (!scale) return null;
   const { priceTop, priceBottom, plotTopRatio, plotBottomRatio } = scale;
 
@@ -112,13 +122,13 @@ function computeDrift(scale, truth) {
   return max;
 }
 
-function isCoherent(a) {
+export function isCoherent(a) {
   if (a.direction === 'BUY') return a.stopLoss < a.entry && a.entry < a.tp1 && a.tp1 < a.tp2;
   if (a.direction === 'SELL') return a.stopLoss > a.entry && a.entry > a.tp1 && a.tp1 > a.tp2;
   return false;
 }
 
-async function askModel(model, image) {
+async function askModel(model, image, baseUrl) {
   let response;
   try {
     response = await fetch(`${baseUrl}/api/chat`, {
@@ -144,7 +154,7 @@ async function askModel(model, image) {
   return (await response.json())?.message?.content;
 }
 
-async function detectVisionModels() {
+async function detectVisionModels(baseUrl) {
   process.stdout.write('Recherche des modeles de vision installes...\n');
 
   let tags;
@@ -214,7 +224,7 @@ function report(results) {
   }
 }
 
-function parseArgs(argv) {
+export function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i += 2) {
     if (argv[i]?.startsWith('--')) out[camel(argv[i].slice(2))] = argv[i + 1];
@@ -222,7 +232,11 @@ function parseArgs(argv) {
   return out;
 }
 
-const camel = (s) => s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+// Declaration de fonction, et non constante flechee : parseArgs s'execute au
+// chargement du module, avant qu'un `const` de fin de fichier soit initialise.
+function camel(name) {
+  return name.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+}
 
 function fail(message) {
   console.error(`\n${message}\n`);
