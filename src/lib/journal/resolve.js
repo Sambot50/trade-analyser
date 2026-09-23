@@ -60,11 +60,40 @@ export function reglageObjectif(objectif) {
   return reglage;
 }
 
-/** Ce que vaut une issue, en unités de risque. null si elle ne compte pas. */
-export function gainEnR(statut, objectif) {
+/**
+ * Traitements possibles d'une issue ambiguë.
+ *
+ * Le résolveur ne devine jamais l'ordre dans lequel une bougie a touché le
+ * stop et l'objectif — il ne peut pas le savoir. Mais l'EXCLURE des
+ * statistiques est aussi une décision, et rien ne dit qu'elle soit neutre.
+ * `perdant` et `gagnant` encadrent la vérité ; l'écart entre les deux mesure
+ * ce que l'exclusion cache.
+ *
+ * Le vrai remède reste une unité de résolution plus fine : une bougie de
+ * 5 minutes qui touche les deux niveaux se décompose en bougies d'une minute
+ * qui, elles, disent l'ordre.
+ */
+export const TRAITEMENTS_AMBIGU = ['exclu', 'perdant', 'gagnant'];
+
+/**
+ * Ce que vaut une issue, en unités de risque. null si elle ne compte pas.
+ *
+ * @param ambigu 'exclu' (défaut), 'perdant' ou 'gagnant'
+ */
+export function gainEnR(statut, objectif, ambigu = 'exclu') {
   const reglage = reglageObjectif(objectif);
+  if (!TRAITEMENTS_AMBIGU.includes(ambigu)) {
+    throw new Error(`Traitement des issues ambiguës inconnu : "${ambigu}". Attendu ${TRAITEMENTS_AMBIGU.join(', ')}.`);
+  }
+
   if (statut === reglage.statut) return reglage.gain;
   if (statut === 'stop') return -1;
+
+  if (statut === 'ambigu') {
+    if (ambigu === 'perdant') return -1;
+    if (ambigu === 'gagnant') return reglage.gain;
+  }
+
   return null;
 }
 

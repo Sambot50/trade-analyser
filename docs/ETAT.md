@@ -10,7 +10,7 @@ d'intérêt que s'il reste honnête : une ligne qui passe de « non vérifié »
 
 | Quoi | Comment | Résultat |
 |---|---|---|
-| Logique pure | 282 tests unitaires | tous passent |
+| Logique pure | 293 tests unitaires | tous passent |
 | Build de production | `npm run build` | 221 kB JS (71 kB gzip) |
 | Projection prix → pixel | lecture des pixels du canvas en navigateur | écart max **1,1 px** sur 4 niveaux |
 | Lecture d'axe sur graphique synthétique | banc d'essai, échelle connue | `qwen3.8:27b` à **2,3 px** |
@@ -116,23 +116,49 @@ Tant que ce plancher n'est pas expliqué, la mesure ne peut ni valider ni
 invalider une règle — elle ne sait que comparer à un témoin dont on ignore
 pourquoi il gagne.
 
-Suspects, et où en est l'enquête :
+Enquête close sur l'essentiel, sur une série à volatilité réaliste — 0,08 %
+d'écart-type à la minute, mèches comparables aux corps. Médiane des tirages,
+coûts à zéro, chiffre qui doit valoir 0 :
 
-1. ~~**L'entrée supposée remplie au prix exact du bord de zone**, touché par une
-   mèche~~ — **éprouvé, responsable en partie.** `--remplissage cloture`
-   (DEC-016) fait tomber le plancher de +0,093 à **+0,043 R** sous la sortie à
-   1 R, mais seulement de +0,108 à **+0,088 R** sous la tenue à 2 R. La moitié
-   du biais sous une règle, presque rien sous l'autre.
-2. **L'exclusion des issues ambiguës** (5 à 9 cas sur ~170) — non éprouvé.
-   Prochaine expérience : les compter en pertes, puis en gains, et regarder si
-   le plancher bouge.
-3. **L'exclusion des `non_declenche`** (25 cas sur 198) — non éprouvé.
-4. ~~La censure par l'horizon~~ — **écarté** : 1 seul `horizon_depasse` sur 198
-   sous 2 R, aucun sous 1 R.
+| Objectif | `meche` | `cloture` |
+|---|---|---|
+| Sortie ferme à 1 R | +0,245 R · 65,8 % | **−0,012 R · 49,2 %** |
+| Tenue jusqu'à 2 R | +0,108 R · 35,6 % | −0,074 R · 27,1 % |
 
-**Il reste donc au moins une cause non identifiée.** Les chiffres ci-dessus
-sont mesurés sur un fichier synthétique ; la même comparaison sur bougies
-BTCUSDT réelles reste à faire.
+1. ~~**L'entrée supposée remplie au prix exact du bord de zone**~~ — **cause
+   principale, établie.** Sous la sortie à 1 R, `--remplissage cloture` annule
+   le biais : 49,2 % de réussite sur une marche aléatoire, là où la théorie
+   exige 50 %.
+2. ~~**L'exclusion des issues ambiguës**~~ — **écartée.** Les compter en pertes
+   ou en gains fait bouger le plancher de 0,023 R au maximum, et l'exclusion
+   tombe toujours entre les deux bornes (DEC-017).
+3. ~~La censure par l'horizon~~ — **écartée** : zéro `horizon_depasse` sur la
+   série réaliste, 1 sur 198 sur BTCUSDT.
+4. **L'exclusion des `non_declenche`** (25 cas sur 198) — non éprouvé, mais
+   sans objet tant que la configuration 1 R / clôture donne déjà zéro.
+
+### Correction d'un chiffre publié la veille
+
+DEC-016 annonçait que le remplissage expliquait « la moitié du biais ». **Le
+chiffre était faux**, et la faute vient de l'instrument : il avait été mesuré
+sur un fichier synthétique aux mèches de 0,017 % du prix, cent fois plus fines
+que celles d'un marché réel — alors que l'hypothèse testée porte précisément
+sur les mèches. Ce fichier ne produisait aucune issue ambiguë non plus, ce qui
+a imposé d'en générer un second.
+
+### Ce qui reste inexpliqué
+
+Sous 2 R, la clôture surcorrige : **−0,074 R**, systématique sur 60 tirages.
+Cause inconnue, et l'hypothèse de l'horizon est écartée par la mesure.
+
+### La configuration utilisable
+
+**`--objectif 1r --remplissage cloture`** est la seule dont le plancher soit
+vérifié proche de zéro, donc la seule dans laquelle un résultat mesuré puisse
+être cru. Les autres servent à comparer, pas à conclure.
+
+Tous ces chiffres viennent de séries synthétiques ; la même comparaison sur
+bougies BTCUSDT réelles reste à faire.
 
 ### Les coûts condamnent BTC à cette distance de stop, avantage ou pas
 

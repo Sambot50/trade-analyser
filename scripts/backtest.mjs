@@ -26,7 +26,7 @@ import { generateurAleatoire, melangerBougies, valeurP, resumeDistribution } fro
 import { cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER, INDETERMINE } from '../src/lib/marche/structure.js';
 import { detecter, anomalieVolume } from '../src/lib/marche/orderblocks.js';
 import { intervalleWilson, conclusionPossible, esperanceEnR } from '../src/lib/marche/statistiques.js';
-import { resoudreIssue, gainEnR, OBJECTIFS, REMPLISSAGES, reglageObjectif } from '../src/lib/journal/resolve.js';
+import { resoudreIssue, gainEnR, OBJECTIFS, REMPLISSAGES, TRAITEMENTS_AMBIGU, reglageObjectif } from '../src/lib/journal/resolve.js';
 
 const DEFAUTS = {
   utBiais: '1h', utDetection: '15m', utResolution: '5m',
@@ -39,6 +39,10 @@ const DEFAUTS = {
   // Tenue jusqu'à 2 R par défaut. Toucher 1 R en chemin ne rapporte rien :
   // on n'y était pas sorti.
   objectif: '2r',
+  // Exclues par défaut : le résolveur ne sait pas l'ordre, et deviner
+  // flatterait la mesure. Mais exclure est aussi une décision — d'où les deux
+  // autres traitements, qui encadrent la vérité.
+  ambigu: 'exclu',
 };
 
 export function parseArgs(argv) {
@@ -160,6 +164,11 @@ export function validerOptions(args) {
     else o.remplissage = args.remplissage;
   }
 
+  if (args.ambigu !== undefined) {
+    if (!TRAITEMENTS_AMBIGU.includes(args.ambigu)) erreurs.push(`--ambigu "${args.ambigu}" inconnu (${TRAITEMENTS_AMBIGU.join(', ')})`);
+    else o.ambigu = args.ambigu;
+  }
+
   o.sansFiltreBiais = Boolean(args.sansFiltreBiais);
   o.baseUrl = typeof args.baseUrl === 'string' ? args.baseUrl : undefined;
   if (o.csv && o.baseUrl) erreurs.push('--csv et --base-url désignent deux sources : choisis-en une.');
@@ -245,7 +254,7 @@ export function chaine(fines, o) {
   };
 }
 
-export function agreger(resultats, coutParDefaut, objectif = '2r') {
+export function agreger(resultats, coutParDefaut, objectif = '2r', ambigu = 'exclu') {
   const reglage = reglageObjectif(objectif);
   const parStatut = {};
   for (const r of resultats) parStatut[r.statut] = (parStatut[r.statut] || 0) + 1;
@@ -253,8 +262,8 @@ export function agreger(resultats, coutParDefaut, objectif = '2r') {
   // Un statut étranger à la règle de sortie ne se compte pas : sous « tenue
   // jusqu'à 2 R » un « tp1 » vient d'une autre règle, et le créditer de 2 R
   // réintroduirait exactement le mélange qu'on vient de supprimer.
-  const tranchees = resultats.filter((r) => gainEnR(r.statut, objectif) !== null);
-  const gagnants = tranchees.filter((r) => r.statut === reglage.statut);
+  const tranchees = resultats.filter((r) => gainEnR(r.statut, objectif, ambigu) !== null);
+  const gagnants = tranchees.filter((r) => gainEnR(r.statut, objectif, ambigu) > 0);
 
   const intervalle = intervalleWilson(gagnants.length, tranchees.length);
   const ambigus = parStatut.ambigu || 0;
@@ -274,6 +283,7 @@ export function agreger(resultats, coutParDefaut, objectif = '2r') {
 
   return {
     objectif,
+    ambigu,
     coutEnR,
     coutMesure,
     ratioMoyen,
@@ -304,7 +314,7 @@ function afficherBloc(titre, agr) {
 
   console.log(`  order blocks retenus  ${agr.total}`);
   for (const [s, n] of Object.entries(agr.parStatut).sort((a, b) => b[1] - a[1])) {
-    console.log(`    ${s.padEnd(16)} ${String(n).padStart(5)}  ${gainEnR(s, agr.objectif) !== null ? '' : '(hors statistiques)'}`);
+    console.log(`    ${s.padEnd(16)} ${String(n).padStart(5)}  ${gainEnR(s, agr.objectif, agr.ambigu) !== null ? '' : '(hors statistiques)'}`);
   }
 
   if (!agr.intervalle) { console.log('\n  aucune issue tranchée\n'); return; }
@@ -333,7 +343,7 @@ function afficherBloc(titre, agr) {
   console.log(`  espérance par trade        ${agr.esperance} R`);
 
   if (!agr.conclusion.possible) console.log(`  ⚠  ${agr.conclusion.raison}`);
-  if (agr.tauxAmbiguite > 0.15) {
+  if (agr.ambigu === 'exclu' && agr.tauxAmbiguite > 0.15) {
     console.log(`  ⚠  ${(agr.tauxAmbiguite * 100).toFixed(0)} % d'issues ambiguës — resserre --ut-resolution`);
   }
   console.log('');
@@ -541,12 +551,12 @@ async function main() {
     const controles = [];
     for (let i = 0; i < o.controle; i++) {
       const melangee = melangerBougies(fines, alea, o.controlePaquet);
-      controles.push(agreger(chaine(melangee, o).resultats, o.coutEnR, o.objectif));
+      controles.push(agreger(chaine(melangee, o).resultats, o.coutEnR, o.objectif, o.ambigu));
       if ((i + 1) % 10 === 0) process.stdout.write('.');
     }
     console.log(' terminé');
 
-    const agrege = agreger(reel.resultats, o.coutEnR, o.objectif);
+    const agrege = agreger(reel.resultats, o.coutEnR, o.objectif, o.ambigu);
     afficherBloc('Réel — ensemble de la période', agrege);
     afficherControle(agrege, controles, o);
     return;
@@ -577,9 +587,9 @@ async function main() {
   const seconde = resultats.filter((r) => r.ms >= milieu);
 
   console.log('\n=== Résultats ===');
-  afficherBloc('Ensemble de la période', agreger(resultats, o.coutEnR, o.objectif));
-  afficherBloc(`Première moitié — jusqu'au ${iso(milieu)} (mise au point)`, agreger(premiere, o.coutEnR, o.objectif));
-  afficherBloc(`Seconde moitié — à partir du ${iso(milieu)} (vérification)`, agreger(seconde, o.coutEnR, o.objectif));
+  afficherBloc('Ensemble de la période', agreger(resultats, o.coutEnR, o.objectif, o.ambigu));
+  afficherBloc(`Première moitié — jusqu'au ${iso(milieu)} (mise au point)`, agreger(premiere, o.coutEnR, o.objectif, o.ambigu));
+  afficherBloc(`Seconde moitié — à partir du ${iso(milieu)} (vérification)`, agreger(seconde, o.coutEnR, o.objectif, o.ambigu));
 
   if (o.baseUrl) {
     console.log('RAPPEL : données non Binance, ces chiffres ne mesurent rien.\n');

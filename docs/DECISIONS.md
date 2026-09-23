@@ -431,3 +431,72 @@ où le biais sera expliqué, `cloture` devrait prendre sa place.
 
 **Écarté :** modéliser un glissement en points. Ça ajouterait un paramètre
 inventé là où `cloture` n'ajoute qu'une hypothèse vérifiable.
+
+
+---
+
+## DEC-017 — Les issues ambiguës sont innocentes ; le remplissage portait tout
+
+**2026-09-23 · Enquête close sur un point, ouverte sur un autre**
+
+`--ambigu exclu|perdant|gagnant`. Le résolveur continue de marquer `ambigu`
+sans jamais deviner l'ordre — c'est un fait, il ne peut pas le savoir. C'est
+le **comptage** qui varie, dans l'agrégation : exclure, compter en perte, ou
+compter en gain. Les deux derniers encadrent la vérité ; l'écart entre eux
+mesure ce que l'exclusion cache.
+
+### Le résultat : elle ne cache rien
+
+Médiane des tirages de contrôle sur données sans structure, coûts à zéro —
+chiffre qui doit valoir 0 :
+
+| Objectif | Remplissage | `perdant` | `exclu` | `gagnant` | Amplitude |
+|---|---|---|---|---|---|
+| 1 R | mèche | +0,231 R | +0,245 R | +0,254 R | 0,023 R |
+| 1 R | clôture | −0,018 R | −0,012 R | +0,000 R | 0,018 R |
+| 2 R | mèche | +0,106 R | +0,108 R | +0,118 R | 0,012 R |
+| 2 R | clôture | −0,076 R | −0,074 R | −0,072 R | 0,004 R |
+
+**L'exclusion tombe systématiquement entre les deux bornes**, et l'amplitude
+ne dépasse jamais 0,023 R. Les issues ambiguës ne peuvent pas expliquer un
+biais de +0,245 R. Suspect écarté.
+
+### Et une correction : le remplissage portait tout, pas la moitié
+
+DEC-016 concluait que l'hypothèse de remplissage expliquait « la moitié du
+biais sous 1 R et presque rien sous 2 R ». **C'était faux, et la faute vient
+de l'instrument.** Ces chiffres avaient été mesurés sur un fichier synthétique
+dont les mèches valaient 0,017 % du prix — cent fois plus fines que celles
+d'un marché réel. Or c'est précisément sur les mèches que porte l'hypothèse.
+Ce fichier ne produisait d'ailleurs **aucune issue ambiguë**, ce qui rendait
+l'expérience ci-dessus impossible et a imposé d'en générer un autre.
+
+Sur une série à volatilité réaliste — 0,08 % d'écart-type à la minute, sauts
+occasionnels, mèches comparables aux corps :
+
+| Objectif | `meche` | `cloture` |
+|---|---|---|
+| Sortie ferme à 1 R | +0,245 R · 65,8 % | **−0,012 R · 49,2 %** |
+| Tenue jusqu'à 2 R | +0,108 R · 35,6 % | −0,074 R · 27,1 % |
+
+Sous 1 R, le remplissage à la clôture **annule le biais** : 49,2 % de réussite
+sur une marche aléatoire, là où la théorie exige 50 %. Le biais entier venait
+de l'hypothèse d'exécution à la mèche.
+
+### Ce qui reste inexpliqué
+
+Sous 2 R, la clôture **surcorrige** : −0,074 R, systématique sur 60 tirages.
+L'hypothèse d'une censure par l'horizon est **écartée par la mesure** — zéro
+`horizon_depasse` dans les deux modes. Cause inconnue.
+
+### Conséquence pratique
+
+**`--objectif 1r --remplissage cloture` est la seule configuration dont le
+plancher soit vérifié proche de zéro.** C'est donc la seule dans laquelle un
+résultat mesuré puisse être cru. Les autres restent utiles pour comparer, pas
+pour conclure.
+
+**Écarté :** deviner l'ordre d'une bougie ambiguë d'après sa couleur. Le vrai
+remède est une unité de résolution plus fine — une bougie de 5 minutes qui
+touche les deux niveaux se décompose en bougies d'une minute qui, elles,
+disent l'ordre.

@@ -259,3 +259,60 @@ describe('chaine — le chemin commun au réel et au contrôle', () => {
     }
   });
 });
+
+describe('validerOptions — traitement des ambiguës et remplissage', () => {
+  it('exclut les ambiguës et remplit à la mèche par défaut', () => {
+    const o = validerOptions(base);
+    expect(o.ambigu).toBe('exclu');
+    expect(o.remplissage).toBe('meche');
+  });
+
+  it('accepte les deux autres traitements', () => {
+    expect(validerOptions({ ...base, ambigu: 'perdant' }).ambigu).toBe('perdant');
+    expect(validerOptions({ ...base, ambigu: 'gagnant' }).ambigu).toBe('gagnant');
+  });
+
+  it('refuse un traitement ou un remplissage inconnu', () => {
+    expect(validerOptions({ ...base, ambigu: 'moitie' }).erreurs)
+      .toEqual(expect.arrayContaining([expect.stringContaining('--ambigu')]));
+    expect(validerOptions({ ...base, remplissage: 'limite' }).erreurs)
+      .toEqual(expect.arrayContaining([expect.stringContaining('--remplissage')]));
+  });
+});
+
+describe('agreger — les ambiguës encadrent la mesure', () => {
+  const jeu = [
+    resultat('tp2', 0.02), resultat('tp2', 0.02),
+    resultat('stop', 0.02), resultat('stop', 0.02),
+    resultat('ambigu', 0.02), resultat('ambigu', 0.02),
+  ];
+
+  it('les laisse hors des statistiques par défaut', () => {
+    const agr = agreger(jeu, 0.05, '2r', 'exclu');
+    expect(agr.tranchees).toBe(4);
+    expect(agr.intervalle.succes).toBe(2);
+  });
+
+  it('les compte en pertes', () => {
+    const agr = agreger(jeu, 0.05, '2r', 'perdant');
+    expect(agr.tranchees).toBe(6);
+    expect(agr.intervalle.succes).toBe(2);
+  });
+
+  it('les compte en gains', () => {
+    const agr = agreger(jeu, 0.05, '2r', 'gagnant');
+    expect(agr.tranchees).toBe(6);
+    expect(agr.intervalle.succes).toBe(4);
+  });
+
+  it('place l’exclusion entre les deux bornes', () => {
+    // Ce qui compte pour l'enquête sur le biais : exclure n'est pas
+    // systématiquement optimiste, c'est un intermédiaire.
+    const pessimiste = agreger(jeu, 0.05, '2r', 'perdant').esperance;
+    const exclu = agreger(jeu, 0.05, '2r', 'exclu').esperance;
+    const optimiste = agreger(jeu, 0.05, '2r', 'gagnant').esperance;
+
+    expect(pessimiste).toBeLessThan(exclu);
+    expect(exclu).toBeLessThan(optimiste);
+  });
+});

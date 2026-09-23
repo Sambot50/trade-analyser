@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resoudreIssue, compteDansLesStats, estGagnant, gainEnR, reglageObjectif } from './resolve.js';
+import { resoudreIssue, compteDansLesStats, estGagnant, gainEnR, reglageObjectif, TRAITEMENTS_AMBIGU } from './resolve.js';
 import { symboleResolvable, normaliserBougie } from './market.js';
 
 // Plan repris du premier essai réel sur capture TradingView.
@@ -303,5 +303,33 @@ describe('remplissage — l’hypothèse d’exécution', () => {
   it('suppose la mèche par défaut, comme avant', () => {
     const b = bougiesC([86530, 86090, 86100]);
     expect(resoudreIssue({ plan: SHORT, bougies: b, horizonBougies: 10, objectif: '2r' }).statut).toBe('tp2');
+  });
+});
+
+describe('gainEnR — traitement des issues ambiguës', () => {
+  it('les exclut par défaut', () => {
+    expect(gainEnR('ambigu', '2r')).toBeNull();
+    expect(gainEnR('ambigu', '1r')).toBeNull();
+  });
+
+  it('les compte en pertes ou en gains selon la demande', () => {
+    // Les deux bornes encadrent la vérité : le résolveur ne peut pas savoir
+    // dans quel ordre la bougie a touché les deux niveaux, mais l'écart entre
+    // ces deux lectures mesure ce que l'exclusion cache.
+    expect(gainEnR('ambigu', '2r', 'perdant')).toBe(-1);
+    expect(gainEnR('ambigu', '2r', 'gagnant')).toBe(2);
+    expect(gainEnR('ambigu', '1r', 'gagnant')).toBe(1);
+  });
+
+  it('ne touche pas aux autres statuts', () => {
+    for (const traitement of TRAITEMENTS_AMBIGU) {
+      expect(gainEnR('tp2', '2r', traitement)).toBe(2);
+      expect(gainEnR('stop', '2r', traitement)).toBe(-1);
+      expect(gainEnR('non_declenche', '2r', traitement)).toBeNull();
+    }
+  });
+
+  it('refuse un traitement inconnu', () => {
+    expect(() => gainEnR('ambigu', '2r', 'moitie')).toThrow(/ambiguës inconnu/);
   });
 });

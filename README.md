@@ -209,12 +209,32 @@ doit valoir 0 sur des données sans structure :
 
 | Règle de sortie | `meche` | `cloture` |
 |---|---|---|
-| Sortie ferme à 1 R | +0,093 R | **+0,043 R** |
-| Tenue jusqu'à 2 R | +0,108 R | **+0,088 R** |
+| Sortie ferme à 1 R | +0,245 R · 65,8 % | **−0,012 R · 49,2 %** |
+| Tenue jusqu'à 2 R | +0,108 R · 35,6 % | −0,074 R · 27,1 % |
 
-L'hypothèse de remplissage portait **la moitié** du biais sous 1 R et presque
-rien sous 2 R. Il reste au moins une autre cause. Voir DEC-016 et
-[docs/ETAT.md](docs/ETAT.md).
+Sous 1 R, le remplissage à la clôture **annule le biais** : 49,2 % de réussite
+sur une marche aléatoire, là où la théorie exige 50 %. Tout le biais venait de
+l'hypothèse d'exécution.
+
+> Une version antérieure de ce tableau annonçait « la moitié du biais ». Elle
+> avait été mesurée sur un fichier d'essai aux mèches cent fois trop fines —
+> soit l'endroit exact où porte l'hypothèse. Voir DEC-017.
+
+**`--objectif 1r --remplissage cloture` est la seule configuration dont le
+plancher soit vérifié proche de zéro**, donc la seule dans laquelle un résultat
+mesuré puisse être cru.
+
+### Le traitement des issues ambiguës — `--ambigu`
+
+Une bougie qui touche le stop et l'objectif ne dit pas dans quel ordre. Le
+résolveur ne devine jamais : il marque `ambigu`. Mais **exclure est aussi une
+décision**, et `perdant` / `gagnant` en encadrent le coût.
+
+Éprouvé : l'écart entre les deux bornes ne dépasse **0,023 R** nulle part, et
+l'exclusion tombe toujours entre elles. Les ambiguës n'expliquent pas le biais.
+Le vrai remède reste une `--ut-resolution` plus fine.
+
+Voir DEC-016, DEC-017 et [docs/ETAT.md](docs/ETAT.md).
 
 ### Le contrôle par permutation — `--controle`
 
@@ -253,6 +273,7 @@ ne prouvent pas une impossibilité, seulement qu'on n'a pas tiré assez.
 | `--controle-paquet` | `1` | Mélange par paquets de N bougies consécutives : conserve la structure courte |
 | `--objectif` | `2r` | Règle de sortie, `1r` ou `2r` |
 | `--remplissage` | `meche` | Hypothèse d'exécution, `meche` ou `cloture` |
+| `--ambigu` | `exclu` | Traitement des issues ambiguës : `exclu`, `perdant`, `gagnant` |
 
 ### Le contrôle a été validé dans les deux sens
 
