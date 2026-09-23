@@ -9,16 +9,16 @@
 //     --symbole BTCUSDT --le 2026-09-22T18:48:55Z \
 //     --direction SELL --entree 86523.27 --stop 86780 --tp1 86300 --tp2 86100
 
-import { resoudreIssue } from '../src/lib/journal/resolve.js';
+import { resoudreIssue, OBJECTIFS, reglageObjectif } from '../src/lib/journal/resolve.js';
 import { recupererBougiesPaginees, symboleResolvable, MINUTES_PAR_BOUGIE, INTERVALLE_RESOLUTION } from '../src/lib/journal/market.js';
 import { calculerExcursions, enUnitesDeRisque } from '../src/lib/journal/excursion.js';
 import { computeRR, rrVerdict, breakEvenRate } from '../src/lib/analysis.js';
 
 const LIBELLE = {
   non_declenche: "Entrée jamais atteinte — le prix n'est pas venu la chercher",
-  stop: 'Stop touché avant tout objectif',
-  tp1: 'TP1 atteint',
-  tp2: 'TP2 atteint',
+  stop: "Stop touché avant l'objectif",
+  tp1: 'TP1 atteint — sortie ferme à 1 R',
+  tp2: 'TP2 atteint — tenue jusqu\'à 2 R',
   ambigu: 'Ambigu — une bougie touche le stop et un objectif, son OHLC ne dit pas l’ordre',
   horizon_depasse: "Déclenché, mais ni stop ni objectif atteint dans l'horizon",
   en_cours: 'Trop tôt — pas assez de bougies pour trancher',
@@ -87,11 +87,19 @@ export function construirePlan(args) {
     return { erreurs: ['--horizon-heures doit être un nombre d’heures positif'] };
   }
 
-  return { plan, symbole, depuisMs, horizonHeures, baseUrl: args.baseUrl };
+  // Règle de sortie explicite : toucher 1 R en chemin ne rapporte rien si on
+  // tenait jusqu'à 2 R. Le trade doit être jugé sur la règle qu'on aurait
+  // suivie, choisie avant d'ouvrir.
+  const objectif = args.objectif ?? '2r';
+  if (!OBJECTIFS[objectif]) {
+    return { erreurs: [`--objectif "${objectif}" inconnu (${Object.keys(OBJECTIFS).join(', ')})`] };
+  }
+
+  return { plan, symbole, depuisMs, horizonHeures, objectif, baseUrl: args.baseUrl };
 }
 
 async function main() {
-  const { erreurs, plan, symbole, depuisMs, horizonHeures, baseUrl } = construirePlan(parseArgs(process.argv.slice(2)));
+  const { erreurs, plan, symbole, depuisMs, horizonHeures, objectif, baseUrl } = construirePlan(parseArgs(process.argv.slice(2)));
 
   if (erreurs) {
     console.error('\nArguments invalides :');
@@ -109,7 +117,8 @@ async function main() {
   console.log(`\n${plan.direction === 'BUY' ? 'Long' : 'Short'} ${symbole} — ${new Date(depuisMs).toISOString()}`);
   console.log(`  entrée ${plan.prixEntree}   stop ${plan.prixStopLoss}   TP1 ${plan.prixTp1}   TP2 ${plan.prixTp2}`);
   console.log(`  risque ${arrondir(risque)}   ratio 1:${rr ?? '?'} (${rrVerdict(rr).label})`);
-  console.log(`  il faudrait ${pourcent(breakEvenRate(rr))} de réussite pour être à l'équilibre\n`);
+  console.log(`  il faudrait ${pourcent(breakEvenRate(rr))} de réussite pour être à l'équilibre`);
+  console.log(`  sortie ${objectif === '1r' ? 'ferme à 1 R' : "tenue jusqu'à 2 R"} — un objectif intermédiaire frôlé ne rapporte rien\n`);
 
   console.log(`Récupération des bougies ${INTERVALLE_RESOLUTION} sur ${horizonHeures} h…`);
 
@@ -128,7 +137,7 @@ async function main() {
     process.exit(2);
   }
 
-  const { statut, detail } = resoudreIssue({ plan, bougies, horizonBougies });
+  const { statut, detail } = resoudreIssue({ plan, bougies, horizonBougies, objectif });
 
   console.log('=== Issue ===\n');
   console.log(`  ${statut.toUpperCase()} — ${LIBELLE[statut] ?? ''}\n`);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resoudreIssue, compteDansLesStats, estGagnant } from './resolve.js';
+import { resoudreIssue, compteDansLesStats, estGagnant, gainEnR, reglageObjectif } from './resolve.js';
 import { symboleResolvable, normaliserBougie } from './market.js';
 
 // Plan repris du premier essai réel sur capture TradingView.
@@ -10,7 +10,8 @@ const LONG = { direction: 'BUY', prixEntree: 1.0842, prixStopLoss: 1.0821, prixT
 const bougies = (...paires) =>
   paires.map(([h, l], i) => ({ ouvertureMs: 1_700_000_000_000 + i * 60_000, plusHaut: h, plusBas: l }));
 
-const resoudre = (plan, b, horizon = 100) => resoudreIssue({ plan, bougies: b, horizonBougies: horizon });
+const resoudre = (plan, b, horizon = 100, objectif = '2r') =>
+  resoudreIssue({ plan, bougies: b, horizonBougies: horizon, objectif });
 
 describe('resoudreIssue — entrée jamais atteinte', () => {
   it('déclare non déclenché quand l’horizon est couvert', () => {
@@ -34,9 +35,14 @@ describe('resoudreIssue — short', () => {
     expect(r.detail.declencheLe).toBe(1_700_000_000_000);
   });
 
-  it('TP1 atteint', () => {
+  it('TP1 atteint sous l’objectif 1 R', () => {
     const b = bougies([86530, 86500], [86520, 86280], [86400, 86350]);
-    expect(resoudre(SHORT, b, 3).statut).toBe('tp1');
+    expect(resoudre(SHORT, b, 3, '1r').statut).toBe('tp1');
+  });
+
+  it('le même parcours n’est pas tranché sous l’objectif 2 R', () => {
+    const b = bougies([86530, 86500], [86520, 86280], [86400, 86350]);
+    expect(resoudre(SHORT, b, 3, '2r').statut).toBe('horizon_depasse');
   });
 
   it('TP2 atteint', () => {
@@ -44,21 +50,33 @@ describe('resoudreIssue — short', () => {
     expect(resoudre(SHORT, b, 3).statut).toBe('tp2');
   });
 
-  it('TP1 puis stop reste un TP1 — l’objectif atteint n’est pas effacé', () => {
+  it('TP1 puis stop est un STOP sous l’objectif 2 R', () => {
+    // Le cas qui fabriquait du rendement : on ne peut pas encaisser 1 R en
+    // passant ET tenir jusqu'à 2 R. Sous l'objectif 2 R, on n'était pas
+    // sorti à 1 R — le stop est un stop.
     const b = bougies([86530, 86500], [86520, 86280], [86850, 86600]);
-    expect(resoudre(SHORT, b, 10).statut).toBe('tp1');
+    expect(resoudre(SHORT, b, 10, '2r').statut).toBe('stop');
+  });
+
+  it('le même parcours est un gain sous l’objectif 1 R, parce qu’on en était sorti', () => {
+    const b = bougies([86530, 86500], [86520, 86280], [86850, 86600]);
+    expect(resoudre(SHORT, b, 10, '1r').statut).toBe('tp1');
   });
 
   it('bougie touchant stop ET objectif : ambigu, jamais deviné', () => {
     const b = bougies([86530, 86500], [86800, 86280]);
-    const r = resoudre(SHORT, b, 10);
+    const r = resoudre(SHORT, b, 10, '1r');
     expect(r.statut).toBe('ambigu');
     expect(r.detail.raison).toMatch(/ne dit pas dans quel ordre/);
   });
 
   it('ambigu dès la bougie de déclenchement', () => {
+    // La bougie franchit l'entrée, le stop et TP1 : sous l'objectif 1 R son
+    // OHLC ne dit pas l'ordre. Sous l'objectif 2 R, TP2 n'est pas atteint,
+    // donc il n'y a rien d'ambigu — c'est un stop.
     const b = bougies([86850, 86250]);
-    expect(resoudre(SHORT, b, 10).statut).toBe('ambigu');
+    expect(resoudre(SHORT, b, 10, '1r').statut).toBe('ambigu');
+    expect(resoudre(SHORT, b, 10, '2r').statut).toBe('stop');
   });
 });
 
@@ -68,9 +86,9 @@ describe('resoudreIssue — long', () => {
     expect(resoudre(LONG, b, 10).statut).toBe('stop');
   });
 
-  it('TP1 atteint', () => {
+  it('TP1 atteint sous l’objectif 1 R', () => {
     const b = bougies([1.0845, 1.0840], [1.0895, 1.0860], [1.0880, 1.0870]);
-    expect(resoudre(LONG, b, 3).statut).toBe('tp1');
+    expect(resoudre(LONG, b, 3, '1r').statut).toBe('tp1');
   });
 
   it('TP2 atteint', () => {
@@ -78,9 +96,16 @@ describe('resoudreIssue — long', () => {
     expect(resoudre(LONG, b, 3).statut).toBe('tp2');
   });
 
-  it('bougie ambiguë', () => {
+  it('bougie ambiguë sous l’objectif 1 R', () => {
     const b = bougies([1.0845, 1.0840], [1.0895, 1.0810]);
-    expect(resoudre(LONG, b, 10).statut).toBe('ambigu');
+    expect(resoudre(LONG, b, 10, '1r').statut).toBe('ambigu');
+  });
+
+  it('la même bougie est un stop sous l’objectif 2 R, qu’elle n’atteint pas', () => {
+    // 1,0895 dépasse TP1 (1,0889) mais pas TP2 (1,0931) : sous l'objectif 2 R
+    // il n'y a pas d'ambiguïté, seulement un stop.
+    const b = bougies([1.0845, 1.0840], [1.0895, 1.0810]);
+    expect(resoudre(LONG, b, 10, '2r').statut).toBe('stop');
   });
 });
 
@@ -154,5 +179,50 @@ describe('symboleResolvable — frontières', () => {
   });
   it('refuse une devise de cotation seule', () => {
     expect(symboleResolvable('USDT')).toBeNull();
+  });
+});
+
+describe('objectif de sortie — pas de convention implicite', () => {
+  it('refuse de résoudre sans objectif', () => {
+    // La valeur par défaut est ce qui a faussé toutes les mesures
+    // précédentes. Mieux vaut une exception qu'un chiffre.
+    expect(() => resoudreIssue({ plan: SHORT, bougies: bougies([86530, 86500]), horizonBougies: 10 }))
+      .toThrow(/Objectif de sortie manquant/);
+  });
+
+  it('refuse un objectif inconnu', () => {
+    expect(() => resoudre(SHORT, bougies([86530, 86500]), 10, '3r')).toThrow(/Objectif de sortie/);
+  });
+
+  it('expose le seuil de rentabilité hors coûts de chaque règle', () => {
+    expect(reglageObjectif('1r').seuil).toBe(0.5);
+    expect(reglageObjectif('2r').seuil).toBeCloseTo(1 / 3, 6);
+  });
+
+  it('inscrit l’objectif dans le détail, pour que l’issue reste interprétable seule', () => {
+    const b = bougies([86530, 86500], [86520, 86280], [86400, 86350]);
+    expect(resoudre(SHORT, b, 3, '1r').detail.objectif).toBe('1r');
+    expect(resoudre(SHORT, b, 3, '2r').detail.objectif).toBe('2r');
+  });
+});
+
+describe('gainEnR', () => {
+  it('rend le gain de la règle choisie', () => {
+    expect(gainEnR('tp1', '1r')).toBe(1);
+    expect(gainEnR('tp2', '2r')).toBe(2);
+  });
+
+  it('rend −1 pour un stop, quelle que soit la règle', () => {
+    expect(gainEnR('stop', '1r')).toBe(-1);
+    expect(gainEnR('stop', '2r')).toBe(-1);
+  });
+
+  it('ignore un statut étranger à la règle', () => {
+    // Sous l'objectif 2 R, un « tp1 » ne peut pas exister ; s'il apparaît,
+    // c'est un enregistrement d'une autre règle et il ne se compte pas.
+    expect(gainEnR('tp2', '1r')).toBeNull();
+    expect(gainEnR('tp1', '2r')).toBeNull();
+    expect(gainEnR('ambigu', '1r')).toBeNull();
+    expect(gainEnR('non_declenche', '2r')).toBeNull();
   });
 });

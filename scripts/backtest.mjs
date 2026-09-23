@@ -26,13 +26,16 @@ import { generateurAleatoire, melangerBougies, valeurP, resumeDistribution } fro
 import { cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER, INDETERMINE } from '../src/lib/marche/structure.js';
 import { detecter, anomalieVolume } from '../src/lib/marche/orderblocks.js';
 import { intervalleWilson, conclusionPossible, esperanceEnR } from '../src/lib/marche/statistiques.js';
-import { resoudreIssue, compteDansLesStats, estGagnant } from '../src/lib/journal/resolve.js';
+import { resoudreIssue, gainEnR, OBJECTIFS, reglageObjectif } from '../src/lib/journal/resolve.js';
 
 const DEFAUTS = {
   utBiais: '1h', utDetection: '15m', utResolution: '5m',
   fenetre: 5, horizonHeures: 48, coutEnR: 0.05,
   utCsv: '1m', decalageHeures: 0,
   graine: 1, controlePaquet: 1,
+  // Tenue jusqu'à 2 R par défaut. Toucher 1 R en chemin ne rapporte rien :
+  // on n'y était pas sorti.
+  objectif: '2r',
 };
 
 export function parseArgs(argv) {
@@ -144,6 +147,11 @@ export function validerOptions(args) {
     else o.controlePaquet = n;
   }
 
+  if (args.objectif !== undefined) {
+    if (!OBJECTIFS[args.objectif]) erreurs.push(`--objectif "${args.objectif}" inconnu (${Object.keys(OBJECTIFS).join(', ')})`);
+    else o.objectif = args.objectif;
+  }
+
   o.sansFiltreBiais = Boolean(args.sansFiltreBiais);
   o.baseUrl = typeof args.baseUrl === 'string' ? args.baseUrl : undefined;
   if (o.csv && o.baseUrl) erreurs.push('--csv et --base-url désignent deux sources : choisis-en une.');
@@ -162,7 +170,7 @@ export function validerOptions(args) {
 }
 
 /** Applique le filtre de biais et résout chaque order block. */
-export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesResolution, horizonBougies, sansFiltreBiais, spread = 0, commission = 0 }) {
+export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesResolution, horizonBougies, sansFiltreBiais, objectif, spread = 0, commission = 0 }) {
   const resultats = [];
 
   for (const ob of orderBlocks) {
@@ -177,7 +185,7 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
     if (depart === -1) continue;
 
     const suite = bougiesResolution.slice(depart, depart + horizonBougies);
-    const { statut, detail } = resoudreIssue({ plan: ob.plan, bougies: suite, horizonBougies });
+    const { statut, detail } = resoudreIssue({ plan: ob.plan, bougies: suite, horizonBougies, objectif });
 
     resultats.push({
       ms: ob.ms, sens: ob.sens, typeCassure: ob.typeCassure, biais, aligne,
@@ -216,7 +224,7 @@ export function chaine(fines, o) {
   const resultats = evaluer({
     orderBlocks, bougiesDetection: detectionBougies, serieBiais,
     bougiesResolution: resolutionBougies, horizonBougies, sansFiltreBiais: o.sansFiltreBiais,
-    spread: o.spread ?? 0, commission: o.commission ?? 0,
+    objectif: o.objectif, spread: o.spread ?? 0, commission: o.commission ?? 0,
   });
 
   return {
@@ -229,12 +237,16 @@ export function chaine(fines, o) {
   };
 }
 
-export function agreger(resultats, coutParDefaut) {
+export function agreger(resultats, coutParDefaut, objectif = '2r') {
+  const reglage = reglageObjectif(objectif);
   const parStatut = {};
   for (const r of resultats) parStatut[r.statut] = (parStatut[r.statut] || 0) + 1;
 
-  const tranchees = resultats.filter((r) => compteDansLesStats(r.statut));
-  const gagnants = tranchees.filter((r) => estGagnant(r.statut));
+  // Un statut étranger à la règle de sortie ne se compte pas : sous « tenue
+  // jusqu'à 2 R » un « tp1 » vient d'une autre règle, et le créditer de 2 R
+  // réintroduirait exactement le mélange qu'on vient de supprimer.
+  const tranchees = resultats.filter((r) => gainEnR(r.statut, objectif) !== null);
+  const gagnants = tranchees.filter((r) => r.statut === reglage.statut);
 
   const intervalle = intervalleWilson(gagnants.length, tranchees.length);
   const ambigus = parStatut.ambigu || 0;
@@ -247,14 +259,16 @@ export function agreger(resultats, coutParDefaut) {
     : coutParDefaut;
   const coutMesure = couts.length === tranchees.length && couts.length > 0;
 
-  const ratioMoyen = gagnants.length
-    ? gagnants.reduce((a, r) => a + (r.statut === 'tp2' ? 2 : 1), 0) / gagnants.length
-    : 1;
+  // Sous une règle de sortie unique, tous les gagnants valent le même
+  // multiple : il n'y a plus de ratio moyen à calculer, seulement celui de
+  // la règle choisie. C'est le mélange des deux qui fabriquait du rendement.
+  const ratioMoyen = reglage.gain;
 
   return {
+    objectif,
     coutEnR,
     coutMesure,
-    ratioMoyen: Number(ratioMoyen.toFixed(3)),
+    ratioMoyen,
     seuil: seuilDeRentabilite(ratioMoyen, coutEnR),
     stops: distributionDesStops(tranchees.map((r) => r.plan)),
     total: resultats.length,
@@ -282,7 +296,7 @@ function afficherBloc(titre, agr) {
 
   console.log(`  order blocks retenus  ${agr.total}`);
   for (const [s, n] of Object.entries(agr.parStatut).sort((a, b) => b[1] - a[1])) {
-    console.log(`    ${s.padEnd(16)} ${String(n).padStart(5)}  ${compteDansLesStats(s) ? '' : '(hors statistiques)'}`);
+    console.log(`    ${s.padEnd(16)} ${String(n).padStart(5)}  ${gainEnR(s, agr.objectif) !== null ? '' : '(hors statistiques)'}`);
   }
 
   if (!agr.intervalle) { console.log('\n  aucune issue tranchée\n'); return; }
@@ -290,7 +304,7 @@ function afficherBloc(titre, agr) {
   const i = agr.intervalle;
   console.log(`\n  atteint 1 R avant le stop  ${(i.proportion * 100).toFixed(1)} %  (${i.succes}/${i.total})`);
   console.log(`  intervalle de confiance    [${(i.bas * 100).toFixed(1)} %, ${(i.haut * 100).toFixed(1)} %]`);
-  console.log(`  ratio moyen des gagnants   ${agr.ratioMoyen} R`);
+  console.log(`  gain d'un trade gagnant    ${agr.ratioMoyen} R  (sortie ${agr.objectif})`);
   console.log(`  coût par trade            ${agr.coutEnR} R  ${agr.coutMesure ? '(mesuré sur le spread)' : '(supposé — donne --spread)'}`);
 
   if (agr.stops) {
@@ -493,6 +507,7 @@ async function main() {
   console.log(`\n${o.symbole}  — source ${o.csv ? `fichier ${basename(o.csv)}` : 'Binance'}`);
   console.log(`  biais ${o.utBiais}  ·  détection ${o.utDetection}  ·  résolution ${o.utResolution}`);
   console.log(`  pivots sur ${o.fenetre} bougies  ·  horizon ${o.horizonHeures} h`);
+  console.log(`  sortie ${o.objectif === '1r' ? 'ferme à 1 R' : "tenue jusqu'à 2 R"}  ·  seuil hors coûts ${(reglageObjectif(o.objectif).seuil * 100).toFixed(1)} %`);
   if (o.spread || o.commission) console.log(`  spread ${o.spread ?? 0}  ·  commission ${o.commission ?? 0}  (unités de prix, aller-retour)`);
   else console.log(`  coûts ${o.coutEnR} R — valeur supposée, à remplacer par --spread`);
   if (o.sansFiltreBiais) console.log('  filtre de biais DÉSACTIVÉ');
@@ -518,12 +533,12 @@ async function main() {
     const controles = [];
     for (let i = 0; i < o.controle; i++) {
       const melangee = melangerBougies(fines, alea, o.controlePaquet);
-      controles.push(agreger(chaine(melangee, o).resultats, o.coutEnR));
+      controles.push(agreger(chaine(melangee, o).resultats, o.coutEnR, o.objectif));
       if ((i + 1) % 10 === 0) process.stdout.write('.');
     }
     console.log(' terminé');
 
-    const agrege = agreger(reel.resultats, o.coutEnR);
+    const agrege = agreger(reel.resultats, o.coutEnR, o.objectif);
     afficherBloc('Réel — ensemble de la période', agrege);
     afficherControle(agrege, controles, o);
     return;
@@ -541,7 +556,7 @@ async function main() {
   const resultats = evaluer({
     orderBlocks, bougiesDetection: detectionBougies, serieBiais,
     bougiesResolution: resolutionBougies, horizonBougies, sansFiltreBiais: o.sansFiltreBiais,
-    spread: o.spread ?? 0, commission: o.commission ?? 0,
+    objectif: o.objectif, spread: o.spread ?? 0, commission: o.commission ?? 0,
   });
 
   console.log(`  retenus après filtre de biais: ${resultats.length}`);
@@ -554,9 +569,9 @@ async function main() {
   const seconde = resultats.filter((r) => r.ms >= milieu);
 
   console.log('\n=== Résultats ===');
-  afficherBloc('Ensemble de la période', agreger(resultats, o.coutEnR));
-  afficherBloc(`Première moitié — jusqu'au ${iso(milieu)} (mise au point)`, agreger(premiere, o.coutEnR));
-  afficherBloc(`Seconde moitié — à partir du ${iso(milieu)} (vérification)`, agreger(seconde, o.coutEnR));
+  afficherBloc('Ensemble de la période', agreger(resultats, o.coutEnR, o.objectif));
+  afficherBloc(`Première moitié — jusqu'au ${iso(milieu)} (mise au point)`, agreger(premiere, o.coutEnR, o.objectif));
+  afficherBloc(`Seconde moitié — à partir du ${iso(milieu)} (vérification)`, agreger(seconde, o.coutEnR, o.objectif));
 
   if (o.baseUrl) {
     console.log('RAPPEL : données non Binance, ces chiffres ne mesurent rien.\n');

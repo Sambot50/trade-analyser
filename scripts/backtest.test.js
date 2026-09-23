@@ -69,13 +69,13 @@ const resultat = (statut, coutEnR = null) => ({
 
 describe('agreger — coûts', () => {
   it('retombe sur la constante quand aucun coût n’est mesuré', () => {
-    const agr = agreger([resultat('tp1'), resultat('stop')], 0.05);
+    const agr = agreger([resultat('tp2'), resultat('stop')], 0.05);
     expect(agr.coutMesure).toBe(false);
     expect(agr.coutEnR).toBe(0.05);
   });
 
   it('moyenne les coûts mesurés et ignore la constante', () => {
-    const agr = agreger([resultat('tp1', 0.02), resultat('stop', 0.04)], 0.05);
+    const agr = agreger([resultat('tp2', 0.02), resultat('stop', 0.04)], 0.05);
     expect(agr.coutMesure).toBe(true);
     expect(agr.coutEnR).toBe(0.03);
   });
@@ -83,13 +83,13 @@ describe('agreger — coûts', () => {
   it('ne se fie pas à une mesure partielle', () => {
     // Un seul trade chiffré sur deux : la moyenne serait fausse, on garde la
     // constante et on continue de l'annoncer comme supposée.
-    const agr = agreger([resultat('tp1', 0.02), resultat('stop')], 0.05);
+    const agr = agreger([resultat('tp2', 0.02), resultat('stop')], 0.05);
     expect(agr.coutMesure).toBe(false);
     expect(agr.coutEnR).toBe(0.05);
   });
 
   it('ignore les issues hors statistiques dans le calcul du coût', () => {
-    const agr = agreger([resultat('tp1', 0.02), resultat('stop', 0.04), resultat('ambigu')], 0.05);
+    const agr = agreger([resultat('tp2', 0.02), resultat('stop', 0.04), resultat('ambigu')], 0.05);
     expect(agr.coutMesure).toBe(true);
     expect(agr.coutEnR).toBe(0.03);
   });
@@ -97,29 +97,51 @@ describe('agreger — coûts', () => {
 
 describe('agreger — seuil de rentabilité', () => {
   it('place le seuil au-dessus du taux observé quand les coûts écrasent le gain', () => {
-    // 2 tp2 + 1 tp1 sur 5 : ratio moyen 1,667, taux 60 %.
+    // 2 gains sur 5 à 2 R : seuil (1 + 0,8) / 3 = 60 %, observé 40 %.
     const resultats = [
-      resultat('tp2', 0.8), resultat('tp2', 0.8), resultat('tp1', 0.8),
-      resultat('stop', 0.8), resultat('stop', 0.8),
+      resultat('tp2', 0.8), resultat('tp2', 0.8),
+      resultat('stop', 0.8), resultat('stop', 0.8), resultat('stop', 0.8),
     ];
-    const agr = agreger(resultats, 0.05);
-    expect(agr.ratioMoyen).toBeCloseTo(1.667, 2);
+    const agr = agreger(resultats, 0.05, '2r');
+    expect(agr.ratioMoyen).toBe(2);
+    expect(agr.seuil).toBeCloseTo(0.6, 4);
     expect(agr.seuil).toBeGreaterThan(agr.intervalle.proportion);
     expect(agr.esperance).toBeLessThan(0);
   });
 
   it('place le seuil sous le taux observé quand les coûts sont faibles', () => {
     const resultats = [
-      resultat('tp2', 0.02), resultat('tp2', 0.02), resultat('tp1', 0.02),
+      resultat('tp2', 0.02), resultat('tp2', 0.02), resultat('tp2', 0.02),
       resultat('stop', 0.02), resultat('stop', 0.02),
     ];
-    const agr = agreger(resultats, 0.05);
+    const agr = agreger(resultats, 0.05, '2r');
     expect(agr.seuil).toBeLessThan(agr.intervalle.proportion);
     expect(agr.esperance).toBeGreaterThan(0);
   });
 
+  it('applique le gain de la règle choisie, pas un mélange', () => {
+    // Le cœur du correctif : 3 gains sur 5 valent 1 R sous la sortie ferme et
+    // 2 R sous la tenue. Aucune lecture ne doit produire les deux.
+    const r = (statut) => resultat(statut, 0.02);
+    const un = agreger([r('tp1'), r('tp1'), r('tp1'), r('stop'), r('stop')], 0.05, '1r');
+    const deux = agreger([r('tp2'), r('tp2'), r('tp2'), r('stop'), r('stop')], 0.05, '2r');
+
+    expect(un.ratioMoyen).toBe(1);
+    expect(deux.ratioMoyen).toBe(2);
+    expect(un.intervalle.proportion).toBe(deux.intervalle.proportion);
+    expect(deux.esperance).toBeGreaterThan(un.esperance);
+  });
+
+  it('écarte un statut étranger à la règle de sortie', () => {
+    // Un « tp1 » sous l'objectif 2 R vient d'une autre règle : le compter
+    // à 2 R réintroduirait le mélange qu'on vient de supprimer.
+    const agr = agreger([resultat('tp2', 0.02), resultat('tp1', 0.02), resultat('stop', 0.02)], 0.05, '2r');
+    expect(agr.tranchees).toBe(2);
+    expect(agr.intervalle.succes).toBe(1);
+  });
+
   it('mesure la distribution des stops des issues tranchées', () => {
-    const agr = agreger([resultat('tp1', 0.02), resultat('stop', 0.02)], 0.05);
+    const agr = agreger([resultat('tp2', 0.02), resultat('stop', 0.02)], 0.05, '2r');
     expect(agr.stops.nombre).toBe(2);
     expect(agr.stops.medianeRelative).toBeCloseTo(0.0025, 4);
   });
@@ -181,7 +203,8 @@ function fines(n = 6000, phi = 0) {
 
 const options = {
   uniteFine: '1m', utBiais: '1h', utDetection: '15m', utResolution: '5m',
-  fenetre: 5, horizonHeures: 48, coutEnR: 0.05, spread: 0, commission: 0, sansFiltreBiais: false,
+  fenetre: 5, horizonHeures: 48, coutEnR: 0.05, spread: 0, commission: 0,
+  sansFiltreBiais: false, objectif: '2r',
 };
 
 describe('chaine — le chemin commun au réel et au contrôle', () => {

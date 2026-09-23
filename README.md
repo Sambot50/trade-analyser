@@ -166,6 +166,28 @@ Mêmes règles, mêmes trades, conclusions opposées. Le seuil de rentabilité e
 affiché face à l'intervalle de confiance, avec trois verdicts : gagnant même
 au pire de l'intervalle, perdant même au mieux, ou indécidable.
 
+### La règle de sortie — `--objectif`
+
+```bash
+node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --objectif 1r
+node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --objectif 2r
+```
+
+| Règle | Gain | Perte | Seuil hors coûts |
+|---|---|---|---|
+| `1r` — sortie ferme à 1 R | +1 R | −1 R | 50 % |
+| `2r` — tenue jusqu'à 2 R (défaut) | +2 R | −1 R | 33,3 % |
+
+**Un seul objectif compte, choisi avant d'ouvrir.** Sous `2r`, un trade passé
+par TP1 puis stoppé est un stop à −1 R : on n'y était pas sorti. Le résolveur
+refuse de trancher sans `objectif` — une convention de sortie implicite est
+exactement ce qui a faussé toutes les mesures antérieures au 2026-09-23.
+
+La version précédente créditait +1 R à ce trade tout en créditant +2 R s'il
+allait jusqu'à TP2. C'est une option gratuite, et sur 200 000 marches
+aléatoires — où toute espérance doit être nulle — elle produisait **+0,330 R
+par trade à partir de rien**. Voir DEC-015.
+
 ### Le contrôle par permutation — `--controle`
 
 ```bash
@@ -201,6 +223,7 @@ ne prouvent pas une impossibilité, seulement qu'on n'a pas tiré assez.
 | `--controle` | — | Nombre de tirages, `100` si passé seul |
 | `--graine` | `1` | Un contrôle qu'on ne peut pas rejouer ne se vérifie pas |
 | `--controle-paquet` | `1` | Mélange par paquets de N bougies consécutives : conserve la structure courte |
+| `--objectif` | `2r` | Règle de sortie, `1r` ou `2r` |
 
 ### Le contrôle a été validé dans les deux sens
 
@@ -212,14 +235,16 @@ bougies 1 minute et 100 tirages :
 | Marche aléatoire | +0,390 R | +0,407 R | 0,604 | pas d'avantage |
 | Momentum planté | +1,605 R | +1,120 R | 0,010 | avantage détecté |
 
-**Et il rend lisible ce qui ne l'était pas.** Sur du bruit pur, les tirages de
-contrôle rendent une espérance médiane de **+0,407 R** : un système qui paraît
-rentable sur des données sans la moindre structure. L'espérance seule ne veut
-rien dire. Elle ne se lit que face à son témoin.
+**Et il a trouvé un bug de mesure dès son premier lancement sur données
+réelles.** Sur BTCUSDT, le réel rendait +0,400 R contre **+0,563 R** pour la
+médiane des tirages — p = 0,970. Or des bougies en ordre aléatoire forment un
+martingale : aucune règle de sortie n'y dégage une espérance positive. +0,563 R
+sur du hasard pur signifiait que la chaîne fabriquait du rendement. C'était la
+règle de sortie (DEC-015) ; après correctif, la médiane des tirages sur données
+sans structure tombe de +0,407 R à **+0,055 R**.
 
-C'est ce qui rend l'ancien résultat sur BTCUSDT — 53,4 %, +0,392 R —
-ininterprétable en l'état : il n'avait pas de témoin. Voir
-[docs/ETAT.md](docs/ETAT.md).
+Ce que le découpage en deux moitiés n'aurait jamais vu : le biais gonflait les
+deux moitiés à l'identique. Voir [docs/ETAT.md](docs/ETAT.md).
 
 ### Volume et déséquilibre acheteurs/vendeurs
 

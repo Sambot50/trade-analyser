@@ -49,7 +49,12 @@ Deux invariants du socle de mesure relèvent du même principe :
    acheteur/vendeur : `delta` y vaut `null` et l'analyse de volume ne rend
    rien. Le déduire du sens de la bougie fabriquerait un indicateur qui ne
    mesure que ce qu'on sait déjà.
-6. **Aucun résultat sans témoin.** Une espérance ne se lit que face à la
+6. **Une seule règle de sortie par plan, choisie avant d'ouvrir.**
+   `resoudreIssue` exige `objectif` (`1r` ou `2r`) et refuse de trancher sans.
+   Sous `2r`, un trade passé par TP1 puis stoppé est un stop à −1 R. Créditer
+   les deux branches est une lecture du futur : ça produisait +0,330 R par
+   trade sur des marches aléatoires. Voir DEC-015.
+7. **Aucun résultat sans témoin.** Une espérance ne se lit que face à la
    distribution obtenue sur les mêmes bougies mélangées (`--controle`). Sur du
    bruit pur, la chaîne rend +0,407 R de médiane : un chiffre flatteur produit
    par rien du tout. Voir DEC-014.
@@ -59,7 +64,7 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 260 tests
+npm test                         # 273 tests
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 

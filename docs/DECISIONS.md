@@ -324,3 +324,60 @@ sur du bruit pur, les tirages de contrôle rendent une espérance médiane de
 **+0,407 R**. Un système qui paraît rentable sur des données sans aucune
 structure. L'espérance seule ne veut rien dire ; elle ne se lit que face à son
 témoin.
+
+---
+
+## DEC-015 — Une seule règle de sortie, choisie avant d'ouvrir
+
+**2026-09-23 · Retenue**
+
+`resoudreIssue` exige désormais un `objectif` explicite, `1r` ou `2r`, et
+refuse de résoudre sans. Sous `2r`, un trade passé par TP1 puis stoppé est un
+**stop à −1 R**. Sous `1r`, TP2 n'existe pas.
+
+**Motif :** la version précédente créditait +1 R à ce trade — « un objectif
+déjà atteint n'est pas effacé par un stop ultérieur » — tout en créditant
++2 R s'il allait jusqu'à TP2. C'est une option gratuite. À l'instant où le
+prix touche 1 R il faut choisir, encaisser ou tenir, et on ne peut pas savoir
+laquelle était la bonne sans regarder la suite. **Une lecture du futur, dans
+la règle de sortie.**
+
+Même classe d'erreur que DEC-013, à un autre endroit de la chaîne, et trouvée
+par le même réflexe : refuser de croire un bon chiffre.
+
+### Mesuré sur 200 000 marches aléatoires
+
+Sur un martingale, toute règle de sortie doit rendre une espérance nulle.
+
+| Règle de sortie | Espérance | Attendu |
+|---|---|---|
+| Convention v1 (TP1 non effacé) | **+0,330 R** | 0 |
+| Sortie ferme à 1 R | −0,001 R | 0 ✓ |
+| Tenue jusqu'à 2 R | −0,007 R | 0 ✓ |
+
+Elle fabriquait un tiers d'unité de risque par trade à partir de rien.
+
+### Ce que le correctif change sur les mesures
+
+Contrôle par permutation sur un fichier sans aucune structure, médiane des
+tirages :
+
+| | Avant | Après |
+|---|---|---|
+| Espérance des tirages de contrôle | +0,407 R | **+0,055 R** (`2r`), +0,035 R (`1r`) |
+
+Le contrôle garde sa sensibilité : sur la série à momentum planté, il détecte
+toujours l'avantage à p = 0,016 (0/60) sous les deux règles.
+
+**Résidu assumé :** +0,035 à +0,055 R au lieu de 0 exactement. Il vient
+probablement de l'exclusion des issues ambiguës et de la censure par
+l'horizon, toutes deux non symétriques. À surveiller, pas encore expliqué.
+
+**Écarté pour l'instant :** la sortie partielle — moitié à 1 R, stop ramené au
+point mort, reste jusqu'à 2 R. C'est la règle la plus réaliste, mais elle
+demande un stop mobile, donc une troisième chose à se tromper. Elle viendra
+quand les deux premières seront mesurées.
+
+**Conséquence sur le journal :** `SCHEMA_VERSION` passe de 1 à 2, et chaque
+plan porte `objectifDeSortie`. Les enregistrements v1 restent lisibles mais ne
+se comparent pas aux v2 — ils ont été résolus sous l'autre convention.

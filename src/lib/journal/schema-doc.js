@@ -4,7 +4,7 @@
 // les données. Générer ce fichier depuis le code garantit qu'il ne dérive pas
 // du format réel, contrairement à une documentation tenue à la main.
 
-import { SCHEMA_VERSION, SEUILS_RATIO, HORIZON_RESOLUTION_MINUTES } from './schema.js';
+import { SCHEMA_VERSION, SEUILS_RATIO, HORIZON_RESOLUTION_MINUTES, OBJECTIF_JOURNAL } from './schema.js';
 import { STATUTS } from './resolve.js';
 import { INTERVALLE_RESOLUTION } from './market.js';
 
@@ -87,12 +87,27 @@ confonde pas avec « non applicable ».
 | Statut | Signification | Compté dans le taux de réussite |
 |---|---|---|
 | \`non_declenche\` | Le prix n'a jamais atteint l'entrée dans l'horizon | non |
-| \`stop\` | Stop touché avant tout objectif | **oui** |
-| \`tp1\` | TP1 atteint | **oui** |
-| \`tp2\` | TP2 atteint | **oui** |
-| \`ambigu\` | Une même bougie touche le stop et un objectif | non |
+| \`stop\` | Stop touché avant l'objectif | **oui**, −1 R |
+| \`tp1\` | TP1 atteint | **oui**, +1 R — seulement sous la sortie ferme à 1 R |
+| \`tp2\` | TP2 atteint | **oui**, +2 R — seulement sous la tenue jusqu'à 2 R |
+| \`ambigu\` | Une même bougie touche le stop et l'objectif | non |
 | \`horizon_depasse\` | Déclenché, mais ni stop ni objectif dans l'horizon | non |
 | \`en_cours\` | Pas encore résolu, sera retenté | non |
+
+### La règle de sortie, et pourquoi elle est inscrite dans chaque plan
+
+\`plan.objectifDeSortie\` vaut \`${OBJECTIF_JOURNAL}\`. **Un seul objectif compte
+par enregistrement**, choisi avant d'ouvrir : sous la tenue jusqu'à 2 R, un
+trade passé par TP1 puis stoppé est un \`stop\` à −1 R, pas un gain.
+
+Le schéma v1 faisait l'inverse : il créditait +1 R à ce trade tout en
+créditant +2 R s'il allait jusqu'à TP2. C'est une option gratuite — à
+l'instant où le prix touche 1 R il faut choisir, et on ne peut pas savoir
+laquelle était la bonne sans regarder la suite. Mesuré sur 200 000 marches
+aléatoires, où toute espérance doit être nulle : **+0,330 R** avec cette
+convention, −0,001 R avec une sortie ferme à 1 R.
+
+**Les enregistrements v1 ne se comparent donc pas aux v2.**
 
 Statuts possibles, exhaustivement : ${STATUTS.map((s) => `\`${s}\``).join(', ')}.
 

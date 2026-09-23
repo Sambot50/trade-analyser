@@ -10,7 +10,7 @@ d'intérêt que s'il reste honnête : une ligne qui passe de « non vérifié »
 
 | Quoi | Comment | Résultat |
 |---|---|---|
-| Logique pure | 260 tests unitaires | tous passent |
+| Logique pure | 273 tests unitaires | tous passent |
 | Build de production | `npm run build` | 221 kB JS (71 kB gzip) |
 | Projection prix → pixel | lecture des pixels du canvas en navigateur | écart max **1,1 px** sur 4 niveaux |
 | Lecture d'axe sur graphique synthétique | banc d'essai, échelle connue | `qwen3.8:27b` à **2,3 px** |
@@ -29,7 +29,8 @@ d'intérêt que s'il reste honnête : une ligne qui passe de « non vérifié »
 | **Écriture sur disque** (File System Access API) | Non automatisable sans interaction utilisateur. | Connecter un dossier depuis l'onglet Journal et vérifier l'arborescence produite. |
 | **Robustesse de la lecture d'axe** | Un seul essai réel, sur un graphique BTC 5 min sans indicateur. | Accumuler des analyses sur d'autres actifs, unités de temps et styles de graphique. Le journal est fait pour ça. |
 | **L'import CSV sur un vrai fichier** | Éprouvé sur des fixtures et sur un fichier synthétique de 92 000 lignes. Aucun fichier HistData ou MetaTrader réel n'a été lu : ils ne se téléchargent pas depuis cet environnement. | Lancer `--csv` sur un export réel et vérifier les bornes de période et le taux de couverture annoncés. |
-| **Le contrôle sur données réelles** | Validé sur deux séries construites, jamais lancé sur du BTCUSDT ni sur de l'or réels : les API de marché sont bloquées depuis cet environnement. | `node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100`, et la même chose avec `--csv` sur l'or. |
+| **La mesure sur BTCUSDT après correctif de la règle de sortie** | Le seul chiffre réel dont on dispose (p = 0,970) a été produit AVANT le correctif DEC-015. Les API de marché sont bloquées depuis cet environnement. | `node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-07-01 --controle 100`, avec `--objectif 1r` puis `2r`. |
+| **Le résidu d'espérance sur données sans structure** | +0,035 à +0,055 R au lieu de 0. Suspects : exclusion des ambiguës, censure par l'horizon. Non expliqué. | Mesurer séparément l'effet de chaque exclusion sur une marche aléatoire. |
 | **Le spread réellement payé chez Vantage** | La valeur passée à `--spread` est fournie par l'utilisateur, jamais mesurée. | Relever le spread affiché sur XAUUSD à plusieurs heures de la journée — il s'élargit à l'ouverture et à la clôture. |
 
 ## Le contre-essai qui change la lecture
@@ -54,6 +55,36 @@ Ce que ça imposait avant toute mise en réel :
 
 1. ~~un mode contrôle intégré~~ — **fait**, voir ci-dessous ;
 2. une période d'au moins un an, pour ramener l'intervalle sous huit points.
+
+## Ce que le contrôle a trouvé du premier coup, sur données réelles
+
+**2026-09-23.** Premier lancement de `--controle 100` sur BTCUSDT réel
+(2026-07-01 → 2026-09-23, 160 issues tranchées) :
+
+| | Réel | Médiane des tirages |
+|---|---|---|
+| Taux de réussite | 53,8 % | 60,2 % |
+| Espérance | +0,400 R | +0,563 R |
+
+**p (espérance) = 0,970** — 97 tirages sur 100 faisaient *mieux* que le réel.
+
+Mais le chiffre décisif n'était pas là : c'était le **+0,563 R des tirages**.
+Des bougies en ordre aléatoire forment un martingale ; aucune règle de sortie
+ne peut y dégager une espérance positive. +0,563 R sur du hasard pur voulait
+dire que la mesure fabriquait du rendement.
+
+C'était le cas. Voir DEC-015 : la convention de sortie créditait +1 R à un
+trade passé par TP1 puis stoppé, tout en créditant +2 R s'il allait jusqu'à
+TP2 — une option qu'aucun trade réel n'offre. Sur 200 000 marches aléatoires,
+elle produisait **+0,330 R par trade à partir de rien**.
+
+Après correctif, sur des données sans structure, la médiane des tirages tombe
+de **+0,407 R à +0,055 R**, et le contrôle garde sa sensibilité : il détecte
+toujours un avantage planté à p = 0,016.
+
+**Ce que ça invalide :** tous les chiffres d'espérance produits avant le
+2026-09-23 — +0,392 R, +0,400 R — mesuraient la convention, pas le marché.
+La mesure sur BTCUSDT est à refaire.
 
 ## Le contrôle par permutation, et sa propre validation
 
