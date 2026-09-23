@@ -87,7 +87,9 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
   const resultats = [];
 
   for (const ob of orderBlocks) {
-    const biais = tendanceA(serieBiais, ob.ms);
+    // Le biais s'apprécie à l'instant où l'on pourrait agir — la cassure
+    // connue — et non à la formation de l'order block, antérieure.
+    const biais = tendanceA(serieBiais, ob.valideAPartirDeMs);
     const aligne = biais === ob.sens;
     if (!sansFiltreBiais && !aligne) continue;
 

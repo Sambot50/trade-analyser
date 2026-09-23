@@ -48,6 +48,11 @@ export function pivots(bougies, fenetre = 5) {
 /**
  * Cassures de structure.
  *
+ * Chaque évènement est daté de l'instant où il devient CONNU, c'est-à-dire de
+ * la fermeture de la bougie qui le produit. Tout le reste de la chaîne en
+ * dépend : c'est ce qui interdit d'agir sur une information pas encore
+ * disponible.
+ *
  * Une cassure est retenue sur **clôture** au-delà du dernier pivot opposé,
  * jamais sur simple mèche : une mèche qui dépasse puis revient est un
  * balayage de liquidité, pas une cassure. C'est le choix le plus strict, donc
@@ -93,9 +98,19 @@ export function cassures(bougies, fenetre = 5) {
 }
 
 function creerCassure(bougies, index, sens, tendanceAvant, niveauCasse, origine) {
+  const b = bougies[index];
+  if (b.fermetureMs === undefined) {
+    throw new Error('Bougie sans fermetureMs : impossible de dater une cassure sans lire le futur.');
+  }
+
   return {
     index,
-    ms: bougies[index].ouvertureMs,
+    // La cassure est constatée SUR LA CLÔTURE : elle n'est connue qu'à la
+    // fermeture de la bougie, jamais à son ouverture. Dater à l'ouverture
+    // ferait remonter l'information de toute la durée de la bougie — une
+    // heure entière en H1.
+    ms: b.fermetureMs,
+    msOuverture: b.ouvertureMs,
     sens,
     type: tendanceAvant !== INDETERMINE && tendanceAvant !== sens ? 'CHoCH' : 'BOS',
     tendanceAvant,
