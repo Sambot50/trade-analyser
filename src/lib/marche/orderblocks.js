@@ -54,9 +54,11 @@ function construire(bougies, index, cassure) {
     zone: { bas, haut, hauteur },
     volume: b.volume,
     delta: b.delta,
-    // La cassure se produit après l'order block : c'est à partir de là que le
-    // prix peut revenir le chercher.
-    valideAPartirDeMs: bougies[cassure.index].ouvertureMs,
+    // L'order block n'est exploitable qu'une fois la cassure CONNUE, donc à
+    // la fermeture de la bougie qui casse — pas à son ouverture. Sans quoi on
+    // compterait comme déclenché un retour sur l'entrée survenu avant que le
+    // signal existe.
+    valideAPartirDeMs: cassure.ms,
     plan: {
       direction: haussier ? 'BUY' : 'SELL',
       prixEntree: arrondir(prixEntree),

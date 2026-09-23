@@ -9,7 +9,9 @@ const b = (o, h, l, c, v = 100, va = 50) => ({
   ouvertureMs: 0, ouverture: o, plusHaut: h, plusBas: l, cloture: c,
   volume: v, volumeAcheteur: va, volumeVendeur: v - va, delta: va - (v - va), nombreTrades: 10,
 });
-const serie = (...bs) => bs.map((x, i) => ({ ...x, ouvertureMs: i * 60000 }));
+const serie = (...bs) => bs.map((x, i) => ({
+  ...x, ouvertureMs: i * 60000, fermetureMs: i * 60000 + 59_999,
+}));
 const plat = (prix, n) => Array.from({ length: n }, () => b(prix, prix + 1, prix - 1, prix));
 
 describe('pivots', () => {
@@ -76,6 +78,46 @@ describe('cassures', () => {
     const retournement = e.find((x) => x.sens === BAISSIER);
     expect(retournement?.type).toBe('CHoCH');
     expect(retournement?.tendanceAvant).toBe(HAUSSIER);
+  });
+});
+
+describe('datation — aucune information avant qu\u2019elle existe', () => {
+  const s = serie(...plat(100, 3), b(100, 120, 99, 110), ...plat(100, 3), b(105, 130, 104, 125));
+
+  it('date une cassure de la FERMETURE de sa bougie, jamais de son ouverture', () => {
+    const [e] = cassures(s, 3);
+    expect(e.ms).toBe(s[e.index].fermetureMs);
+    expect(e.ms).toBeGreaterThan(s[e.index].ouvertureMs);
+  });
+
+  it('conserve l\u2019ouverture à part, pour référence', () => {
+    const [e] = cassures(s, 3);
+    expect(e.msOuverture).toBe(s[e.index].ouvertureMs);
+  });
+
+  it('refuse une bougie sans heure de fermeture plutôt que de deviner', () => {
+    const sansFermeture = s.map(({ fermetureMs, ...reste }) => reste);
+    expect(() => cassures(sansFermeture, 3)).toThrow(/sans lire le futur/);
+  });
+
+  it('rend un order block exploitable seulement à partir de la cassure connue', () => {
+    const avecOb = serie(
+      ...plat(100, 3), b(100, 120, 99, 110), ...plat(100, 3),
+      b(104, 105, 95, 96), b(96, 130, 96, 125),
+    );
+    const c = cassures(avecOb, 3)[0];
+    const ob = orderBlockDe(avecOb, c);
+    expect(ob.valideAPartirDeMs).toBe(c.ms);
+    expect(ob.valideAPartirDeMs).toBe(avecOb[c.index].fermetureMs);
+    // Et surtout : postérieur à l'ouverture de la bougie de cassure.
+    expect(ob.valideAPartirDeMs).toBeGreaterThan(avecOb[c.index].ouvertureMs);
+  });
+
+  it('ne date jamais un évènement avant la bougie qui le produit', () => {
+    for (const e of cassures(s, 3)) {
+      expect(e.ms).toBeGreaterThanOrEqual(s[e.index].ouvertureMs);
+      expect(e.ms).toBe(s[e.index].fermetureMs);
+    }
   });
 });
 
@@ -221,8 +263,14 @@ describe('esperanceEnR', () => {
 });
 
 describe('bougies', () => {
+  it('extrait l\u2019heure de fermeture, qui date toute information tirée de la clôture', () => {
+    const n = normaliser([1700000000000, '100', '110', '90', '105', '50', 1700000059999, '0', 12, '30', '0', '0']);
+    expect(n.fermetureMs).toBe(1700000059999);
+    expect(n.fermetureMs).toBeGreaterThan(n.ouvertureMs);
+  });
+
   it('extrait le volume acheteur et en déduit le delta', () => {
-    const n = normaliser([1700000000000, '100', '110', '90', '105', '50', 0, '0', 12, '30', '0', '0']);
+    const n = normaliser([1700000000000, '100', '110', '90', '105', '50', 1700000059999, '0', 12, '30', '0', '0']);
     expect(n.volumeAcheteur).toBe(30);
     expect(n.volumeVendeur).toBe(20);
     expect(n.delta).toBe(10);

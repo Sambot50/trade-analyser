@@ -39,6 +39,10 @@ export function normaliser(k) {
   const volumeAcheteur = Number(k[9]);
   return {
     ouvertureMs: Number(k[0]),
+    // Instant où la bougie se ferme, donc où sa clôture devient connue.
+    // C'est cette date, et non l'ouverture, qui date une information tirée
+    // de la clôture. Confondre les deux revient à lire le futur.
+    fermetureMs: Number(k[6]),
     ouverture: Number(k[1]),
     plusHaut: Number(k[2]),
     plusBas: Number(k[3]),
