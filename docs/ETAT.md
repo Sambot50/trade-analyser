@@ -29,8 +29,7 @@ d'intérêt que s'il reste honnête : une ligne qui passe de « non vérifié »
 | **Écriture sur disque** (File System Access API) | Non automatisable sans interaction utilisateur. | Connecter un dossier depuis l'onglet Journal et vérifier l'arborescence produite. |
 | **Robustesse de la lecture d'axe** | Un seul essai réel, sur un graphique BTC 5 min sans indicateur. | Accumuler des analyses sur d'autres actifs, unités de temps et styles de graphique. Le journal est fait pour ça. |
 | **L'import CSV sur un vrai fichier** | Éprouvé sur des fixtures et sur un fichier synthétique de 92 000 lignes. Aucun fichier HistData ou MetaTrader réel n'a été lu : ils ne se téléchargent pas depuis cet environnement. | Lancer `--csv` sur un export réel et vérifier les bornes de période et le taux de couverture annoncés. |
-| **La mesure sur BTCUSDT après correctif de la règle de sortie** | Le seul chiffre réel dont on dispose (p = 0,970) a été produit AVANT le correctif DEC-015. Les API de marché sont bloquées depuis cet environnement. | `node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-07-01 --controle 100`, avec `--objectif 1r` puis `2r`. |
-| **Le résidu d'espérance sur données sans structure** | +0,035 à +0,055 R au lieu de 0. Suspects : exclusion des ambiguës, censure par l'horizon. Non expliqué. | Mesurer séparément l'effet de chaque exclusion sur une marche aléatoire. |
+| **Le biais de mesure résiduel** | +0,074 à +0,167 R au lieu de 0 sur données sans structure, sur données réelles mélangées. Non expliqué. C'est le verrou actuel. | Mesurer séparément : entrée remplie à la clôture plutôt qu'à la mèche, puis issues ambiguës comptées en pertes. |
 | **Le spread réellement payé chez Vantage** | La valeur passée à `--spread` est fournie par l'utilisateur, jamais mesurée. | Relever le spread affiché sur XAUUSD à plusieurs heures de la journée — il s'élargit à l'ouverture et à la clôture. |
 
 ## Le contre-essai qui change la lecture
@@ -85,6 +84,65 @@ toujours un avantage planté à p = 0,016.
 **Ce que ça invalide :** tous les chiffres d'espérance produits avant le
 2026-09-23 — +0,392 R, +0,400 R — mesuraient la convention, pas le marché.
 La mesure sur BTCUSDT est à refaire.
+
+## La mesure refaite après correctif — BTCUSDT, 2026-07-01 → 09-23
+
+**2026-09-23, après DEC-015.** 198 order blocks retenus, ~165 issues tranchées,
+100 tirages de contrôle.
+
+| Règle de sortie | Réel | Médiane des tirages | p | Verdict |
+|---|---|---|---|---|
+| Tenue jusqu'à 2 R | 36,4 % · +0,041 R | 37,5 % · +0,074 R | **0,624** | pas d'avantage |
+| Sortie ferme à 1 R | 54,3 % · +0,036 R | 60,8 % · +0,167 R | **0,990** | sous le hasard |
+
+**Le correctif est confirmé sur données réelles :** l'espérance du réel tombe de
++0,400 R à +0,041 R. Le rendement fabriqué a disparu.
+
+**Et il ne reste rien.** Sous la tenue à 2 R, le réel est indiscernable de ses
+propres bougies mélangées. Sous la sortie ferme à 1 R, il est *au plancher* de
+la distribution de contrôle — le minimum des 100 tirages est 54,0 %, le réel
+fait 54,3 %. Mélanger les bougies améliore la règle, 99 fois sur 100.
+
+La règle des order blocks, telle que spécifiée ici, n'extrait rien de la
+structure de BTCUSDT sur ces trois mois.
+
+### Le biais de mesure résiduel est maintenant le verrou
+
+Les tirages de contrôle rendent **+0,074 R (2 R) et +0,167 R (1 R)** sur des
+données sans aucune structure, là où la théorie impose zéro. Sous la sortie à
+1 R, les 100 tirages sont positifs, minimum +0,031 R : ce n'est pas du bruit.
+
+Tant que ce plancher n'est pas expliqué, la mesure ne peut ni valider ni
+invalider une règle — elle ne sait que comparer à un témoin dont on ignore
+pourquoi il gagne.
+
+Suspects, par ordre de plausibilité décroissante :
+
+1. **L'entrée est supposée remplie au prix exact du bord de zone**, touché par
+   une mèche. Une bougie dont la mèche touche notre niveau referme
+   généralement au-dessus : on entre systématiquement à l'extrême favorable de
+   la bougie. Aucun ordre réel ne fait ça sans glissement.
+2. **L'exclusion des issues ambiguës** (5 à 9 cas sur ~170). Trop peu pour
+   expliquer six points à elle seule, mais non neutre.
+3. ~~La censure par l'horizon~~ — **écarté** : 1 seul `horizon_depasse` sur 198
+   sous 2 R, aucun sous 1 R.
+
+### Les coûts condamnent BTC à cette distance de stop, avantage ou pas
+
+Le stop médian vaut **0,169 % du prix**. Rapporté à ce risque :
+
+| Instrument | Coût aller-retour | Coût en R |
+|---|---|---|
+| BTC spot Binance (0,2 % tout compris) | 0,2 % du prix | **~1,2 R** |
+| BTC spot, frais réduits (0,15 %) | 0,15 % | ~0,9 R |
+| BTCUSD CFD, spread 20 $ | ~0,03 % | ~0,17 R |
+| **XAUUSD CFD, spread 0,25 $** | ~0,010 % | **~0,06 R** |
+
+Un coût supérieur à 0,17 % du prix mange plus d'une unité de risque entière.
+**Sur BTC spot, aucun taux de réussite ne rattrape ça.** La constante 0,05 R
+utilisée jusqu'ici sous-estimait le coût réel d'un facteur vingt.
+
+L'or reste mesurable : même distance de stop relative, coût vingt fois moindre.
 
 ## Le contrôle par permutation, et sa propre validation
 
