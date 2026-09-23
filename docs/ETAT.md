@@ -85,7 +85,50 @@ toujours un avantage planté à p = 0,016.
 2026-09-23 — +0,392 R, +0,400 R — mesuraient la convention, pas le marché.
 La mesure sur BTCUSDT est à refaire.
 
-## L'échelle de détection change tout — BTCUSDT, 2026-01-01 → 09-23
+## Le verdict — test hors échantillon, 2026-09-23
+
+Configuration gelée par DEC-018, lancée sur deux jeux jamais examinés.
+
+| Jeu | Issues tranchées | Réel | Contrôle médiane | p |
+|---|---|---|---|---|
+| BTCUSDT 2024-2025 | 318 | 50,0 % · **0,000 R** | 49,2 % · −0,017 R | 0,373 |
+| ETHUSDT 2026 | 116 | 47,4 % · −0,052 R | 49,0 % · −0,021 R | 0,617 |
+
+**Les deux `p` dépassent 0,05 : la règle est abandonnée** (DEC-019).
+
+Le run BTCUSDT est un nul sans ambiguïté — 159 gagnants, 159 perdants,
+espérance 0,000 R, intervalle [44,5 % – 55,5 %]. Le plus serré du projet. Ce
+n'est pas « on ne sait pas », c'est « il n'y a rien ».
+
+Le `p = 0,129` des neuf mois de 2026 était bien un tirage parmi six.
+
+### Ce que ça établit sur l'appareil, et pas seulement sur la règle
+
+Plancher de contrôle : **−0,017 R / 49,2 %** sur deux ans de BTCUSDT,
+**−0,021 R / 49,0 %** sur ETHUSDT. Zéro et 50 %, sur deux jeux jamais vus.
+L'étalonnage tient hors échantillon.
+
+### Ce que ça ne dit pas
+
+La lecture de graphique par modèle de vision n'est pas concernée : le backtest
+teste une règle mécanique, pas le raisonnement d'un modèle sur une capture.
+Cette question reste entière, et non mesurée.
+
+### Le diagnostic qui n'a jamais été fait
+
+Le taux vaut **exactement 50 % sur 318 cas** — la signature d'un point d'entrée
+sans information directionnelle. La question n'est plus « la règle gagne-t-elle »
+mais « une variable enregistrée sépare-t-elle les gagnants des perdants ».
+
+`anomalieVolume` est calculée pour chaque order block depuis le premier jour et
+**n'a jamais été regardée**. La consigne d'alors — « mesurer d'abord, filtrer
+ensuite » — n'a jamais atteint son second temps. Le backtest agrège puis jette
+les enregistrements individuels.
+
+C'est la seule piste qui reste, et elle exige la même discipline : explorer sur
+un jeu, pré-enregistrer, tester sur un autre.
+
+## L'échelle de détection — BTCUSDT, 2026-01-01 → 09-23
 
 **2026-09-23, mesure la plus récente.** Même règle, même code, trois échelles
 de structure. Sortie ferme à 1 R, remplissage à la clôture, coûts à zéro,
@@ -313,12 +356,18 @@ Constatées pendant l'écriture, utiles à connaître avant de les reproduire :
 
 ## Prochaines étapes, par ordre
 
-1. **Le test hors échantillon de DEC-018.** Rien d'autre ne fait avancer la
-   question de fond. La configuration est gelée, la règle de décision est
-   écrite : `p < 0,05` ou on abandonne la piste.
-2. **L'or**, une fois le point 1 tranché. L'import CSV est prêt
-   (`docs/DONNEES.md`), et les coûts y sont vingt fois moindres qu'en crypto
-   spot — c'est le seul terrain où une espérance de +0,08 R survivrait.
+1. ~~**Le test hors échantillon de DEC-018.**~~ — **fait, négatif** (DEC-019).
+2. **Exporter les enregistrements individuels du backtest**, puis chercher
+   quelle variable sépare les gagnants des perdants. 436 order blocks portent
+   déjà leur anomalie de volume, leur type de cassure et leur alignement de
+   biais ; aucun n'a jamais été examiné. C'est la seule piste qui reste après
+   DEC-019, et elle exige la discipline de DEC-018 : explorer sur un jeu,
+   pré-enregistrer, tester sur un autre.
+3. **L'or** — permis par DEC-018 puisque c'est un autre marché, mais le
+   pronostic est mauvais : la règle vient d'échouer sur trois jeux crypto avec
+   des intervalles serrés. Les coûts y sont vingt fois moindres, or des coûts
+   faibles ne créent pas un avantage, ils en préservent un. À garder pour le
+   jour où il y aura quelque chose à préserver.
 3. **Accumuler des analyses réelles** par le chemin vision. Vingt suffisent à
    savoir si le taux de réussite dépasse le seuil d'équilibre. Question
    distincte de celle du backtest : elle porte sur le modèle, pas sur la règle.

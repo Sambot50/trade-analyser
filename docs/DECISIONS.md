@@ -569,3 +569,54 @@ les mesures précédentes.
 
 **Poursuivre en ajustant la configuration jusqu'à obtenir p < 0,05.** C'est
 exactement le geste que ce document existe pour interdire.
+
+---
+
+## DEC-019 — Abandon de la configuration pré-enregistrée
+
+**2026-09-23 · Application de DEC-018**
+
+Le test hors échantillon a été lancé sur les deux jeux nommés, avec la
+configuration gelée, sans rien modifier.
+
+| Jeu | Issues tranchées | Réel | Contrôle médiane | p |
+|---|---|---|---|---|
+| BTCUSDT 2024-2025 | 318 | 50,0 % · **0,000 R** | 49,2 % · −0,017 R | 0,373 |
+| ETHUSDT 2026 | 116 | 47,4 % · −0,052 R | 49,0 % · −0,021 R | 0,617 |
+
+Les deux `p` dépassent 0,05. **La troisième ligne du tableau de décision
+s'applique : abandon, sans nouvelle variante sur les mêmes données.**
+
+Le run BTCUSDT est un nul sans ambiguïté : 159 gagnants, 159 perdants,
+espérance 0,000 R sur 318 cas, intervalle [44,5 % – 55,5 %]. Ce n'est pas
+« on ne sait pas », c'est « il n'y a rien ». Le `p = 0,129` obtenu sur les
+neuf mois de 2026 était bien ce que DEC-018 annonçait : un tirage parmi six.
+
+### Ce qui est acquis au passage
+
+Le plancher de contrôle vaut **−0,017 R / 49,2 %** sur deux ans de BTCUSDT et
+**−0,021 R / 49,0 %** sur ETHUSDT. L'appareil est propre à la détection 1 h
+sur deux jeux qu'il n'avait jamais vus — la conclusion de DEC-017 sur l'échelle
+se confirme hors échantillon.
+
+### Portée exacte de l'abandon
+
+Est abandonnée **la règle mécanique telle que spécifiée** : dernière bougie
+opposée avant l'impulsion, entrée au bord proximal, stop à `MARGE_STOP` au-delà
+de la zone, filtre de biais sur l'unité supérieure.
+
+N'est **pas** concernée la question de la lecture de graphique par modèle de
+vision, qui porte sur le raisonnement d'un modèle et non sur une règle
+mécanique. Elle reste non mesurée.
+
+### Ce que l'abandon interdit, et ce qu'il n'interdit pas
+
+**Interdit :** réessayer une variante de réglage sur ces mêmes données —
+`--fenetre 7`, `MARGE_STOP` à 0,2, une autre unité de temps. C'est le geste que
+DEC-018 existe pour empêcher, et le plus tentant après un échec.
+
+**Permis :** diagnostiquer *pourquoi* la règle ne porte rien. Un diagnostic
+n'est pas un réglage : il cherche à savoir si une variable enregistrée sépare
+les gagnants des perdants, question à laquelle personne n'a encore regardé
+alors que la donnée existe. Toute règle qui en sortirait devra être
+pré-enregistrée et testée hors échantillon comme celle-ci.
