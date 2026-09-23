@@ -75,6 +75,75 @@ elle n'est écrite ni sur disque, ni dans le navigateur.
 Le palier gratuit de l'API Gemini ne demande pas de carte bancaire. Il s'obtient
 depuis Google AI Studio, pas depuis la console de facturation.
 
+## Backtest des order blocks
+
+Le chemin capture d'écran lit des prix sur des pixels. Binance donne les
+chiffres exacts, gratuitement. Ce socle mesure donc les order blocks
+directement sur la donnée, sans modèle de vision.
+
+```bash
+node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01
+```
+
+### La chaîne
+
+```
+bougies Binance
+  → pivots            sommets et creux confirmés
+  → cassures          BOS et CHoCH, sur clôture jamais sur mèche
+  → order blocks      dernière bougie opposée avant l'impulsion
+  → plan hypothétique entrée au bord proximal, stop au-delà, TP à 1 R et 2 R
+  → résolution        le MÊME algorithme que le journal
+  → fréquence observée, avec son intervalle de confiance
+```
+
+Rien n'est réécrit : chaque order block produit un plan, et le code déjà
+éprouvé du journal dit ce que le prix en a fait.
+
+### Trois unités de temps, trois rôles
+
+| Unité | Rôle | Défaut |
+|---|---|---|
+| Biais | On ne retient que les order blocks alignés | `1h` |
+| Détection | Où les structures se lisent | `15m` |
+| Résolution | Où l'issue se tranche | `5m` |
+
+Les détecteurs ignorent la notion d'unité de temps : ce sont des fonctions
+pures sur un tableau de bougies. L'unité est ce qu'on leur donne à manger,
+jamais ce qu'ils savent.
+
+### Le découpage en deux moitiés est imposé
+
+Un réglage mis au point sur la totalité d'un historique décrit ce passé-là et
+rien d'autre. Le script rapporte donc systématiquement les deux moitiés
+séparément : la première pour régler, **la seconde seule a valeur de preuve**.
+
+Il refuse aussi de conclure quand l'intervalle de confiance dépasse 20 points.
+Trois succès sur cinq font « 60 % », mais l'intervalle va de 23 % à 88 % :
+rien n'est mesuré.
+
+### Options
+
+| Option | Défaut | Effet |
+|---|---|---|
+| `--ut-biais` | `1h` | Unité du filtre directionnel |
+| `--ut-detection` | `15m` | Unité de détection |
+| `--ut-resolution` | `5m` | Doit être plus fine que la détection |
+| `--fenetre` | `5` | Bougies de chaque côté pour confirmer un pivot |
+| `--horizon-heures` | `48` | Au-delà, le trade est déclaré non résolu |
+| `--sans-filtre-biais` | — | Mesure l'apport réel du filtre |
+| `--jusqua` | maintenant | Borne de fin |
+
+### Volume et déséquilibre acheteurs/vendeurs
+
+Chaque bougie Binance porte le volume acheteur agressif. Le module en déduit
+le volume vendeur et leur différence, et mesure l'anomalie de volume d'un
+order block en écarts-types par rapport aux vingt bougies précédentes.
+
+Ces chiffres sont enregistrés, **pas encore utilisés comme filtre** : c'est au
+backtest de dire s'ils séparent les gagnants des perdants. Mesurer d'abord,
+filtrer ensuite.
+
 ## Ce que l'outil ne fait pas
 
 **Les niveaux ne sont pas mesurés, ils sont estimés par un modèle de vision.**
