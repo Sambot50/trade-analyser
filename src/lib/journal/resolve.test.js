@@ -158,9 +158,11 @@ describe('symboleResolvable', () => {
 });
 
 describe('normaliserBougie', () => {
-  it('extrait ouverture, plus haut et plus bas du format Binance', () => {
+  it('extrait horodatage, extrêmes et clôture du format Binance', () => {
+    // La clôture est indispensable à l'hypothèse de remplissage `cloture` :
+    // sans elle, ce mode échouait dans le seul chemin qui compte, le journal.
     expect(normaliserBougie([1700000000000, '86500.00', '86780.10', '86290.50', '86400.00']))
-      .toEqual({ ouvertureMs: 1700000000000, plusHaut: 86780.1, plusBas: 86290.5 });
+      .toEqual({ ouvertureMs: 1700000000000, plusHaut: 86780.1, plusBas: 86290.5, cloture: 86400 });
   });
 });
 
@@ -224,5 +226,82 @@ describe('gainEnR', () => {
     expect(gainEnR('tp1', '2r')).toBeNull();
     expect(gainEnR('ambigu', '1r')).toBeNull();
     expect(gainEnR('non_declenche', '2r')).toBeNull();
+  });
+});
+
+/** Bougies portant une clôture, requises par le remplissage à la clôture. */
+const bougiesC = (...triplets) =>
+  triplets.map(([h, l, c], i) => ({ ouvertureMs: 1_700_000_000_000 + i * 60_000, plusHaut: h, plusBas: l, cloture: c }));
+
+describe('remplissage — l’hypothèse d’exécution', () => {
+  it('refuse une hypothèse inconnue', () => {
+    expect(() => resoudreIssue({
+      plan: SHORT, bougies: bougiesC([86530, 86500, 86520]), horizonBougies: 10,
+      objectif: '2r', remplissage: 'limite',
+    })).toThrow(/remplissage inconnue/);
+  });
+
+  it('refuse de supposer une clôture sur une bougie qui n’en porte pas', () => {
+    expect(() => resoudreIssue({
+      plan: SHORT, bougies: bougies([86530, 86500]), horizonBougies: 10,
+      objectif: '2r', remplissage: 'cloture',
+    })).toThrow(/sans clôture/);
+  });
+
+  it('interdit à la bougie de déclenchement de trancher l’issue', () => {
+    // Le cœur du soupçon : sous `meche`, la bougie qui vient chercher l'entrée
+    // peut dans la même foulée atteindre l'objectif — on encaisse le mouvement
+    // de la bougie dans laquelle on prétend être entré.
+    const b = bougiesC([86530, 86090, 86100]);
+    expect(resoudreIssue({ plan: SHORT, bougies: b, horizonBougies: 10, objectif: '2r', remplissage: 'meche' }).statut)
+      .toBe('tp2');
+    expect(resoudreIssue({ plan: SHORT, bougies: b, horizonBougies: 10, objectif: '2r', remplissage: 'cloture' }).statut)
+      .toBe('en_cours');
+  });
+
+  it('entre au prix de clôture, pas au prix du plan', () => {
+    const b = bougiesC([86530, 86500, 86510], [86520, 86400, 86450]);
+    const r = resoudreIssue({ plan: SHORT, bougies: b, horizonBougies: 10, objectif: '2r', remplissage: 'cloture' });
+    expect(r.detail.prixEntreeReel).toBe(86510);
+  });
+
+  it('redérive les objectifs depuis le prix réellement obtenu', () => {
+    // Entrée à 86510 au lieu de 86523,27 : stop à 86780 donc risque 270,
+    // TP2 à 86510 − 540 = 85970, plus loin que les 86100 du plan.
+    const proche = bougiesC([86530, 86500, 86510], [86400, 86080, 86090]);
+    const loin = bougiesC([86530, 86500, 86510], [86400, 85960, 85970]);
+    // Horizon exactement égal au nombre de bougies : l'issue est tranchée,
+    // pas « trop tôt pour le dire ».
+    const opts = { plan: SHORT, horizonBougies: 2, objectif: '2r', remplissage: 'cloture' };
+
+    expect(resoudreIssue({ ...opts, bougies: proche }).statut).toBe('horizon_depasse');
+    expect(resoudreIssue({ ...opts, bougies: loin }).statut).toBe('tp2');
+  });
+
+  it('compte un stop quand la bougie de déclenchement clôture au-delà du stop', () => {
+    // On aurait été pris et sorti dans la même bougie : c'est une perte, pas
+    // un trade qui n'a pas eu lieu.
+    const b = bougiesC([86800, 86500, 86790], [86800, 86700, 86750]);
+    const r = resoudreIssue({ plan: SHORT, bougies: b, horizonBougies: 10, objectif: '2r', remplissage: 'cloture' });
+    expect(r.statut).toBe('stop');
+    expect(r.detail.raison).toMatch(/au-delà du stop/);
+  });
+
+  it('reste en cours quand aucune bougie ne suit le déclenchement', () => {
+    const b = bougiesC([86530, 86500, 86510]);
+    expect(resoudreIssue({ plan: SHORT, bougies: b, horizonBougies: 50, objectif: '2r', remplissage: 'cloture' }).statut)
+      .toBe('en_cours');
+  });
+
+  it('inscrit l’hypothèse dans le détail, sous les deux modes', () => {
+    const b = bougiesC([86530, 86500, 86510], [86400, 85960, 85970]);
+    const opts = { plan: SHORT, bougies: b, horizonBougies: 10, objectif: '2r' };
+    expect(resoudreIssue({ ...opts, remplissage: 'meche' }).detail.remplissage).toBe('meche');
+    expect(resoudreIssue({ ...opts, remplissage: 'cloture' }).detail.remplissage).toBe('cloture');
+  });
+
+  it('suppose la mèche par défaut, comme avant', () => {
+    const b = bougiesC([86530, 86090, 86100]);
+    expect(resoudreIssue({ plan: SHORT, bougies: b, horizonBougies: 10, objectif: '2r' }).statut).toBe('tp2');
   });
 });

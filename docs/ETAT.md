@@ -10,7 +10,7 @@ d'intérêt que s'il reste honnête : une ligne qui passe de « non vérifié »
 
 | Quoi | Comment | Résultat |
 |---|---|---|
-| Logique pure | 273 tests unitaires | tous passent |
+| Logique pure | 282 tests unitaires | tous passent |
 | Build de production | `npm run build` | 221 kB JS (71 kB gzip) |
 | Projection prix → pixel | lecture des pixels du canvas en navigateur | écart max **1,1 px** sur 4 niveaux |
 | Lecture d'axe sur graphique synthétique | banc d'essai, échelle connue | `qwen3.8:27b` à **2,3 px** |
@@ -116,16 +116,23 @@ Tant que ce plancher n'est pas expliqué, la mesure ne peut ni valider ni
 invalider une règle — elle ne sait que comparer à un témoin dont on ignore
 pourquoi il gagne.
 
-Suspects, par ordre de plausibilité décroissante :
+Suspects, et où en est l'enquête :
 
-1. **L'entrée est supposée remplie au prix exact du bord de zone**, touché par
-   une mèche. Une bougie dont la mèche touche notre niveau referme
-   généralement au-dessus : on entre systématiquement à l'extrême favorable de
-   la bougie. Aucun ordre réel ne fait ça sans glissement.
-2. **L'exclusion des issues ambiguës** (5 à 9 cas sur ~170). Trop peu pour
-   expliquer six points à elle seule, mais non neutre.
-3. ~~La censure par l'horizon~~ — **écarté** : 1 seul `horizon_depasse` sur 198
+1. ~~**L'entrée supposée remplie au prix exact du bord de zone**, touché par une
+   mèche~~ — **éprouvé, responsable en partie.** `--remplissage cloture`
+   (DEC-016) fait tomber le plancher de +0,093 à **+0,043 R** sous la sortie à
+   1 R, mais seulement de +0,108 à **+0,088 R** sous la tenue à 2 R. La moitié
+   du biais sous une règle, presque rien sous l'autre.
+2. **L'exclusion des issues ambiguës** (5 à 9 cas sur ~170) — non éprouvé.
+   Prochaine expérience : les compter en pertes, puis en gains, et regarder si
+   le plancher bouge.
+3. **L'exclusion des `non_declenche`** (25 cas sur 198) — non éprouvé.
+4. ~~La censure par l'horizon~~ — **écarté** : 1 seul `horizon_depasse` sur 198
    sous 2 R, aucun sous 1 R.
+
+**Il reste donc au moins une cause non identifiée.** Les chiffres ci-dessus
+sont mesurés sur un fichier synthétique ; la même comparaison sur bougies
+BTCUSDT réelles reste à faire.
 
 ### Les coûts condamnent BTC à cette distance de stop, avantage ou pas
 

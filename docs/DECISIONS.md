@@ -381,3 +381,53 @@ quand les deux premières seront mesurées.
 **Conséquence sur le journal :** `SCHEMA_VERSION` passe de 1 à 2, et chaque
 plan porte `objectifDeSortie`. Les enregistrements v1 restent lisibles mais ne
 se comparent pas aux v2 — ils ont été résolus sous l'autre convention.
+
+
+---
+
+## DEC-016 — L'hypothèse de remplissage devient un paramètre, et elle explique la moitié du biais
+
+**2026-09-23 · Retenue, résultat partiel**
+
+`--remplissage meche|cloture`. Sous `cloture`, l'entrée est supposée obtenue à
+la clôture de la bougie qui a touché la zone, et la résolution ne commence
+qu'à la bougie **suivante**. Le stop reste où le plan l'a posé — c'est un
+niveau structurel — et les objectifs sont redérivés à 1 R et 2 R du prix
+réellement obtenu, si bien qu'un remplissage défavorable éloigne l'objectif
+autant qu'il rapproche le stop.
+
+**Motif :** le contrôle par permutation rendait une espérance positive sur des
+données sans aucune structure, là où la théorie impose zéro (DEC-015, résidu
+non expliqué). Soupçon principal : `meche` suppose une exécution au prix exact
+du plan dès qu'une mèche le touche, sans glissement ni file d'attente. Or une
+bougie dont la mèche vient chercher un niveau referme généralement au-dessus —
+on entre à l'extrême favorable, et le mouvement favorable de la bougie de
+déclenchement est compté pour nous.
+
+### Mesuré — médiane des tirages de contrôle, coûts mis à zéro
+
+Ce chiffre doit valoir 0. Tout écart est du biais de mesure.
+
+| Règle de sortie | `meche` | `cloture` | Réduction |
+|---|---|---|---|
+| Sortie ferme à 1 R | +0,093 R | **+0,043 R** | −54 % |
+| Tenue jusqu'à 2 R | +0,108 R | **+0,088 R** | −19 % |
+
+**Le soupçon était fondé, et insuffisant.** Sous 1 R, l'hypothèse de
+remplissage portait la moitié du biais ; sous 2 R, presque rien. Il reste
+donc au moins une autre cause, non identifiée.
+
+La sensibilité est intacte : sur la série à momentum planté, l'avantage est
+toujours détecté à p = 0,016 (0/60) sous les deux règles.
+
+**Ce qui reste à éprouver**, par ordre de plausibilité : le traitement des
+issues ambiguës (exclues aujourd'hui), puis celui des `non_declenche`. La
+méthode est la même — faire varier une exclusion à la fois et regarder si le
+plancher bouge.
+
+**`meche` reste le défaut**, pour que les mesures antérieures restent
+comparables. C'est pourtant l'hypothèse la plus favorable qui existe : le jour
+où le biais sera expliqué, `cloture` devrait prendre sa place.
+
+**Écarté :** modéliser un glissement en points. Ça ajouterait un paramètre
+inventé là où `cloture` n'ajoute qu'une hypothèse vérifiable.

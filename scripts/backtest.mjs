@@ -26,13 +26,16 @@ import { generateurAleatoire, melangerBougies, valeurP, resumeDistribution } fro
 import { cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER, INDETERMINE } from '../src/lib/marche/structure.js';
 import { detecter, anomalieVolume } from '../src/lib/marche/orderblocks.js';
 import { intervalleWilson, conclusionPossible, esperanceEnR } from '../src/lib/marche/statistiques.js';
-import { resoudreIssue, gainEnR, OBJECTIFS, reglageObjectif } from '../src/lib/journal/resolve.js';
+import { resoudreIssue, gainEnR, OBJECTIFS, REMPLISSAGES, reglageObjectif } from '../src/lib/journal/resolve.js';
 
 const DEFAUTS = {
   utBiais: '1h', utDetection: '15m', utResolution: '5m',
   fenetre: 5, horizonHeures: 48, coutEnR: 0.05,
   utCsv: '1m', decalageHeures: 0,
   graine: 1, controlePaquet: 1,
+  // Remplissage à la mèche par défaut, pour rester comparable aux mesures
+  // antérieures — mais c'est l'hypothèse la plus favorable qui existe.
+  remplissage: 'meche',
   // Tenue jusqu'à 2 R par défaut. Toucher 1 R en chemin ne rapporte rien :
   // on n'y était pas sorti.
   objectif: '2r',
@@ -152,6 +155,11 @@ export function validerOptions(args) {
     else o.objectif = args.objectif;
   }
 
+  if (args.remplissage !== undefined) {
+    if (!REMPLISSAGES.includes(args.remplissage)) erreurs.push(`--remplissage "${args.remplissage}" inconnu (${REMPLISSAGES.join(', ')})`);
+    else o.remplissage = args.remplissage;
+  }
+
   o.sansFiltreBiais = Boolean(args.sansFiltreBiais);
   o.baseUrl = typeof args.baseUrl === 'string' ? args.baseUrl : undefined;
   if (o.csv && o.baseUrl) erreurs.push('--csv et --base-url désignent deux sources : choisis-en une.');
@@ -170,7 +178,7 @@ export function validerOptions(args) {
 }
 
 /** Applique le filtre de biais et résout chaque order block. */
-export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesResolution, horizonBougies, sansFiltreBiais, objectif, spread = 0, commission = 0 }) {
+export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesResolution, horizonBougies, sansFiltreBiais, objectif, remplissage, spread = 0, commission = 0 }) {
   const resultats = [];
 
   for (const ob of orderBlocks) {
@@ -185,7 +193,7 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
     if (depart === -1) continue;
 
     const suite = bougiesResolution.slice(depart, depart + horizonBougies);
-    const { statut, detail } = resoudreIssue({ plan: ob.plan, bougies: suite, horizonBougies, objectif });
+    const { statut, detail } = resoudreIssue({ plan: ob.plan, bougies: suite, horizonBougies, objectif, remplissage });
 
     resultats.push({
       ms: ob.ms, sens: ob.sens, typeCassure: ob.typeCassure, biais, aligne,
@@ -224,7 +232,7 @@ export function chaine(fines, o) {
   const resultats = evaluer({
     orderBlocks, bougiesDetection: detectionBougies, serieBiais,
     bougiesResolution: resolutionBougies, horizonBougies, sansFiltreBiais: o.sansFiltreBiais,
-    objectif: o.objectif, spread: o.spread ?? 0, commission: o.commission ?? 0,
+    objectif: o.objectif, remplissage: o.remplissage, spread: o.spread ?? 0, commission: o.commission ?? 0,
   });
 
   return {
@@ -556,7 +564,7 @@ async function main() {
   const resultats = evaluer({
     orderBlocks, bougiesDetection: detectionBougies, serieBiais,
     bougiesResolution: resolutionBougies, horizonBougies, sansFiltreBiais: o.sansFiltreBiais,
-    objectif: o.objectif, spread: o.spread ?? 0, commission: o.commission ?? 0,
+    objectif: o.objectif, remplissage: o.remplissage, spread: o.spread ?? 0, commission: o.commission ?? 0,
   });
 
   console.log(`  retenus après filtre de biais: ${resultats.length}`);

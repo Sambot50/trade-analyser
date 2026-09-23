@@ -9,7 +9,7 @@
 //     --symbole BTCUSDT --le 2026-09-22T18:48:55Z \
 //     --direction SELL --entree 86523.27 --stop 86780 --tp1 86300 --tp2 86100
 
-import { resoudreIssue, OBJECTIFS, reglageObjectif } from '../src/lib/journal/resolve.js';
+import { resoudreIssue, OBJECTIFS, REMPLISSAGES } from '../src/lib/journal/resolve.js';
 import { recupererBougiesPaginees, symboleResolvable, MINUTES_PAR_BOUGIE, INTERVALLE_RESOLUTION } from '../src/lib/journal/market.js';
 import { calculerExcursions, enUnitesDeRisque } from '../src/lib/journal/excursion.js';
 import { computeRR, rrVerdict, breakEvenRate } from '../src/lib/analysis.js';
@@ -95,11 +95,16 @@ export function construirePlan(args) {
     return { erreurs: [`--objectif "${objectif}" inconnu (${Object.keys(OBJECTIFS).join(', ')})`] };
   }
 
-  return { plan, symbole, depuisMs, horizonHeures, objectif, baseUrl: args.baseUrl };
+  const remplissage = args.remplissage ?? 'meche';
+  if (!REMPLISSAGES.includes(remplissage)) {
+    return { erreurs: [`--remplissage "${remplissage}" inconnu (${REMPLISSAGES.join(', ')})`] };
+  }
+
+  return { plan, symbole, depuisMs, horizonHeures, objectif, remplissage, baseUrl: args.baseUrl };
 }
 
 async function main() {
-  const { erreurs, plan, symbole, depuisMs, horizonHeures, objectif, baseUrl } = construirePlan(parseArgs(process.argv.slice(2)));
+  const { erreurs, plan, symbole, depuisMs, horizonHeures, objectif, remplissage, baseUrl } = construirePlan(parseArgs(process.argv.slice(2)));
 
   if (erreurs) {
     console.error('\nArguments invalides :');
@@ -137,7 +142,7 @@ async function main() {
     process.exit(2);
   }
 
-  const { statut, detail } = resoudreIssue({ plan, bougies, horizonBougies, objectif });
+  const { statut, detail } = resoudreIssue({ plan, bougies, horizonBougies, objectif, remplissage });
 
   console.log('=== Issue ===\n');
   console.log(`  ${statut.toUpperCase()} — ${LIBELLE[statut] ?? ''}\n`);

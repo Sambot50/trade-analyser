@@ -188,6 +188,34 @@ allait jusqu'à TP2. C'est une option gratuite, et sur 200 000 marches
 aléatoires — où toute espérance doit être nulle — elle produisait **+0,330 R
 par trade à partir de rien**. Voir DEC-015.
 
+### L'hypothèse de remplissage — `--remplissage`
+
+| Mode | À quel prix on suppose être entré |
+|---|---|
+| `meche` (défaut) | Au prix exact du plan, dès qu'une mèche le touche |
+| `cloture` | À la clôture de la bougie qui a touché la zone, résolution à partir de la **suivante** |
+
+`meche` est l'hypothèse la plus favorable qui existe : une bougie dont la mèche
+vient chercher un niveau referme généralement au-dessus, donc on entre à
+l'extrême favorable, sans glissement ni file d'attente — et le mouvement
+favorable de la bougie de déclenchement est compté pour nous.
+
+Sous `cloture`, le stop reste où le plan l'a posé (c'est un niveau structurel)
+et les objectifs sont redérivés à 1 R et 2 R du prix réellement obtenu : un
+remplissage défavorable éloigne l'objectif autant qu'il rapproche le stop.
+
+**Ce que ça a montré**, sur la médiane des tirages de contrôle — un chiffre qui
+doit valoir 0 sur des données sans structure :
+
+| Règle de sortie | `meche` | `cloture` |
+|---|---|---|
+| Sortie ferme à 1 R | +0,093 R | **+0,043 R** |
+| Tenue jusqu'à 2 R | +0,108 R | **+0,088 R** |
+
+L'hypothèse de remplissage portait **la moitié** du biais sous 1 R et presque
+rien sous 2 R. Il reste au moins une autre cause. Voir DEC-016 et
+[docs/ETAT.md](docs/ETAT.md).
+
 ### Le contrôle par permutation — `--controle`
 
 ```bash
@@ -224,6 +252,7 @@ ne prouvent pas une impossibilité, seulement qu'on n'a pas tiré assez.
 | `--graine` | `1` | Un contrôle qu'on ne peut pas rejouer ne se vérifie pas |
 | `--controle-paquet` | `1` | Mélange par paquets de N bougies consécutives : conserve la structure courte |
 | `--objectif` | `2r` | Règle de sortie, `1r` ou `2r` |
+| `--remplissage` | `meche` | Hypothèse d'exécution, `meche` ou `cloture` |
 
 ### Le contrôle a été validé dans les deux sens
 
