@@ -140,6 +140,62 @@ chargement, donc analysables comme une vraie capture. Leur échelle exacte est c
 3. compare. Un écart important sur `scale` signale un modèle inadapté à la
    lecture de l'axe, avant que tu ne t'appuies dessus sur un vrai graphique.
 
+## Journal
+
+Chaque analyse réelle est enregistrée automatiquement, sans bouton à cliquer :
+un journal qu'on alimente à la main se remplit trois fois puis s'arrête.
+
+### Où vont les données
+
+Le stockage du navigateur sert de **tampon**, jamais de mémoire — il s'efface
+avec les données de site. La mémoire, ce sont des fichiers dans un dossier que
+tu désignes, depuis l'onglet **Journal** → *Connecter un dossier*.
+
+L'interface indique en permanence combien d'analyses n'ont pas encore atteint
+le disque.
+
+```
+journal/
+├─ RAPPORT.md      tableau de toutes les analyses + statistiques
+├─ SCHEMA.md       documentation du format, générée depuis le code
+├─ index.jsonl     un évènement par ligne
+└─ 2026-09-22/184855-BTCUSDT-5m/
+   ├─ capture.png  l'image soumise au modèle, octet pour octet
+   ├─ overlay.png  le rendu affiché, niveaux tracés
+   └─ analyse.json le détail
+```
+
+`index.jsonl` est un journal d'évènements, pas une table : constater une issue
+**ajoute** une ligne pour le même `id`, le fichier n'est jamais réécrit. Pour
+l'état courant, regrouper par `id` et garder la dernière ligne.
+
+### Constater les issues
+
+À l'ouverture de l'application, les analyses sans issue sont retentées
+automatiquement sur les bougies d'une minute de Binance, sur un horizon de
+24 heures. Tu ouvres l'outil le lendemain, le journal s'est mis à jour seul.
+
+| | Résolution |
+|---|---|
+| Paires crypto cotées sur Binance | automatique |
+| Forex, indices, actions | manuelle, dans l'onglet Journal |
+
+Quand une même bougie touche le stop **et** un objectif, l'OHLC ne dit pas
+lequel a été atteint en premier. Ces cas sont marqués `ambigu` et **exclus des
+statistiques** : trancher au hasard biaiserait le taux de réussite.
+
+### Pourquoi ce format
+
+Un enregistrement doit être interprétable seul, par un humain comme par un
+agent, sans lire le code qui l'a produit — d'où les noms complets, la devise
+explicite, les seuils embarqués et le résumé en langue naturelle.
+
+`RAPPORT.md` est le point d'entrée : quelques milliers de tokens pour cent
+analyses, au lieu d'ouvrir cent fichiers JSON. Il répond à la seule question
+qui compte — le taux de réussite dépasse-t-il le seuil d'équilibre qu'impose
+le ratio médian, et la confiance déclarée par le modèle prédit-elle quoi que
+ce soit.
+
 ## Architecture
 
 ```
@@ -147,6 +203,15 @@ src/lib/analysis.js          validation, ratio, projection prix → pixel (pur)
 src/lib/image.js             conversion en data-URI PNG
 scripts/bench-vision.mjs     banc d'essai des modèles de vision
 src/lib/settings.js          préférences de moteur (jamais la clé API)
+src/lib/journal/
+  schema.js                  format d'enregistrement, index, réduction
+  resolve.js                 issue d'un plan à partir de bougies (pur)
+  market.js                  bougies publiques Binance
+  report.js                  RAPPORT.md et statistiques
+  schema-doc.js              SCHEMA.md, généré depuis le code
+  store.js                   tampon IndexedDB et écriture disque
+  index.js                   orchestration
+src/JournalView.jsx          liste, issues, connexion du dossier
 src/lib/providers/
   schema.js                  schéma et invite partagés, conversion Gemini
   ollama.js                  moteur local
@@ -163,9 +228,17 @@ src/lib/providers/
 npm test
 ```
 
-40 tests sur la logique pure : cohérence, ratio, projection, exclusion des
-niveaux hors cadre, conversion de schéma, tolérance du JSON renvoyé, règles
-d'accès aux fournisseurs.
+112 tests sur la logique pure : cohérence des plans, ratio, projection,
+exclusion des niveaux hors cadre, conversion de schéma, tolérance du JSON
+renvoyé, règles d'accès aux fournisseurs, format d'enregistrement, réduction
+du journal d'évènements, statistiques, et résolution des issues — entrée
+jamais atteinte, stop avant objectif, objectif avant stop, bougie ambiguë,
+horizon dépassé, dans les deux sens de marché.
+
+L'appel réseau à Binance n'est pas couvert : les API de marché étaient
+inaccessibles depuis l'environnement où ce code a été écrit. L'algorithme qui
+exploite les bougies, lui, est testé exhaustivement contre des jeux
+fabriqués, et toute défaillance réseau est annoncée sans être masquée.
 
 ## Déploiement
 
