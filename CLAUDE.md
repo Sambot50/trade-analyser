@@ -54,7 +54,13 @@ Deux invariants du socle de mesure relèvent du même principe :
    Sous `2r`, un trade passé par TP1 puis stoppé est un stop à −1 R. Créditer
    les deux branches est une lecture du futur : ça produisait +0,330 R par
    trade sur des marches aléatoires. Voir DEC-015.
-7. **Aucun résultat sans témoin.** Une espérance ne se lit que face à la
+7. **Compter les essais.** Le contrôle par permutation compare une règle au
+   hasard, une règle à la fois ; il ne sait pas combien de configurations ont
+   été essayées avant. Six essais suffisent à produire un p de 0,13 par pur
+   hasard une fois sur deux. Un indice trouvé après exploration se teste sur
+   des données jamais regardées, avec la règle de décision écrite d'avance —
+   voir DEC-018.
+8. **Aucun résultat sans témoin.** Une espérance ne se lit que face à la
    distribution obtenue sur les mêmes bougies mélangées (`--controle`). Sur du
    bruit pur, la chaîne rend +0,407 R de médiane : un chiffre flatteur produit
    par rien du tout. Voir DEC-014.

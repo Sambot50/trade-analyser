@@ -500,3 +500,72 @@ pour conclure.
 remède est une unité de résolution plus fine — une bougie de 5 minutes qui
 touche les deux niveaux se décompose en bougies d'une minute qui, elles,
 disent l'ordre.
+
+---
+
+## DEC-018 — Pré-enregistrement : un seul test, décidé avant de le lancer
+
+**2026-09-23 · Retenue, écrite avant les données**
+
+À la détection 1 h, le backtest rend **p = 0,129** sur BTCUSDT — le premier
+indice du projet. Ce document fixe ce qui sera testé et comment le résultat
+sera lu, **avant** que les données servant à le trancher soient examinées.
+
+### La configuration, gelée
+
+```
+--ut-biais 4h  --ut-detection 1h  --ut-resolution 5m
+--objectif 1r  --remplissage cloture  --fenetre 5  --horizon-heures 48
+--controle 200
+```
+
+Aucun paramètre ne bouge. Pas de variante, pas de réglage, pas de « et si on
+essayait aussi ». Toute modification annule le test et en ouvre un autre.
+
+### Les données, jamais regardées
+
+1. `BTCUSDT --depuis 2024-01-01 --jusqua 2025-12-31` — deux ans antérieurs.
+2. `ETHUSDT --depuis 2026-01-01` — autre actif, même période.
+
+### La règle de décision
+
+| Résultat | Conséquence |
+|---|---|
+| `p < 0,05` sur les deux jeux | La piste vaut la peine d'être poursuivie : mesurer sur l'or, puis dimensionner. |
+| `p < 0,05` sur un seul | Indice persistant, pas de conclusion. Étendre l'historique, ne rien engager. |
+| `p ≥ 0,05` sur les deux | **Abandon de cette configuration.** Pas de nouvelle variante sur les mêmes données. |
+
+### Motif
+
+**Six configurations ont été essayées sur la même période de BTCUSDT.** Sous
+l'hypothèse nulle, la probabilité qu'au moins une affiche p ≤ 0,13 par hasard
+est de l'ordre de 55 % — les essais partagent leurs données, donc ce chiffre
+n'est qu'un ordre de grandeur, mais le mode d'échec est réel : à force de
+chercher, on trouve.
+
+Ni le découpage en deux moitiés ni le contrôle par permutation n'attrapent ce
+biais-là. Le premier compare deux moitiés des mêmes données ; le second
+compare une règle au hasard, une règle à la fois. Aucun des deux ne sait
+combien de règles ont été essayées avant.
+
+Le seul remède est d'écrire la décision avant de voir le résultat. C'est ce
+que fait ce document, et c'est pourquoi il est daté.
+
+### Ce qui plaide malgré tout pour cette configuration
+
+Elle n'a pas été pêchée parmi dix. Elle a été proposée pour un motif mécanique
+énoncé **avant** la mesure : à la détection 15 minutes, le stop médian valait
+0,169 % du prix, soit l'amplitude d'une seule bougie — un stop posé dans le
+bruit. Le passage à 1 h portait ce stop à 0,438 %.
+
+Ce motif a d'ailleurs été confirmé par un effet qui n'était pas recherché : à
+la détection 1 h, le plancher de contrôle tombe à **−0,004 R pour 49,8 % de
+réussite**, c'est-à-dire exactement zéro, alors qu'il était biaisé à toutes
+les mesures précédentes.
+
+Ça rend l'hypothèse moins arbitraire. Ça ne la rend pas vraie.
+
+### Écarté
+
+**Poursuivre en ajustant la configuration jusqu'à obtenir p < 0,05.** C'est
+exactement le geste que ce document existe pour interdire.

@@ -85,7 +85,64 @@ toujours un avantage planté à p = 0,016.
 2026-09-23 — +0,392 R, +0,400 R — mesuraient la convention, pas le marché.
 La mesure sur BTCUSDT est à refaire.
 
-## La mesure refaite après correctif — BTCUSDT, 2026-07-01 → 09-23
+## L'échelle de détection change tout — BTCUSDT, 2026-01-01 → 09-23
+
+**2026-09-23, mesure la plus récente.** Même règle, même code, trois échelles
+de structure. Sortie ferme à 1 R, remplissage à la clôture, coûts à zéro,
+100 tirages de contrôle.
+
+| Détection | Stop médian | Issues tranchées | Réel | Contrôle médiane | p |
+|---|---|---|---|---|---|
+| 15 min | 0,169 % du prix | 161 | 42,9 % · −0,143 R | 45,2 % · −0,096 R | 0,703 |
+| **1 h** | **0,438 %** | **111** | **54,0 % · +0,081 R** | **49,8 % · −0,004 R** | **0,129** |
+| 4 h | 1,278 % | 17 | 47,1 % · −0,059 R | 45,9 % · −0,081 R | 0,495 |
+
+Le run 4 h ne dit rien : 17 issues, intervalle de 43 points. À ignorer dans
+les deux sens.
+
+### Le biais de mesure était une affaire d'échelle
+
+À la détection 1 h, la médiane des tirages vaut **−0,004 R pour 49,8 % de
+réussite**. C'est zéro, et c'est 50 %. Le plancher positif qui a occupé toute
+la journée du 2026-09-23 était **spécifique à la détection 15 minutes** : des
+zones d'order block à 0,169 % du prix, c'est-à-dire l'amplitude d'une seule
+bougie — un stop posé dans le bruit intrabar, où les hypothèses d'exécution
+pèsent plus que la structure.
+
+Le biais n'était donc pas un défaut générique de la chaîne mais une fonction
+du rapport entre la distance du stop et le bruit de la bougie. À 0,438 % il a
+disparu de lui-même. (Mesuré pour la sortie à 1 R seulement ; la sortie à 2 R
+n'a pas été rejouée à cette échelle.)
+
+### Le seul indice du projet, et pourquoi il ne prouve rien
+
+À la détection 1 h, **p = 0,129** : douze tirages sur cent font aussi bien.
+C'est la première fois que le réel passe au-dessus de son témoin.
+
+Ce n'est pas une preuve, pour une raison qui n'a rien à voir avec le code :
+**six configurations ont été essayées sur les mêmes données.** Sous
+l'hypothèse nulle, la probabilité qu'au moins une affiche p ≤ 0,13 par hasard
+est de l'ordre de **55 %**. Ordre de grandeur — les essais partagent leurs
+données, ils ne sont pas indépendants — mais le mode d'échec est réel : à
+force de chercher, on trouve.
+
+Ni le découpage en deux moitiés ni le contrôle par permutation n'attrapent
+celui-là. Seul un test hors échantillon le peut. Voir DEC-018, qui fige la
+configuration et la règle de décision **avant** de regarder les données.
+
+### Les coûts, à cette échelle
+
+Espérance brute +0,081 R, stop médian 0,438 % du prix :
+
+| Instrument | Coût en R | Espérance nette |
+|---|---|---|
+| BTC spot Binance (0,2 %) | 0,46 R | **−0,38 R** |
+| BTCUSD CFD, spread 20 $ | 0,06 R | +0,02 R |
+| Coûts type or CFD | 0,02 R | +0,06 R |
+
+Même confirmé, l'indice serait **inexploitable en spot**.
+
+## La mesure à la détection 15 minutes — BTCUSDT, 2026-07-01 → 09-23
 
 **2026-09-23, après DEC-015.** 198 order blocks retenus, ~165 issues tranchées,
 100 tirages de contrôle.
@@ -106,15 +163,24 @@ fait 54,3 %. Mélanger les bougies améliore la règle, 99 fois sur 100.
 La règle des order blocks, telle que spécifiée ici, n'extrait rien de la
 structure de BTCUSDT sur ces trois mois.
 
-### Le biais de mesure résiduel est maintenant le verrou
+### Le biais de mesure résiduel, et ce qu'il a fallu comprendre
 
-Les tirages de contrôle rendent **+0,074 R (2 R) et +0,167 R (1 R)** sur des
-données sans aucune structure, là où la théorie impose zéro. Sous la sortie à
-1 R, les 100 tirages sont positifs, minimum +0,031 R : ce n'est pas du bruit.
+Les tirages de contrôle rendaient **+0,074 R (2 R) et +0,167 R (1 R)** sur des
+données sans aucune structure, là où la théorie impose zéro.
 
-Tant que ce plancher n'est pas expliqué, la mesure ne peut ni valider ni
-invalider une règle — elle ne sait que comparer à un témoin dont on ignore
-pourquoi il gagne.
+Deux causes, l'une corrigée et l'autre comprise après coup :
+
+- **L'hypothèse d'exécution à la mèche** (DEC-016, DEC-017), qui valait
+  16 points de taux de réussite sortis de rien ;
+- **l'échelle de détection**, comprise plus tard : à 15 minutes le stop est
+  dans le bruit intrabar. À la détection 1 h, le plancher tombe à −0,004 R
+  sans rien changer d'autre.
+
+**Une précision sur la portée de ce plancher, écrite après coup.** Un test de
+permutation compare le réel à SA PROPRE distribution nulle : le biais de
+l'appareil frappe le réel et les cent tirages de la même façon, et s'annule
+dans le `p`. Le plancher invalidait donc la lecture *absolue* — « +0,400 R
+donc rentable » — mais jamais le `p`, qui a toujours été le bon chiffre.
 
 Enquête close sur l'essentiel, sur une série à volatilité réaliste — 0,08 %
 d'écart-type à la minute, mèches comparables aux corps. Médiane des tirages,
@@ -247,14 +313,18 @@ Constatées pendant l'écriture, utiles à connaître avant de les reproduire :
 
 ## Prochaines étapes, par ordre
 
-1. **Accumuler des analyses réelles.** Vingt suffisent à savoir si le taux de
-   réussite dépasse le seuil d'équilibre imposé par le ratio médian. Tant que
-   ce chiffre n'existe pas, tout le reste est de l'optimisation à l'aveugle.
-2. **Vérifier la résolution automatique** sur une paire crypto.
-3. **Dimensionnement de position.** Des niveaux sans taille de position ne sont
-   pas un plan de trade. Capital, risque par trade, distance au stop : du
-   calcul pur.
-4. **Intégration continue.** Les 112 tests existent, rien ne les exécute au
-   push.
+1. **Le test hors échantillon de DEC-018.** Rien d'autre ne fait avancer la
+   question de fond. La configuration est gelée, la règle de décision est
+   écrite : `p < 0,05` ou on abandonne la piste.
+2. **L'or**, une fois le point 1 tranché. L'import CSV est prêt
+   (`docs/DONNEES.md`), et les coûts y sont vingt fois moindres qu'en crypto
+   spot — c'est le seul terrain où une espérance de +0,08 R survivrait.
+3. **Accumuler des analyses réelles** par le chemin vision. Vingt suffisent à
+   savoir si le taux de réussite dépasse le seuil d'équilibre. Question
+   distincte de celle du backtest : elle porte sur le modèle, pas sur la règle.
+4. **Dimensionnement de position.** Des niveaux sans taille de position ne sont
+   pas un plan de trade.
 5. **Travailler l'invite** pour que les niveaux découlent du raisonnement —
-   mais seulement une fois qu'il y aura une mesure de départ.
+   seulement une fois qu'il y aura une mesure de départ.
+
+~~Intégration continue~~ — faite, Node 20 et 22 à chaque push.
