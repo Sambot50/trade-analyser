@@ -1,0 +1,61 @@
+# Vérification automatique à chaque push et chaque pull request.
+#
+# Ce qui tourne ici est exactement ce qu'un contributeur lance en local :
+# installation depuis le verrou de dépendances, tests, build. Rien de plus.
+#
+# Ce qui n'y tourne délibérément PAS :
+#   - scripts/bench-vision.mjs      exige un serveur Ollama et des modèles de
+#                                   plusieurs gigaoctets. C'est un outil de
+#                                   mesure locale, pas un test.
+#   - l'appel Binance de market.js  dépend d'une API tierce. Un rouge pour
+#                                   cause de réseau instable apprend à ignorer
+#                                   les rouges.
+
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Une nouvelle poussée annule la vérification en cours sur la même branche :
+# seul le dernier état compte.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verifier:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      # Ne pas interrompre les autres versions au premier échec : savoir si le
+      # problème touche une version ou toutes est une information.
+      fail-fast: false
+      matrix:
+        # 20 est la version utilisée en développement sur la machine de
+        # travail, 22 celle des environnements d'écriture. Les deux doivent
+        # passer, sans quoi le code dépend d'une version sans qu'on le sache.
+        node: [20, 22]
+
+    steps:
+      - name: Récupérer le dépôt
+        uses: actions/checkout@v4
+
+      - name: Installer Node ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Installer les dépendances
+        # npm ci et non npm install : installe exactement les versions du
+        # verrou, sans jamais le modifier.
+        run: npm ci
+
+      - name: Lancer les tests
+        run: npm test
+
+      - name: Construire le bundle de production
+        run: npm run build
