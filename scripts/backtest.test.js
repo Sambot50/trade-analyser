@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { validerOptions, agreger } from './backtest.mjs';
+import { validerOptions, agreger, chaine } from './backtest.mjs';
+import { generateurAleatoire, melangerBougies } from '../src/lib/marche/controle.js';
 
 const base = { symbole: 'BTCUSDT', depuis: '2025-01-01' };
 
@@ -127,5 +128,111 @@ describe('agreger — seuil de rentabilité', () => {
     const agr = agreger([resultat('non_declenche'), resultat('ambigu')], 0.05);
     expect(agr.intervalle).toBeNull();
     expect(agr.esperance).toBeNull();
+  });
+});
+
+describe('validerOptions — contrôle', () => {
+  it('prend 100 tirages quand --controle est passé seul', () => {
+    expect(validerOptions({ ...base, controle: true }).controle).toBe(100);
+  });
+
+  it('accepte un nombre de tirages explicite', () => {
+    expect(validerOptions({ ...base, controle: '500' }).controle).toBe(500);
+  });
+
+  it('refuse un nombre de tirages absurde', () => {
+    for (const n of ['0', '-5', '2.5', '99999']) {
+      expect(validerOptions({ ...base, controle: n }).erreurs)
+        .toEqual(expect.arrayContaining([expect.stringContaining('--controle')]));
+    }
+  });
+
+  it('expose une graine par défaut, pour que le contrôle soit rejouable', () => {
+    expect(validerOptions(base).graine).toBe(1);
+    expect(validerOptions({ ...base, graine: '77' }).graine).toBe(77);
+  });
+
+  it('refuse une taille de paquet non entière', () => {
+    expect(validerOptions({ ...base, controlePaquet: '1.5' }).erreurs)
+      .toEqual(expect.arrayContaining([expect.stringContaining('--controle-paquet')]));
+  });
+});
+
+/** Série 1 minute déterministe, assez longue pour produire des order blocks. */
+function fines(n = 6000, phi = 0) {
+  const alea = generateurAleatoire(2025);
+  const normal = () => { let s = 0; for (let i = 0; i < 12; i++) s += alea(); return s - 6; };
+  let prix = 2400, r = 0;
+  return Array.from({ length: n }, (_, i) => {
+    r = phi * r + normal() * 0.0004;
+    const ouverture = prix;
+    const cloture = prix * Math.exp(r);
+    prix = cloture;
+    return {
+      ouvertureMs: Date.UTC(2025, 0, 1) + i * 60_000,
+      fermetureMs: Date.UTC(2025, 0, 1) + (i + 1) * 60_000 - 1,
+      ouverture, cloture,
+      plusHaut: Math.max(ouverture, cloture) * (1 + alea() * 0.0002),
+      plusBas: Math.min(ouverture, cloture) * (1 - alea() * 0.0002),
+      volume: 100 + (i % 37), volumeAcheteur: null, volumeVendeur: null, delta: null, nombreTrades: null,
+    };
+  });
+}
+
+const options = {
+  uniteFine: '1m', utBiais: '1h', utDetection: '15m', utResolution: '5m',
+  fenetre: 5, horizonHeures: 48, coutEnR: 0.05, spread: 0, commission: 0, sansFiltreBiais: false,
+};
+
+describe('chaine — le chemin commun au réel et au contrôle', () => {
+  it('produit des order blocks depuis une seule série fine', () => {
+    const { resultats, compteurs } = chaine(fines(), options);
+    expect(compteurs.orderBlocks).toBeGreaterThan(0);
+    expect(resultats.length).toBeGreaterThan(0);
+  });
+
+  it('est déterministe : mêmes bougies, mêmes résultats', () => {
+    const serie = fines();
+    const a = chaine(serie, options).resultats;
+    const b = chaine(serie, options).resultats;
+    expect(a.map((r) => `${r.ms}:${r.statut}`)).toEqual(b.map((r) => `${r.ms}:${r.statut}`));
+  });
+
+  it('avale une série mélangée sans se casser', () => {
+    // Le contrôle ne vaut que si le hasard traverse exactement le même code.
+    const melangee = melangerBougies(fines(), generateurAleatoire(3));
+    const { resultats } = chaine(melangee, options);
+    for (const r of resultats) {
+      expect(r.plan.prixEntree).toBeGreaterThan(0);
+      expect(Number.isFinite(r.plan.risque)).toBe(true);
+    }
+  });
+
+  it('donne un résultat différent après mélange', () => {
+    // Garde-fou contre le contrôle silencieusement inopérant : si mélanger ne
+    // changeait rien, chaque tirage rejouerait le réel et p vaudrait 1.
+    const serie = fines();
+    const reel = chaine(serie, options).resultats;
+    const melange = chaine(melangerBougies(serie, generateurAleatoire(3)), options).resultats;
+    expect(melange.map((r) => `${r.ms}:${r.statut}`)).not.toEqual(reel.map((r) => `${r.ms}:${r.statut}`));
+  });
+
+  it('respecte la même graine d’un tirage à l’autre', () => {
+    const serie = fines();
+    const a = chaine(melangerBougies(serie, generateurAleatoire(8)), options).resultats;
+    const b = chaine(melangerBougies(serie, generateurAleatoire(8)), options).resultats;
+    expect(a.map((r) => r.statut)).toEqual(b.map((r) => r.statut));
+  });
+
+  it('date toujours les order blocks à un instant connaissable', () => {
+    // L'invariant anti-lecture du futur doit survivre au mélange : une bougie
+    // déplacée garde son horodatage d'origine, donc la cassure reste datée à
+    // une fermeture réelle.
+    const melangee = melangerBougies(fines(), generateurAleatoire(3));
+    const { resultats } = chaine(melangee, options);
+    for (const r of resultats) {
+      expect(r.ms).toBeGreaterThanOrEqual(melangee[0].ouvertureMs);
+      expect(r.ms).toBeLessThanOrEqual(melangee[melangee.length - 1].fermetureMs);
+    }
   });
 });

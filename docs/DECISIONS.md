@@ -269,3 +269,58 @@ qui a trouvé le bug, c'est d'avoir refusé de croire un bon résultat.
 **Conséquence sur les tests :** un test parcourt désormais **tous** les
 évènements produits et vérifie `c.ms === bougies[c.index].fermetureMs`. Un
 invariant vérifié sur un cas choisi ne vaut rien.
+
+
+---
+
+## DEC-014 — Le hasard comme témoin, sur les mêmes données
+
+**2026-09-23 · Retenue**
+
+`--controle N` rejoue les mêmes détecteurs sur les mêmes bougies, remises dans
+un ordre tiré au sort, N fois. Le résultat réel est positionné dans la
+distribution obtenue, et le script rapporte la proportion de tirages qui font
+aussi bien — le p unilatéral d'un test de permutation.
+
+**Motif :** le découpage en deux moitiés attrape un réglage sur-ajusté, pas une
+règle qui n'a jamais rien eu à exploiter. Si l'avantage est nul, il est nul
+dans les deux moitiés et rien ne le signale. C'est exactement ce qui s'est
+produit : 53,4 % sur du BTCUSDT réel, 53,2 % sur une marche aléatoire.
+
+**Le mélange conserve chaque bougie et ne détruit que la suite.** Chaque bougie
+est décomposée en rendements logarithmiques relatifs à son ouverture, plus
+l'écart avec la clôture précédente ; les tuples sont permutés, la série est
+reconstruite. Un marteau reste un marteau, une bougie de +2 % reste une bougie
+de +2 %. Les horodatages ne bougent pas — sinon les week-ends du forex
+atterriraient en milieu de semaine.
+
+**Écarté :** mélanger les prix eux-mêmes. Ça produirait des séries qu'aucun
+marché ne peut engendrer, et le témoin ne témoignerait de rien.
+
+**Écarté :** un générateur de marche aléatoire séparé. Il n'a ni la volatilité
+ni la distribution des bougies du marché étudié ; la comparaison porterait
+autant sur le générateur que sur la règle. Le seul témoin honnête est fait des
+données elles-mêmes.
+
+**Le p ne descend jamais à zéro.** `(k+1)/(N+1)` plutôt que `k/N` : sans ça,
+cent tirages tous battus afficheraient « p = 0 », c'est-à-dire une
+impossibilité, alors qu'on a seulement manqué de tirages. Le plancher est
+annoncé quand il est atteint.
+
+### Ce que le contrôle a montré en se validant lui-même
+
+Éprouvé dans les deux sens, sur 92 000 bougies 1 minute et 100 tirages :
+
+| Série d'essai | Réel | Médiane des tirages | p |
+|---|---|---|---|
+| Marche aléatoire | +0,390 R | +0,407 R | **0,604** |
+| Momentum planté (`r = 0,35·r₋₁ + bruit`) | +1,605 R | +1,120 R | **0,010** (0/100) |
+
+Un contrôle qui répondrait toujours « pas d'avantage » serait inutile. Celui-ci
+détecte un avantage planté et ignore le bruit.
+
+**Et il montre au passage ce qui rendait les chiffres précédents illisibles :**
+sur du bruit pur, les tirages de contrôle rendent une espérance médiane de
+**+0,407 R**. Un système qui paraît rentable sur des données sans aucune
+structure. L'espérance seule ne veut rien dire ; elle ne se lit que face à son
+témoin.

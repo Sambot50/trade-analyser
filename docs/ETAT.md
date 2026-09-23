@@ -10,7 +10,7 @@ d'intérêt que s'il reste honnête : une ligne qui passe de « non vérifié »
 
 | Quoi | Comment | Résultat |
 |---|---|---|
-| Logique pure | 222 tests unitaires | tous passent |
+| Logique pure | 260 tests unitaires | tous passent |
 | Build de production | `npm run build` | 221 kB JS (71 kB gzip) |
 | Projection prix → pixel | lecture des pixels du canvas en navigateur | écart max **1,1 px** sur 4 niveaux |
 | Lecture d'axe sur graphique synthétique | banc d'essai, échelle connue | `qwen3.8:27b` à **2,3 px** |
@@ -29,6 +29,7 @@ d'intérêt que s'il reste honnête : une ligne qui passe de « non vérifié »
 | **Écriture sur disque** (File System Access API) | Non automatisable sans interaction utilisateur. | Connecter un dossier depuis l'onglet Journal et vérifier l'arborescence produite. |
 | **Robustesse de la lecture d'axe** | Un seul essai réel, sur un graphique BTC 5 min sans indicateur. | Accumuler des analyses sur d'autres actifs, unités de temps et styles de graphique. Le journal est fait pour ça. |
 | **L'import CSV sur un vrai fichier** | Éprouvé sur des fixtures et sur un fichier synthétique de 92 000 lignes. Aucun fichier HistData ou MetaTrader réel n'a été lu : ils ne se téléchargent pas depuis cet environnement. | Lancer `--csv` sur un export réel et vérifier les bornes de période et le taux de couverture annoncés. |
+| **Le contrôle sur données réelles** | Validé sur deux séries construites, jamais lancé sur du BTCUSDT ni sur de l'or réels : les API de marché sont bloquées depuis cet environnement. | `node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100`, et la même chose avec `--csv` sur l'or. |
 | **Le spread réellement payé chez Vantage** | La valeur passée à `--spread` est fournie par l'utilisateur, jamais mesurée. | Relever le spread affiché sur XAUUSD à plusieurs heures de la journée — il s'élargit à l'ouverture et à la clôture. |
 
 ## Le contre-essai qui change la lecture
@@ -49,12 +50,36 @@ ni les tendances du BTC, et les deux intervalles font plus de quinze points.
 C'est une preuve que **l'échantillon actuel ne permet pas de conclure**, et que
 le découpage en deux moitiés ne suffisait pas à le dire.
 
-Ce que ça impose avant toute mise en réel :
+Ce que ça imposait avant toute mise en réel :
 
-1. un mode contrôle intégré, qui rejoue les mêmes détecteurs sur la série réelle
-   mélangée — pour que le hasard soit mesuré sur les mêmes données, pas sur un
-   générateur qui ne ressemble à rien ;
+1. ~~un mode contrôle intégré~~ — **fait**, voir ci-dessous ;
 2. une période d'au moins un an, pour ramener l'intervalle sous huit points.
+
+## Le contrôle par permutation, et sa propre validation
+
+**2026-09-23.** `--controle N` rejoue les mêmes détecteurs sur les mêmes
+bougies remises dans un ordre tiré au sort, et positionne le réel dans la
+distribution obtenue (DEC-014).
+
+Un contrôle qui répondrait toujours « pas d'avantage » ne vaudrait rien. Il a
+donc été éprouvé dans les deux sens, sur 92 000 bougies 1 minute, 100 tirages :
+
+| Série d'essai | Réel | Médiane des tirages | p | Verdict rendu |
+|---|---|---|---|---|
+| Marche aléatoire | +0,390 R | +0,407 R | 0,604 | pas d'avantage |
+| Momentum planté | +1,605 R | +1,120 R | 0,010 (0/100) | avantage détecté |
+
+Commandes exactes, rejouables :
+
+```bash
+node scripts/backtest.mjs --csv <marche_aleatoire>.csv --controle 100
+node scripts/backtest.mjs --csv <momentum>.csv --controle 100
+```
+
+**Le chiffre le plus instructif de tout le projet :** sur du bruit pur, les
+tirages de contrôle rendent une espérance médiane de **+0,407 R**. Un système
+qui paraît rentable sur des données sans la moindre structure. Ça condamne la
+lecture isolée de l'espérance — la nôtre comprise, jusqu'ici.
 
 ## Coûts : mesurés, et décisifs
 

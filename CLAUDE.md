@@ -49,19 +49,26 @@ Deux invariants du socle de mesure relèvent du même principe :
    acheteur/vendeur : `delta` y vaut `null` et l'analyse de volume ne rend
    rien. Le déduire du sens de la bougie fabriquerait un indicateur qui ne
    mesure que ce qu'on sait déjà.
+6. **Aucun résultat sans témoin.** Une espérance ne se lit que face à la
+   distribution obtenue sur les mêmes bougies mélangées (`--controle`). Sur du
+   bruit pur, la chaîne rend +0,407 R de médiane : un chiffre flatteur produit
+   par rien du tout. Voir DEC-014.
 
 ## Commandes
 
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 222 tests
+npm test                         # 260 tests
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 
 # Backtest — deux sources, une chaîne
 node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01
 node scripts/backtest.mjs --csv XAUUSD_M1_2025.csv --decalage-heures -5 --spread 0.25
+
+# Contrôle par permutation : la règle bat-elle le hasard sur ces données ?
+node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100
 npm run samples                  # régénère les graphiques de référence
 ```
 

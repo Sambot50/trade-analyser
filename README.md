@@ -166,16 +166,60 @@ Mêmes règles, mêmes trades, conclusions opposées. Le seuil de rentabilité e
 affiché face à l'intervalle de confiance, avec trois verdicts : gagnant même
 au pire de l'intervalle, perdant même au mieux, ou indécidable.
 
-### Ce qu'un contre-essai a montré
+### Le contrôle par permutation — `--controle`
 
-Lancée sur une marche aléatoire — des bougies tirées au hasard, sans aucune
-structure — la chaîne rend **53,2 %** de réussite. Sur du BTCUSDT réel, elle
-rend **53,4 %**. Les deux intervalles se recouvrent entièrement.
+```bash
+node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100
+```
 
-Ça ne prouve pas que la règle ne vaut rien. Ça prouve que l'échantillon actuel
-ne permet pas de la distinguer du hasard, et qu'il faut une année d'historique
-et un mode contrôle sur données mélangées avant d'en tirer quoi que ce soit.
-Voir [docs/ETAT.md](docs/ETAT.md).
+Le découpage en deux moitiés attrape un réglage sur-ajusté. Il n'attrape pas
+une règle qui n'a **jamais rien eu à exploiter** : si l'avantage est nul, il
+est nul dans les deux moitiés, et rien ne le signale.
+
+Le contrôle rejoue les mêmes détecteurs sur les mêmes bougies, remises dans un
+ordre tiré au sort, cent fois. Chaque bougie reste elle-même — un marteau reste
+un marteau, une bougie de +2 % reste une bougie de +2 % — seule la **suite** est
+détruite, avec elle les tendances, les cassures et les order blocks. Les
+horodatages ne bougent pas.
+
+```
+                        réel     médiane   [min – max]
+  order blocks           207         199   [157 – 225]
+  issues tranchées       113        73.5   [55 – 91]
+  taux de réussite    92.0 %      74.7 %   [64.6 % – 85.5 %]
+  espérance          1.605 R     1.120 R   [0.779 R – 1.456 R]
+
+  p (espérance)       0.010   0/100 tirages font aussi bien
+```
+
+`p` est la proportion de tirages qui font aussi bien **sans rien exploiter**.
+Il ne descend jamais à zéro : `(k+1)/(N+1)`, parce que cent tirages tous battus
+ne prouvent pas une impossibilité, seulement qu'on n'a pas tiré assez.
+
+| Option | Défaut | Effet |
+|---|---|---|
+| `--controle` | — | Nombre de tirages, `100` si passé seul |
+| `--graine` | `1` | Un contrôle qu'on ne peut pas rejouer ne se vérifie pas |
+| `--controle-paquet` | `1` | Mélange par paquets de N bougies consécutives : conserve la structure courte |
+
+### Le contrôle a été validé dans les deux sens
+
+Un contrôle qui répond toujours « pas d'avantage » ne sert à rien. Sur 92 000
+bougies 1 minute et 100 tirages :
+
+| Série d'essai | Réel | Médiane des tirages | p | Verdict rendu |
+|---|---|---|---|---|
+| Marche aléatoire | +0,390 R | +0,407 R | 0,604 | pas d'avantage |
+| Momentum planté | +1,605 R | +1,120 R | 0,010 | avantage détecté |
+
+**Et il rend lisible ce qui ne l'était pas.** Sur du bruit pur, les tirages de
+contrôle rendent une espérance médiane de **+0,407 R** : un système qui paraît
+rentable sur des données sans la moindre structure. L'espérance seule ne veut
+rien dire. Elle ne se lit que face à son témoin.
+
+C'est ce qui rend l'ancien résultat sur BTCUSDT — 53,4 %, +0,392 R —
+ininterprétable en l'état : il n'avait pas de témoin. Voir
+[docs/ETAT.md](docs/ETAT.md).
 
 ### Volume et déséquilibre acheteurs/vendeurs
 

@@ -2,6 +2,7 @@
 //
 //   node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01
 //   node scripts/backtest.mjs --csv XAUUSD_M1_2025.csv --spread 0.25
+//   node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100
 //
 // Deux sources, une seule chaîne : Binance pour ce qu'il cote, un fichier CSV
 // pour le reste — or, forex, indices. Les détecteurs ne savent pas d'où
@@ -21,6 +22,7 @@ import { basename } from 'node:path';
 import { recuperer, dureeUnite, nombreDeRequetes, UNITES } from '../src/lib/marche/bougies.js';
 import { analyser as analyserCsv, agreger as agregerBougies, decrire } from '../src/lib/marche/csv.js';
 import { coutEnRDuPlan, distributionDesStops, seuilDeRentabilite } from '../src/lib/marche/couts.js';
+import { generateurAleatoire, melangerBougies, valeurP, resumeDistribution } from '../src/lib/marche/controle.js';
 import { cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER, INDETERMINE } from '../src/lib/marche/structure.js';
 import { detecter, anomalieVolume } from '../src/lib/marche/orderblocks.js';
 import { intervalleWilson, conclusionPossible, esperanceEnR } from '../src/lib/marche/statistiques.js';
@@ -30,6 +32,7 @@ const DEFAUTS = {
   utBiais: '1h', utDetection: '15m', utResolution: '5m',
   fenetre: 5, horizonHeures: 48, coutEnR: 0.05,
   utCsv: '1m', decalageHeures: 0,
+  graine: 1, controlePaquet: 1,
 };
 
 export function parseArgs(argv) {
@@ -123,6 +126,24 @@ export function validerOptions(args) {
     else o.horizonHeures = n;
   }
 
+  if (args.controle !== undefined) {
+    const n = args.controle === true ? 100 : Number(args.controle);
+    if (!Number.isInteger(n) || n < 1 || n > 10_000) erreurs.push('--controle doit être un entier entre 1 et 10000 (défaut 100)');
+    else o.controle = n;
+  }
+
+  if (args.graine !== undefined) {
+    const n = Number(args.graine);
+    if (!Number.isInteger(n) || n < 0) erreurs.push('--graine doit être un entier positif');
+    else o.graine = n;
+  }
+
+  if (args.controlePaquet !== undefined) {
+    const n = Number(args.controlePaquet);
+    if (!Number.isInteger(n) || n < 1) erreurs.push('--controle-paquet doit être un entier positif');
+    else o.controlePaquet = n;
+  }
+
   o.sansFiltreBiais = Boolean(args.sansFiltreBiais);
   o.baseUrl = typeof args.baseUrl === 'string' ? args.baseUrl : undefined;
   if (o.csv && o.baseUrl) erreurs.push('--csv et --base-url désignent deux sources : choisis-en une.');
@@ -170,6 +191,42 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
   }
 
   return resultats;
+}
+
+/**
+ * La chaîne entière depuis une seule série fine.
+ *
+ * Le contrôle par permutation exige que le réel et le hasard passent par
+ * exactement le même chemin — y compris l'agrégation. Deux chemins distincts
+ * introduiraient une différence sans rapport avec ce qu'on mesure.
+ */
+export function chaine(fines, o) {
+  const memeUnite = (unite) => dureeUnite(unite) === dureeUnite(o.uniteFine);
+  const vers = (unite) => (memeUnite(unite) ? fines : agregerBougies(fines, unite));
+
+  const biaisBougies = vers(o.utBiais);
+  const detectionBougies = vers(o.utDetection);
+  const resolutionBougies = vers(o.utResolution);
+
+  const serieBiais = tendanceAuFilDuTemps(cassures(biaisBougies, o.fenetre));
+  const evenements = cassures(detectionBougies, o.fenetre);
+  const orderBlocks = detecter(detectionBougies, evenements);
+
+  const horizonBougies = Math.round((o.horizonHeures * 3_600_000) / dureeUnite(o.utResolution));
+  const resultats = evaluer({
+    orderBlocks, bougiesDetection: detectionBougies, serieBiais,
+    bougiesResolution: resolutionBougies, horizonBougies, sansFiltreBiais: o.sansFiltreBiais,
+    spread: o.spread ?? 0, commission: o.commission ?? 0,
+  });
+
+  return {
+    resultats,
+    compteurs: {
+      cassuresBiais: serieBiais.length,
+      cassuresDetection: evenements.length,
+      orderBlocks: orderBlocks.length,
+    },
+  };
 }
 
 export function agreger(resultats, coutParDefaut) {
@@ -262,11 +319,7 @@ function afficherBloc(titre, agr) {
 
 /** Les trois séries depuis Binance, une requête par tranche de 1000 bougies. */
 async function chargerBinance(o) {
-  const plan = ['utBiais', 'utDetection', 'utResolution'].map((k) => ({
-    unite: o[k], ...nombreDeRequetes({ unite: o[k], depuisMs: o.depuisMs, jusquaMs: o.jusquaMs }),
-  }));
-  console.log(`\n  ${plan.map((p) => `${p.unite}: ${p.bougies} bougies`).join('  ·  ')}`);
-  console.log(`  ${plan.reduce((a, p) => a + p.requetes, 0)} requêtes à envoyer\n`);
+  o.uniteFine = o.utResolution;
 
   const charger = async (unite) => {
     process.stdout.write(`  ${unite}… `);
@@ -275,11 +328,26 @@ async function chargerBinance(o) {
     return bs;
   };
 
-  return {
-    biaisBougies: await charger(o.utBiais),
-    detectionBougies: await charger(o.utDetection),
-    resolutionBougies: await charger(o.utResolution),
-  };
+  // En mode contrôle, seule la série fine est chargée : les unités supérieures
+  // en découlent par agrégation exacte, et le hasard doit être tiré sur la même
+  // série que le réel.
+  if (o.controle) {
+    const { requetes } = nombreDeRequetes({ unite: o.utResolution, depuisMs: o.depuisMs, jusquaMs: o.jusquaMs });
+    console.log(`\n  ${requetes} requêtes à envoyer (série ${o.utResolution} seule, les autres s'en déduisent)\n`);
+    const fines = await charger(o.utResolution);
+    return { fines };
+  }
+
+  const plan = ['utBiais', 'utDetection', 'utResolution'].map((k) => ({
+    unite: o[k], ...nombreDeRequetes({ unite: o[k], depuisMs: o.depuisMs, jusquaMs: o.jusquaMs }),
+  }));
+  console.log(`\n  ${plan.map((p) => `${p.unite}: ${p.bougies} bougies`).join('  ·  ')}`);
+  console.log(`  ${plan.reduce((a, p) => a + p.requetes, 0)} requêtes à envoyer\n`);
+
+  const biaisBougies = await charger(o.utBiais);
+  const detectionBougies = await charger(o.utDetection);
+  const resolutionBougies = await charger(o.utResolution);
+  return { biaisBougies, detectionBougies, resolutionBougies, fines: resolutionBougies };
 }
 
 /**
@@ -294,6 +362,7 @@ async function chargerBinance(o) {
  * sur une intention.
  */
 async function chargerFichier(o) {
+  o.uniteFine = o.utCsv;
   process.stdout.write(`\n  lecture de ${basename(o.csv)}… `);
   const contenu = await readFile(o.csv, 'utf8');
   const { bougies, volumeExploitable, separateur } = analyserCsv(contenu, {
@@ -332,7 +401,72 @@ async function chargerFichier(o) {
   const resolutionBougies = vers(o.utResolution);
 
   console.log(`  ${o.utBiais}: ${biaisBougies.length}  ·  ${o.utDetection}: ${detectionBougies.length}  ·  ${o.utResolution}: ${resolutionBougies.length} bougies`);
-  return { biaisBougies, detectionBougies, resolutionBougies };
+  return { biaisBougies, detectionBougies, resolutionBougies, fines: retenues };
+}
+
+/**
+ * Affiche le réel face à la distribution des tirages de contrôle.
+ *
+ * Un seul chiffre compte vraiment ici : la proportion de tirages qui font
+ * aussi bien que le réel SANS RIEN EXPLOITER. Tout le reste est du décor
+ * destiné à rendre ce chiffre interprétable.
+ */
+function afficherControle(reel, controles, o) {
+  const ligne = (nom, valeurReelle, echantillon, format) => {
+    const d = resumeDistribution(echantillon);
+    if (!d) { console.log(`  ${nom.padEnd(22)} ${format(valeurReelle).padStart(9)}   (aucun tirage exploitable)`); return; }
+    console.log(
+      `  ${nom.padEnd(22)} ${format(valeurReelle).padStart(9)}   ${format(d.mediane).padStart(9)}   `
+      + `[${format(d.minimum)} – ${format(d.maximum)}]`,
+    );
+  };
+
+  const pct = (v) => (v === null || v === undefined ? '—' : `${(v * 100).toFixed(1)} %`);
+  const enR = (v) => (v === null || v === undefined ? '—' : `${v.toFixed(3)} R`);
+  const nb = (v) => String(v ?? '—');
+
+  console.log('\n=== Contrôle par permutation ===\n');
+  console.log(`  ${o.controle} tirages · graine ${o.graine} · mélange par paquets de ${o.controlePaquet} bougie${o.controlePaquet > 1 ? 's' : ''}`);
+  console.log('  Les mêmes bougies, remises dans un ordre tiré au sort : chaque bougie');
+  console.log("  reste elle-même, seule la suite est détruite. Tout ce que la règle tire");
+  console.log('  de la structure temporelle doit disparaître.\n');
+
+  console.log(`  ${''.padEnd(22)} ${'réel'.padStart(9)}   ${'médiane'.padStart(9)}   [min – max]`);
+  ligne('order blocks', reel.total, controles.map((c) => c.total), nb);
+  ligne('issues tranchées', reel.tranchees, controles.map((c) => c.tranchees), nb);
+  ligne('taux de réussite', reel.intervalle?.proportion, controles.map((c) => c.intervalle?.proportion), pct);
+  ligne('espérance', reel.esperance, controles.map((c) => c.esperance), enR);
+
+  // L'espérance décide, pas le taux : un taux élevé à ratio défavorable perd.
+  const pEsperance = valeurP(reel.esperance, controles.map((c) => c.esperance));
+  const pTaux = valeurP(reel.intervalle?.proportion, controles.map((c) => c.intervalle?.proportion));
+
+  console.log('');
+  if (!pEsperance) {
+    console.log('  Aucun tirage n’a produit d’espérance exploitable — période trop courte.');
+    return;
+  }
+
+  console.log(`  p (espérance)          ${pEsperance.p.toFixed(3)}   ${pEsperance.auMoinsAussiBons}/${pEsperance.tirages} tirages font aussi bien`);
+  if (pTaux) console.log(`  p (taux)               ${pTaux.p.toFixed(3)}   ${pTaux.auMoinsAussiBons}/${pTaux.tirages} tirages font aussi bien`);
+
+  console.log('');
+  if (pEsperance.p <= 0.05) {
+    console.log('  ✓ Le hasard reproduit rarement ce résultat. La règle lit quelque chose');
+    console.log('    dans la structure. À confirmer sur une autre période avant d’y croire.');
+  } else if (pEsperance.p <= 0.2) {
+    console.log('  ~ Indice faible. Le hasard y arrive une fois sur cinq ou mieux : c’est');
+    console.log('    trop souvent pour conclure, trop rare pour écarter. Allonge la période.');
+  } else {
+    console.log('  ✗ Le hasard fait aussi bien sans rien exploiter. En l’état, rien ne');
+    console.log('    distingue cette règle d’un tirage au sort sur les mêmes bougies.');
+  }
+
+  if (pEsperance.p === pEsperance.plancher) {
+    console.log(`\n  ⚠  p est au plancher (1/${pEsperance.tirages + 1}) : aucun tirage n’a fait aussi bien,`);
+    console.log('     donc le vrai p est peut-être plus petit. Augmente --controle pour le voir.');
+  }
+  console.log('');
 }
 
 async function main() {
@@ -343,7 +477,8 @@ async function main() {
     for (const e of o.erreurs) console.error('  - ' + e);
     console.error('\nExemples :');
     console.error('  node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01');
-    console.error('  node scripts/backtest.mjs --csv XAUUSD_M1_2025.csv --decalage-heures -5 --spread 0.25\n');
+    console.error('  node scripts/backtest.mjs --csv XAUUSD_M1_2025.csv --decalage-heures -5 --spread 0.25');
+    console.error('  node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100\n');
     process.exit(1);
   }
 
@@ -362,14 +497,36 @@ async function main() {
   else console.log(`  coûts ${o.coutEnR} R — valeur supposée, à remplacer par --spread`);
   if (o.sansFiltreBiais) console.log('  filtre de biais DÉSACTIVÉ');
 
-  let biaisBougies, detectionBougies, resolutionBougies;
+  let biaisBougies, detectionBougies, resolutionBougies, fines;
   try {
-    ({ biaisBougies, detectionBougies, resolutionBougies } = o.csv
+    ({ biaisBougies, detectionBougies, resolutionBougies, fines } = o.csv
       ? await chargerFichier(o)
       : await chargerBinance(o));
   } catch (err) {
     console.error(`\nÉchec : ${err.message}\n`);
     process.exit(2);
+  }
+
+  if (o.controle) {
+    if (!fines.length) { console.error('\nAucune bougie.\n'); process.exit(2); }
+
+    const reel = chaine(fines, o);
+    console.log(`\n  order blocks (réel): ${reel.compteurs.orderBlocks}  ·  retenus après filtre: ${reel.resultats.length}`);
+
+    process.stdout.write(`  ${o.controle} tirages de contrôle… `);
+    const alea = generateurAleatoire(o.graine);
+    const controles = [];
+    for (let i = 0; i < o.controle; i++) {
+      const melangee = melangerBougies(fines, alea, o.controlePaquet);
+      controles.push(agreger(chaine(melangee, o).resultats, o.coutEnR));
+      if ((i + 1) % 10 === 0) process.stdout.write('.');
+    }
+    console.log(' terminé');
+
+    const agrege = agreger(reel.resultats, o.coutEnR);
+    afficherBloc('Réel — ensemble de la période', agrege);
+    afficherControle(agrege, controles, o);
+    return;
   }
 
   if (!detectionBougies.length) { console.error('\nAucune bougie de détection.\n'); process.exit(2); }

@@ -157,17 +157,35 @@ export function agreger(bougies, uniteCible) {
       groupes.set(debut, {
         ouvertureMs: debut, fermetureMs: debut + duree - 1,
         ouverture: b.ouverture, plusHaut: b.plusHaut, plusBas: b.plusBas, cloture: b.cloture,
-        volume: b.volume, volumeAcheteur: null, volumeVendeur: null, delta: null, nombreTrades: null,
+        volume: b.volume,
+        // Sommés quand ils existent : une bougie Binance agrégée doit garder
+        // son détail acheteur/vendeur, sinon l'agrégation ferait disparaître
+        // une donnée réelle au passage.
+        volumeAcheteur: b.volumeAcheteur, nombreTrades: b.nombreTrades,
       });
     } else {
       g.plusHaut = Math.max(g.plusHaut, b.plusHaut);
       g.plusBas = Math.min(g.plusBas, b.plusBas);
       g.cloture = b.cloture;
       g.volume += b.volume;
+      g.volumeAcheteur = somme(g.volumeAcheteur, b.volumeAcheteur);
+      g.nombreTrades = somme(g.nombreTrades, b.nombreTrades);
     }
   }
 
-  return [...groupes.values()].sort((a, b) => a.ouvertureMs - b.ouvertureMs);
+  const agregees = [...groupes.values()].sort((a, b) => a.ouvertureMs - b.ouvertureMs);
+
+  for (const g of agregees) {
+    g.volumeVendeur = typeof g.volumeAcheteur === 'number' ? g.volume - g.volumeAcheteur : null;
+    g.delta = typeof g.volumeAcheteur === 'number' ? g.volumeAcheteur - g.volumeVendeur : null;
+  }
+
+  return agregees;
+}
+
+/** Une somme dont un seul terme manquant suffit à rendre le total inconnu. */
+function somme(a, b) {
+  return typeof a === 'number' && typeof b === 'number' ? a + b : null;
 }
 
 /** Bornes et continuité d'une série, pour prévenir de ce qui manque. */
