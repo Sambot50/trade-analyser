@@ -63,6 +63,9 @@ export function normaliserBougie(k) {
     ouvertureMs: Number(k[0]),
     plusHaut: Number(k[2]),
     plusBas: Number(k[3]),
+    // Requise par l'hypothèse de remplissage à la clôture. Son absence faisait
+    // échouer ce mode dans le seul chemin qui compte : le journal réel.
+    cloture: Number(k[4]),
   };
 }
 

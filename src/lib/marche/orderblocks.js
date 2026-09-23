@@ -102,7 +102,15 @@ export function anomalieVolume(bougies, index, fenetre = 20) {
   const ecartType = Math.sqrt(variance);
 
   const b = bougies[index];
-  const deltaMoyen = precedentes.reduce((a, p) => a + Math.abs(p.delta), 0) / precedentes.length;
+
+  // Un CSV de CFD ne porte pas le détail acheteur/vendeur : le déséquilibre
+  // est absent, et doit le rester. Le déduire du sens de la bougie
+  // fabriquerait un indicateur qui ne mesure que ce qu'on sait déjà.
+  const deltaDisponible = typeof b.delta === 'number'
+    && precedentes.every((p) => typeof p.delta === 'number');
+  const deltaMoyen = deltaDisponible
+    ? precedentes.reduce((a, p) => a + Math.abs(p.delta), 0) / precedentes.length
+    : 0;
 
   return {
     // Un écart-type nul signifie un volume parfaitement constant avant : la
@@ -111,7 +119,7 @@ export function anomalieVolume(bougies, index, fenetre = 20) {
     ecartsTypes: ecartType ? arrondir((b.volume - moyenne) / ecartType, 2) : null,
     volumeRapporteALaMoyenne: arrondir(b.volume / moyenne, 2),
     // Négatif = vendeurs dominants sur cette bougie, positif = acheteurs.
-    deltaRapporteAuMoyen: deltaMoyen ? arrondir(b.delta / deltaMoyen, 2) : null,
+    deltaRapporteAuMoyen: deltaDisponible && deltaMoyen ? arrondir(b.delta / deltaMoyen, 2) : null,
   };
 }
 

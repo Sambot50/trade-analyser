@@ -185,3 +185,318 @@ grand-chose — on efface les cas gênants sans s'en rendre compte.
 
 Supprimer une entrée reste possible : en supprimant son dossier. Le geste est
 délibéré.
+
+---
+
+## DEC-011 — Un fichier CSV comme seconde source, pas comme second système
+
+**2026-09-23 · Retenue**
+
+Le backtest accepte `--csv`. Les bougies d'un fichier traversent exactement les
+mêmes détecteurs que celles de Binance ; rien dans `structure.js`,
+`orderblocks.js` ou `resolve.js` ne sait d'où elles viennent.
+
+**Motif :** Binance ne cote ni l'or, ni le forex, ni les indices — c'est-à-dire
+l'essentiel de ce qui est réellement tradé ici. Sans seconde source, le projet
+mesurait un marché qui n'était pas le sien.
+
+**Écarté :** un connecteur par courtier. Chaque API impose son compte, ses
+quotas et sa forme ; le CSV est le seul format que tous exportent. Un fichier
+se rejoue à l'identique dans six mois, ce qu'aucune API ne garantit.
+
+**Écarté :** trois fichiers, un par unité de temps. Un seul fichier 1 minute
+porte tout, et l'agrégation est exacte. Trois fichiers exposent à trois
+périodes qui ne se recouvrent pas — un décalage qu'aucune erreur ne signale.
+
+**Conséquence assumée :** un CSV de CFD ne porte pas le détail acheteur/vendeur.
+`delta` y vaut `null`, et l'analyse de volume ne produit rien plutôt que de
+déduire le déséquilibre du sens de la bougie — ce qui ne mesurerait que ce
+qu'on sait déjà. L'étude de volume reste donc réservée au crypto.
+
+---
+
+## DEC-012 — Les coûts se mesurent, ils ne se supposent pas
+
+**2026-09-23 · Retenue**
+
+`--spread` et `--commission` s'expriment en unités de prix. Le coût en R est
+calculé plan par plan : `(spread + commission) / distance du stop`. La constante
+`--cout-en-r` ne sert plus que de repli, et l'affichage dit laquelle des deux
+a servi.
+
+**Motif :** la constante précédente valait 0,05 R, posée faute de mieux. Mesurée,
+elle vaut **0,10 R** sur l'or à 0,25 $ de spread et **0,78 R** sur du BTC spot
+à 0,1 %. Entre les deux, la conclusion s'inverse : même taux de réussite, même
+ratio, espérance +0,34 R d'un côté et −0,34 R de l'autre.
+
+Le seuil de rentabilité est désormais affiché face à l'intervalle de confiance,
+avec trois verdicts possibles : gagnant même au pire de l'intervalle, perdant
+même au mieux, ou indécidable. C'est le seul chiffre qui dise si une règle
+gagne de l'argent — un taux de réussite ne le dit pas.
+
+**Écarté :** un coût en pourcentage du prix. Ce qui décide n'est pas le rapport
+du coût au prix mais son rapport au risque. Deux plans au même prix et aux stops
+différents ne paient pas le même coût en R ; seule la division par la distance
+du stop le montre.
+
+
+---
+
+## DEC-013 — Un évènement est daté quand il devient connaissable
+
+**2026-09-23 · Retenue, rétroactive**
+
+Consignée après coup : la règle s'appliquait déjà, le code ne la respectait
+pas. Elle est écrite ici pour qu'on ne la reperde pas.
+
+Une cassure de structure est datée à la **fermeture** de la bougie qui casse,
+jamais à son ouverture. D'où `fermetureMs` sur chaque bougie — colonne 6 des
+klines Binance, calculée depuis l'unité de temps pour un CSV — et le refus de
+`creerCassure` d'en produire une sans.
+
+**Motif :** `creerCassure` estampillait `ouvertureMs` alors que la cassure se
+constate sur clôture. La résolution démarrait jusqu'à quinze minutes trop tôt
+et le filtre de biais 1 heure lisait jusqu'à soixante minutes dans le futur.
+
+**L'effet mesuré, sur données identiques :** 62,2 % → 45,1 %. Espérance de la
+seconde moitié : +0,607 R → −0,014 R. Tout l'avantage apparent venait de là.
+
+**Ce qui n'a pas marché :** le découpage en deux moitiés n'a rien vu — les deux
+moitiés trichaient également. Un test anti-lecture-du-futur existait déjà, mais
+il ne vérifiait que le délai de confirmation des pivots, pas l'horodatage. Ce
+qui a trouvé le bug, c'est d'avoir refusé de croire un bon résultat.
+
+**Conséquence sur les tests :** un test parcourt désormais **tous** les
+évènements produits et vérifie `c.ms === bougies[c.index].fermetureMs`. Un
+invariant vérifié sur un cas choisi ne vaut rien.
+
+
+---
+
+## DEC-014 — Le hasard comme témoin, sur les mêmes données
+
+**2026-09-23 · Retenue**
+
+`--controle N` rejoue les mêmes détecteurs sur les mêmes bougies, remises dans
+un ordre tiré au sort, N fois. Le résultat réel est positionné dans la
+distribution obtenue, et le script rapporte la proportion de tirages qui font
+aussi bien — le p unilatéral d'un test de permutation.
+
+**Motif :** le découpage en deux moitiés attrape un réglage sur-ajusté, pas une
+règle qui n'a jamais rien eu à exploiter. Si l'avantage est nul, il est nul
+dans les deux moitiés et rien ne le signale. C'est exactement ce qui s'est
+produit : 53,4 % sur du BTCUSDT réel, 53,2 % sur une marche aléatoire.
+
+**Le mélange conserve chaque bougie et ne détruit que la suite.** Chaque bougie
+est décomposée en rendements logarithmiques relatifs à son ouverture, plus
+l'écart avec la clôture précédente ; les tuples sont permutés, la série est
+reconstruite. Un marteau reste un marteau, une bougie de +2 % reste une bougie
+de +2 %. Les horodatages ne bougent pas — sinon les week-ends du forex
+atterriraient en milieu de semaine.
+
+**Écarté :** mélanger les prix eux-mêmes. Ça produirait des séries qu'aucun
+marché ne peut engendrer, et le témoin ne témoignerait de rien.
+
+**Écarté :** un générateur de marche aléatoire séparé. Il n'a ni la volatilité
+ni la distribution des bougies du marché étudié ; la comparaison porterait
+autant sur le générateur que sur la règle. Le seul témoin honnête est fait des
+données elles-mêmes.
+
+**Le p ne descend jamais à zéro.** `(k+1)/(N+1)` plutôt que `k/N` : sans ça,
+cent tirages tous battus afficheraient « p = 0 », c'est-à-dire une
+impossibilité, alors qu'on a seulement manqué de tirages. Le plancher est
+annoncé quand il est atteint.
+
+### Ce que le contrôle a montré en se validant lui-même
+
+Éprouvé dans les deux sens, sur 92 000 bougies 1 minute et 100 tirages :
+
+| Série d'essai | Réel | Médiane des tirages | p |
+|---|---|---|---|
+| Marche aléatoire | +0,390 R | +0,407 R | **0,604** |
+| Momentum planté (`r = 0,35·r₋₁ + bruit`) | +1,605 R | +1,120 R | **0,010** (0/100) |
+
+Un contrôle qui répondrait toujours « pas d'avantage » serait inutile. Celui-ci
+détecte un avantage planté et ignore le bruit.
+
+**Et il montre au passage ce qui rendait les chiffres précédents illisibles :**
+sur du bruit pur, les tirages de contrôle rendent une espérance médiane de
+**+0,407 R**. Un système qui paraît rentable sur des données sans aucune
+structure. L'espérance seule ne veut rien dire ; elle ne se lit que face à son
+témoin.
+
+---
+
+## DEC-015 — Une seule règle de sortie, choisie avant d'ouvrir
+
+**2026-09-23 · Retenue**
+
+`resoudreIssue` exige désormais un `objectif` explicite, `1r` ou `2r`, et
+refuse de résoudre sans. Sous `2r`, un trade passé par TP1 puis stoppé est un
+**stop à −1 R**. Sous `1r`, TP2 n'existe pas.
+
+**Motif :** la version précédente créditait +1 R à ce trade — « un objectif
+déjà atteint n'est pas effacé par un stop ultérieur » — tout en créditant
++2 R s'il allait jusqu'à TP2. C'est une option gratuite. À l'instant où le
+prix touche 1 R il faut choisir, encaisser ou tenir, et on ne peut pas savoir
+laquelle était la bonne sans regarder la suite. **Une lecture du futur, dans
+la règle de sortie.**
+
+Même classe d'erreur que DEC-013, à un autre endroit de la chaîne, et trouvée
+par le même réflexe : refuser de croire un bon chiffre.
+
+### Mesuré sur 200 000 marches aléatoires
+
+Sur un martingale, toute règle de sortie doit rendre une espérance nulle.
+
+| Règle de sortie | Espérance | Attendu |
+|---|---|---|
+| Convention v1 (TP1 non effacé) | **+0,330 R** | 0 |
+| Sortie ferme à 1 R | −0,001 R | 0 ✓ |
+| Tenue jusqu'à 2 R | −0,007 R | 0 ✓ |
+
+Elle fabriquait un tiers d'unité de risque par trade à partir de rien.
+
+### Ce que le correctif change sur les mesures
+
+Contrôle par permutation sur un fichier sans aucune structure, médiane des
+tirages :
+
+| | Avant | Après |
+|---|---|---|
+| Espérance des tirages de contrôle | +0,407 R | **+0,055 R** (`2r`), +0,035 R (`1r`) |
+
+Le contrôle garde sa sensibilité : sur la série à momentum planté, il détecte
+toujours l'avantage à p = 0,016 (0/60) sous les deux règles.
+
+**Résidu assumé :** +0,035 à +0,055 R au lieu de 0 exactement. Il vient
+probablement de l'exclusion des issues ambiguës et de la censure par
+l'horizon, toutes deux non symétriques. À surveiller, pas encore expliqué.
+
+**Écarté pour l'instant :** la sortie partielle — moitié à 1 R, stop ramené au
+point mort, reste jusqu'à 2 R. C'est la règle la plus réaliste, mais elle
+demande un stop mobile, donc une troisième chose à se tromper. Elle viendra
+quand les deux premières seront mesurées.
+
+**Conséquence sur le journal :** `SCHEMA_VERSION` passe de 1 à 2, et chaque
+plan porte `objectifDeSortie`. Les enregistrements v1 restent lisibles mais ne
+se comparent pas aux v2 — ils ont été résolus sous l'autre convention.
+
+
+---
+
+## DEC-016 — L'hypothèse de remplissage devient un paramètre, et elle explique la moitié du biais
+
+**2026-09-23 · Retenue, résultat partiel**
+
+`--remplissage meche|cloture`. Sous `cloture`, l'entrée est supposée obtenue à
+la clôture de la bougie qui a touché la zone, et la résolution ne commence
+qu'à la bougie **suivante**. Le stop reste où le plan l'a posé — c'est un
+niveau structurel — et les objectifs sont redérivés à 1 R et 2 R du prix
+réellement obtenu, si bien qu'un remplissage défavorable éloigne l'objectif
+autant qu'il rapproche le stop.
+
+**Motif :** le contrôle par permutation rendait une espérance positive sur des
+données sans aucune structure, là où la théorie impose zéro (DEC-015, résidu
+non expliqué). Soupçon principal : `meche` suppose une exécution au prix exact
+du plan dès qu'une mèche le touche, sans glissement ni file d'attente. Or une
+bougie dont la mèche vient chercher un niveau referme généralement au-dessus —
+on entre à l'extrême favorable, et le mouvement favorable de la bougie de
+déclenchement est compté pour nous.
+
+### Mesuré — médiane des tirages de contrôle, coûts mis à zéro
+
+Ce chiffre doit valoir 0. Tout écart est du biais de mesure.
+
+| Règle de sortie | `meche` | `cloture` | Réduction |
+|---|---|---|---|
+| Sortie ferme à 1 R | +0,093 R | **+0,043 R** | −54 % |
+| Tenue jusqu'à 2 R | +0,108 R | **+0,088 R** | −19 % |
+
+**Le soupçon était fondé, et insuffisant.** Sous 1 R, l'hypothèse de
+remplissage portait la moitié du biais ; sous 2 R, presque rien. Il reste
+donc au moins une autre cause, non identifiée.
+
+La sensibilité est intacte : sur la série à momentum planté, l'avantage est
+toujours détecté à p = 0,016 (0/60) sous les deux règles.
+
+**Ce qui reste à éprouver**, par ordre de plausibilité : le traitement des
+issues ambiguës (exclues aujourd'hui), puis celui des `non_declenche`. La
+méthode est la même — faire varier une exclusion à la fois et regarder si le
+plancher bouge.
+
+**`meche` reste le défaut**, pour que les mesures antérieures restent
+comparables. C'est pourtant l'hypothèse la plus favorable qui existe : le jour
+où le biais sera expliqué, `cloture` devrait prendre sa place.
+
+**Écarté :** modéliser un glissement en points. Ça ajouterait un paramètre
+inventé là où `cloture` n'ajoute qu'une hypothèse vérifiable.
+
+
+---
+
+## DEC-017 — Les issues ambiguës sont innocentes ; le remplissage portait tout
+
+**2026-09-23 · Enquête close sur un point, ouverte sur un autre**
+
+`--ambigu exclu|perdant|gagnant`. Le résolveur continue de marquer `ambigu`
+sans jamais deviner l'ordre — c'est un fait, il ne peut pas le savoir. C'est
+le **comptage** qui varie, dans l'agrégation : exclure, compter en perte, ou
+compter en gain. Les deux derniers encadrent la vérité ; l'écart entre eux
+mesure ce que l'exclusion cache.
+
+### Le résultat : elle ne cache rien
+
+Médiane des tirages de contrôle sur données sans structure, coûts à zéro —
+chiffre qui doit valoir 0 :
+
+| Objectif | Remplissage | `perdant` | `exclu` | `gagnant` | Amplitude |
+|---|---|---|---|---|---|
+| 1 R | mèche | +0,231 R | +0,245 R | +0,254 R | 0,023 R |
+| 1 R | clôture | −0,018 R | −0,012 R | +0,000 R | 0,018 R |
+| 2 R | mèche | +0,106 R | +0,108 R | +0,118 R | 0,012 R |
+| 2 R | clôture | −0,076 R | −0,074 R | −0,072 R | 0,004 R |
+
+**L'exclusion tombe systématiquement entre les deux bornes**, et l'amplitude
+ne dépasse jamais 0,023 R. Les issues ambiguës ne peuvent pas expliquer un
+biais de +0,245 R. Suspect écarté.
+
+### Et une correction : le remplissage portait tout, pas la moitié
+
+DEC-016 concluait que l'hypothèse de remplissage expliquait « la moitié du
+biais sous 1 R et presque rien sous 2 R ». **C'était faux, et la faute vient
+de l'instrument.** Ces chiffres avaient été mesurés sur un fichier synthétique
+dont les mèches valaient 0,017 % du prix — cent fois plus fines que celles
+d'un marché réel. Or c'est précisément sur les mèches que porte l'hypothèse.
+Ce fichier ne produisait d'ailleurs **aucune issue ambiguë**, ce qui rendait
+l'expérience ci-dessus impossible et a imposé d'en générer un autre.
+
+Sur une série à volatilité réaliste — 0,08 % d'écart-type à la minute, sauts
+occasionnels, mèches comparables aux corps :
+
+| Objectif | `meche` | `cloture` |
+|---|---|---|
+| Sortie ferme à 1 R | +0,245 R · 65,8 % | **−0,012 R · 49,2 %** |
+| Tenue jusqu'à 2 R | +0,108 R · 35,6 % | −0,074 R · 27,1 % |
+
+Sous 1 R, le remplissage à la clôture **annule le biais** : 49,2 % de réussite
+sur une marche aléatoire, là où la théorie exige 50 %. Le biais entier venait
+de l'hypothèse d'exécution à la mèche.
+
+### Ce qui reste inexpliqué
+
+Sous 2 R, la clôture **surcorrige** : −0,074 R, systématique sur 60 tirages.
+L'hypothèse d'une censure par l'horizon est **écartée par la mesure** — zéro
+`horizon_depasse` dans les deux modes. Cause inconnue.
+
+### Conséquence pratique
+
+**`--objectif 1r --remplissage cloture` est la seule configuration dont le
+plancher soit vérifié proche de zéro.** C'est donc la seule dans laquelle un
+résultat mesuré puisse être cru. Les autres restent utiles pour comparer, pas
+pour conclure.
+
+**Écarté :** deviner l'ordre d'une bougie ambiguë d'après sa couleur. Le vrai
+remède est une unité de résolution plus fine — une bougie de 5 minutes qui
+touche les deux niveaux se décompose en bougies d'une minute qui, elles,
+disent l'ordre.

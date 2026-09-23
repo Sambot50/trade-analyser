@@ -8,7 +8,21 @@
 
 import { breakEvenRate, computeRR, rrVerdict } from '../analysis.js';
 
-export const SCHEMA_VERSION = 1;
+// v2 (2026-09-23) : la règle de sortie devient explicite. En v1, un trade
+// passé par TP1 puis stoppé était compté comme un gain de +1 R tout en
+// pouvant valoir +2 R s'il allait plus loin — une option gratuite qui
+// fabriquait +0,33 R par trade sur des données sans aucune structure. Les
+// enregistrements v1 restent lisibles mais ne se comparent pas aux v2.
+export const SCHEMA_VERSION = 2;
+
+/**
+ * Règle de sortie du journal : tenue jusqu'à 2 R, stop sinon.
+ *
+ * Choisie parce que les plans produits portent déjà un TP2 et que c'est la
+ * règle que le backtest mesure par défaut. Toucher 1 R en chemin ne rapporte
+ * rien : on n'y était pas sorti.
+ */
+export const OBJECTIF_JOURNAL = '2r';
 
 export const SEUILS_RATIO = {
   defavorableEnDessousDe: 1,
@@ -147,6 +161,14 @@ export function construireEnregistrement({ analyse, moteur, fichiers, horodatage
         : verdict.tone === 'good' ? 'bonne_asymetrie'
         : 'indisponible',
       seuilsVerdictRatio: SEUILS_RATIO,
+
+      // La règle de sortie fait partie du plan : sans elle, un statut « stop »
+      // ne dit pas si le prix avait frôlé 1 R en chemin, ni si ça comptait.
+      // Deux enregistrements de règles différentes ne se comparent pas.
+      objectifDeSortie: OBJECTIF_JOURNAL,
+      commentaireObjectifDeSortie: OBJECTIF_JOURNAL === '2r'
+        ? "Tenue jusqu'à TP2. Toucher TP1 en chemin ne rapporte rien : on n'y était pas sorti."
+        : 'Sortie ferme à TP1. TP2 n’est pas visé.',
     },
 
     raisonnement: Array.isArray(analyse.reasoning) ? analyse.reasoning : [],
@@ -196,6 +218,7 @@ export function ligneIndex(record) {
     prixStopLoss: record.plan.prixStopLoss,
     prixTp1: record.plan.prixTp1,
     prixTp2: record.plan.prixTp2,
+    objectifDeSortie: record.plan.objectifDeSortie,
     ratioRisqueRendementTp1: record.plan.ratioRisqueRendementTp1,
     verdictRatio: record.plan.verdictRatio,
     confianceDeclareeParLeModele: record.lecture.confianceDeclareeParLeModele,

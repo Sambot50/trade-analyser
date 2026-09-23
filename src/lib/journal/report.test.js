@@ -113,7 +113,14 @@ describe('format d’enregistrement', () => {
   });
 
   it('porte une version de schéma', () => {
-    expect(rec.schemaVersion).toBe(1);
+    expect(rec.schemaVersion).toBe(2);
+  });
+
+  it('inscrit la règle de sortie dans le plan', () => {
+    // Sans elle, un « stop » ne dit pas si le prix avait frôlé 1 R en chemin
+    // ni si ça comptait : l'enregistrement cesse d'être interprétable seul.
+    expect(rec.plan.objectifDeSortie).toBe('2r');
+    expect(rec.plan.commentaireObjectifDeSortie).toMatch(/ne rapporte rien/);
   });
 
   it('recalcule le ratio plutôt que de le recopier', () => {

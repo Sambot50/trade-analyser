@@ -1,7 +1,7 @@
 // Orchestration du journal : produire, écrire, résoudre.
 
 import { construireEnregistrement, cheminDossier, ligneIndex, ligneMiseAJour, construireResume,
-         reduireIndex, HORIZON_RESOLUTION_MINUTES } from './schema.js';
+         reduireIndex, HORIZON_RESOLUTION_MINUTES, OBJECTIF_JOURNAL } from './schema.js';
 import { genererRapport } from './report.js';
 import { genererSchemaDoc } from './schema-doc.js';
 import { resoudreIssue } from './resolve.js';
@@ -148,6 +148,7 @@ export async function resoudreEnAttente({ racine, signal } = {}) {
       const bougies = await recupererBougiesPaginees({ symbole, depuisMs, nombre: HORIZON_BOUGIES, signal });
       const { statut, detail } = resoudreIssue({
         plan: record.plan, bougies, horizonBougies: HORIZON_BOUGIES,
+        objectif: OBJECTIF_JOURNAL,
       });
 
       if (statut === 'en_cours') {

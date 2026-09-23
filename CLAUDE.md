@@ -38,14 +38,42 @@ jamais faire passer une estimation pour une mesure.
 Corollaire : le ratio risque/rendement est recalculé en JavaScript, jamais lu
 dans la réponse du modèle. Un LLM se trompe en arithmétique.
 
+Deux invariants du socle de mesure relèvent du même principe :
+
+4. **Aucune lecture du futur.** Un évènement est daté à l'instant où il
+   devient connaissable — une cassure à la **fermeture** de sa bougie, jamais
+   à son ouverture. D'où `fermetureMs` sur chaque bougie, quelle que soit sa
+   source, et le refus de `creerCassure` d'en produire une sans. Ce bug a
+   existé : corrigé, le taux mesuré est passé de 62 % à 45 %. Voir DEC-013.
+5. **Ce qui manque reste absent.** Un CSV de CFD ne porte pas le détail
+   acheteur/vendeur : `delta` y vaut `null` et l'analyse de volume ne rend
+   rien. Le déduire du sens de la bougie fabriquerait un indicateur qui ne
+   mesure que ce qu'on sait déjà.
+6. **Une seule règle de sortie par plan, choisie avant d'ouvrir.**
+   `resoudreIssue` exige `objectif` (`1r` ou `2r`) et refuse de trancher sans.
+   Sous `2r`, un trade passé par TP1 puis stoppé est un stop à −1 R. Créditer
+   les deux branches est une lecture du futur : ça produisait +0,330 R par
+   trade sur des marches aléatoires. Voir DEC-015.
+7. **Aucun résultat sans témoin.** Une espérance ne se lit que face à la
+   distribution obtenue sur les mêmes bougies mélangées (`--controle`). Sur du
+   bruit pur, la chaîne rend +0,407 R de médiane : un chiffre flatteur produit
+   par rien du tout. Voir DEC-014.
+
 ## Commandes
 
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 112 tests
+npm test                         # 293 tests
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
+
+# Backtest — deux sources, une chaîne
+node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01
+node scripts/backtest.mjs --csv XAUUSD_M1_2025.csv --decalage-heures -5 --spread 0.25
+
+# Contrôle par permutation : la règle bat-elle le hasard sur ces données ?
+node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100
 npm run samples                  # régénère les graphiques de référence
 ```
 
