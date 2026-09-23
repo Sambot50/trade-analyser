@@ -169,6 +169,22 @@ journal/
 **ajoute** une ligne pour le même `id`, le fichier n'est jamais réécrit. Pour
 l'état courant, regrouper par `id` et garder la dernière ligne.
 
+### Rattraper un plan produit hors de l'application
+
+Un plan noté à la main, ou analysé avant que le journal existe, se résout par
+un script qui utilise exactement le même algorithme :
+
+```bash
+node scripts/resoudre-plan.mjs --symbole BTCUSDT --le 2026-09-22T18:48:55Z \
+  --direction SELL --entree 86523.27 --stop 86780 --tp1 86300 --tp2 86100
+```
+
+Il rapporte l'issue, mais aussi les **amplitudes** atteintes de part et
+d'autre, en unités de risque. L'issue seule ne dit pas tout : un stop touché
+après que le prix soit allé à deux doigts de l'objectif n'est pas le même
+échec qu'un stop pris d'emblée. Le premier signale un stop trop serré, le
+second une lecture fausse — et le script le dit.
+
 ### Constater les issues
 
 À l'ouverture de l'application, les analyses sans issue sont retentées
