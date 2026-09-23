@@ -8,7 +8,12 @@
 // bloquées. L'algorithme de résolution, lui, est testé exhaustivement contre
 // des jeux de bougies fabriqués. Toute défaillance ici doit donc être bruyante.
 
-const BINANCE = 'https://api.binance.com/api/v3/klines';
+export const BINANCE_PAR_DEFAUT = 'https://api.binance.com';
+
+/** Point d'accès des bougies, paramétrable pour pouvoir éprouver le chemin réseau. */
+function urlKlines(baseUrl) {
+  return `${(baseUrl || BINANCE_PAR_DEFAUT).replace(/\/+$/, '')}/api/v3/klines`;
+}
 
 // Résoudre sur des bougies d'une minute, quelle que soit l'unité de temps de
 // l'analyse : plus la bougie est fine, moins le cas ambigu se produit.
@@ -27,11 +32,11 @@ export function symboleResolvable(symbole) {
  * Bougies à partir d'un horodatage, au pas d'une minute.
  * @returns [{ ouvertureMs, plusHaut, plusBas }]
  */
-export async function recupererBougies({ symbole, depuisMs, nombre, signal }) {
+export async function recupererBougies({ symbole, depuisMs, nombre, signal, baseUrl }) {
   const pair = symboleResolvable(symbole);
   if (!pair) throw new Error(`Symbole non résolvable automatiquement : ${symbole}`);
 
-  const url = `${BINANCE}?symbol=${pair}&interval=${INTERVALLE_RESOLUTION}` +
+  const url = `${urlKlines(baseUrl)}?symbol=${pair}&interval=${INTERVALLE_RESOLUTION}` +
     `&startTime=${depuisMs}&limit=${Math.min(1000, nombre)}`;
 
   let reponse;
@@ -39,7 +44,7 @@ export async function recupererBougies({ symbole, depuisMs, nombre, signal }) {
     reponse = await fetch(url, { signal });
   } catch (err) {
     if (err.name === 'AbortError') throw err;
-    throw new Error('Binance injoignable. Vérifie ta connexion réseau.');
+    throw new Error(`Source de bougies injoignable : ${urlKlines(baseUrl)}. Vérifie ta connexion réseau.`);
   }
 
   if (!reponse.ok) {
@@ -65,13 +70,13 @@ export function normaliserBougie(k) {
  * Récupère jusqu'à `nombre` bougies, en enchaînant les pages de 1000.
  * Un horizon de 24 h au pas d'une minute fait 1440 bougies.
  */
-export async function recupererBougiesPaginees({ symbole, depuisMs, nombre, signal }) {
+export async function recupererBougiesPaginees({ symbole, depuisMs, nombre, signal, baseUrl }) {
   const toutes = [];
   let curseur = depuisMs;
 
   while (toutes.length < nombre) {
     const lot = await recupererBougies({
-      symbole, depuisMs: curseur, nombre: nombre - toutes.length, signal,
+      symbole, depuisMs: curseur, nombre: nombre - toutes.length, signal, baseUrl,
     });
     if (!lot.length) break;
 
