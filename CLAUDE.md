@@ -38,14 +38,30 @@ jamais faire passer une estimation pour une mesure.
 Corollaire : le ratio risque/rendement est recalculé en JavaScript, jamais lu
 dans la réponse du modèle. Un LLM se trompe en arithmétique.
 
+Deux invariants du socle de mesure relèvent du même principe :
+
+4. **Aucune lecture du futur.** Un évènement est daté à l'instant où il
+   devient connaissable — une cassure à la **fermeture** de sa bougie, jamais
+   à son ouverture. D'où `fermetureMs` sur chaque bougie, quelle que soit sa
+   source, et le refus de `creerCassure` d'en produire une sans. Ce bug a
+   existé : corrigé, le taux mesuré est passé de 62 % à 45 %. Voir DEC-013.
+5. **Ce qui manque reste absent.** Un CSV de CFD ne porte pas le détail
+   acheteur/vendeur : `delta` y vaut `null` et l'analyse de volume ne rend
+   rien. Le déduire du sens de la bougie fabriquerait un indicateur qui ne
+   mesure que ce qu'on sait déjà.
+
 ## Commandes
 
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 112 tests
+npm test                         # 222 tests
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
+
+# Backtest — deux sources, une chaîne
+node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01
+node scripts/backtest.mjs --csv XAUUSD_M1_2025.csv --decalage-heures -5 --spread 0.25
 npm run samples                  # régénère les graphiques de référence
 ```
 

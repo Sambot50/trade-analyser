@@ -185,3 +185,87 @@ grand-chose — on efface les cas gênants sans s'en rendre compte.
 
 Supprimer une entrée reste possible : en supprimant son dossier. Le geste est
 délibéré.
+
+---
+
+## DEC-011 — Un fichier CSV comme seconde source, pas comme second système
+
+**2026-09-23 · Retenue**
+
+Le backtest accepte `--csv`. Les bougies d'un fichier traversent exactement les
+mêmes détecteurs que celles de Binance ; rien dans `structure.js`,
+`orderblocks.js` ou `resolve.js` ne sait d'où elles viennent.
+
+**Motif :** Binance ne cote ni l'or, ni le forex, ni les indices — c'est-à-dire
+l'essentiel de ce qui est réellement tradé ici. Sans seconde source, le projet
+mesurait un marché qui n'était pas le sien.
+
+**Écarté :** un connecteur par courtier. Chaque API impose son compte, ses
+quotas et sa forme ; le CSV est le seul format que tous exportent. Un fichier
+se rejoue à l'identique dans six mois, ce qu'aucune API ne garantit.
+
+**Écarté :** trois fichiers, un par unité de temps. Un seul fichier 1 minute
+porte tout, et l'agrégation est exacte. Trois fichiers exposent à trois
+périodes qui ne se recouvrent pas — un décalage qu'aucune erreur ne signale.
+
+**Conséquence assumée :** un CSV de CFD ne porte pas le détail acheteur/vendeur.
+`delta` y vaut `null`, et l'analyse de volume ne produit rien plutôt que de
+déduire le déséquilibre du sens de la bougie — ce qui ne mesurerait que ce
+qu'on sait déjà. L'étude de volume reste donc réservée au crypto.
+
+---
+
+## DEC-012 — Les coûts se mesurent, ils ne se supposent pas
+
+**2026-09-23 · Retenue**
+
+`--spread` et `--commission` s'expriment en unités de prix. Le coût en R est
+calculé plan par plan : `(spread + commission) / distance du stop`. La constante
+`--cout-en-r` ne sert plus que de repli, et l'affichage dit laquelle des deux
+a servi.
+
+**Motif :** la constante précédente valait 0,05 R, posée faute de mieux. Mesurée,
+elle vaut **0,10 R** sur l'or à 0,25 $ de spread et **0,78 R** sur du BTC spot
+à 0,1 %. Entre les deux, la conclusion s'inverse : même taux de réussite, même
+ratio, espérance +0,34 R d'un côté et −0,34 R de l'autre.
+
+Le seuil de rentabilité est désormais affiché face à l'intervalle de confiance,
+avec trois verdicts possibles : gagnant même au pire de l'intervalle, perdant
+même au mieux, ou indécidable. C'est le seul chiffre qui dise si une règle
+gagne de l'argent — un taux de réussite ne le dit pas.
+
+**Écarté :** un coût en pourcentage du prix. Ce qui décide n'est pas le rapport
+du coût au prix mais son rapport au risque. Deux plans au même prix et aux stops
+différents ne paient pas le même coût en R ; seule la division par la distance
+du stop le montre.
+
+
+---
+
+## DEC-013 — Un évènement est daté quand il devient connaissable
+
+**2026-09-23 · Retenue, rétroactive**
+
+Consignée après coup : la règle s'appliquait déjà, le code ne la respectait
+pas. Elle est écrite ici pour qu'on ne la reperde pas.
+
+Une cassure de structure est datée à la **fermeture** de la bougie qui casse,
+jamais à son ouverture. D'où `fermetureMs` sur chaque bougie — colonne 6 des
+klines Binance, calculée depuis l'unité de temps pour un CSV — et le refus de
+`creerCassure` d'en produire une sans.
+
+**Motif :** `creerCassure` estampillait `ouvertureMs` alors que la cassure se
+constate sur clôture. La résolution démarrait jusqu'à quinze minutes trop tôt
+et le filtre de biais 1 heure lisait jusqu'à soixante minutes dans le futur.
+
+**L'effet mesuré, sur données identiques :** 62,2 % → 45,1 %. Espérance de la
+seconde moitié : +0,607 R → −0,014 R. Tout l'avantage apparent venait de là.
+
+**Ce qui n'a pas marché :** le découpage en deux moitiés n'a rien vu — les deux
+moitiés trichaient également. Un test anti-lecture-du-futur existait déjà, mais
+il ne vérifiait que le délai de confirmation des pivots, pas l'horodatage. Ce
+qui a trouvé le bug, c'est d'avoir refusé de croire un bon résultat.
+
+**Conséquence sur les tests :** un test parcourt désormais **tous** les
+évènements produits et vérifie `c.ms === bougies[c.index].fermetureMs`. Un
+invariant vérifié sur un cas choisi ne vaut rien.

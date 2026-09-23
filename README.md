@@ -82,13 +82,20 @@ chiffres exacts, gratuitement. Ce socle mesure donc les order blocks
 directement sur la donnée, sans modèle de vision.
 
 ```bash
+# Crypto, depuis Binance
 node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01
+
+# Or, forex, indices : depuis un fichier
+node scripts/backtest.mjs --csv XAUUSD_M1_2025.csv --decalage-heures -5 --spread 0.25
 ```
+
+Deux sources, une seule chaîne. Où trouver les fichiers et comment éviter le
+piège de fuseau horaire : [docs/DONNEES.md](docs/DONNEES.md).
 
 ### La chaîne
 
 ```
-bougies Binance
+bougies Binance ou CSV
   → pivots            sommets et creux confirmés
   → cassures          BOS et CHoCH, sur clôture jamais sur mèche
   → order blocks      dernière bougie opposée avant l'impulsion
@@ -132,7 +139,43 @@ rien n'est mesuré.
 | `--fenetre` | `5` | Bougies de chaque côté pour confirmer un pivot |
 | `--horizon-heures` | `48` | Au-delà, le trade est déclaré non résolu |
 | `--sans-filtre-biais` | — | Mesure l'apport réel du filtre |
-| `--jusqua` | maintenant | Borne de fin |
+| `--depuis` / `--jusqua` | bornes du fichier | Période |
+| `--csv` | — | Fichier de bougies au lieu de Binance |
+| `--ut-csv` | `1m` | Unité des lignes du fichier |
+| `--decalage-heures` | `0` | Correction de fuseau, `-5` pour HistData |
+| `--spread` | `0` | Écart achat/vente, en unités de prix |
+| `--commission` | `0` | Coût additionnel par aller-retour, mêmes unités |
+| `--cout-en-r` | `0.05` | Repli quand le spread est inconnu |
+
+### Les coûts décident, donc ils se mesurent
+
+`--spread` s'exprime en unités de prix — `0.25` pour de l'or à 25 cents,
+`0.00012` pour EURUSD à 1,2 pip. Le coût en R est calculé plan par plan :
+`(spread + commission) / distance du stop`. Un stop serré paie le même spread
+sur un risque plus petit, donc plus cher.
+
+Sans `--spread`, le script retombe sur une constante supposée et le dit à
+chaque ligne. L'écart n'est pas cosmétique :
+
+| Spread | Coût mesuré | Seuil de rentabilité | Verdict, à 53 % de réussite |
+|---|---|---|---|
+| 0,25 $ sur l'or | 0,10 R | 40,6 % | gagnant |
+| 0,1 % sur BTC spot | 0,78 R | 65,9 % | perdant |
+
+Mêmes règles, mêmes trades, conclusions opposées. Le seuil de rentabilité est
+affiché face à l'intervalle de confiance, avec trois verdicts : gagnant même
+au pire de l'intervalle, perdant même au mieux, ou indécidable.
+
+### Ce qu'un contre-essai a montré
+
+Lancée sur une marche aléatoire — des bougies tirées au hasard, sans aucune
+structure — la chaîne rend **53,2 %** de réussite. Sur du BTCUSDT réel, elle
+rend **53,4 %**. Les deux intervalles se recouvrent entièrement.
+
+Ça ne prouve pas que la règle ne vaut rien. Ça prouve que l'échantillon actuel
+ne permet pas de la distinguer du hasard, et qu'il faut une année d'historique
+et un mode contrôle sur données mélangées avant d'en tirer quoi que ce soit.
+Voir [docs/ETAT.md](docs/ETAT.md).
 
 ### Volume et déséquilibre acheteurs/vendeurs
 
@@ -143,6 +186,12 @@ order block en écarts-types par rapport aux vingt bougies précédentes.
 Ces chiffres sont enregistrés, **pas encore utilisés comme filtre** : c'est au
 backtest de dire s'ils séparent les gagnants des perdants. Mesurer d'abord,
 filtrer ensuite.
+
+**Un CSV de CFD ne porte pas cette information.** Le détail acheteur/vendeur
+n'existe que sur un carnet d'ordres centralisé ; un courtier forex n'en a pas.
+`delta` y vaut donc `null`, et l'analyse de volume ne produit rien plutôt que
+de déduire le déséquilibre du sens de la bougie — ce qui ne mesurerait que ce
+qu'on sait déjà. L'étude de volume reste réservée au crypto.
 
 ## Ce que l'outil ne fait pas
 

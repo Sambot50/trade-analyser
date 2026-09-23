@@ -1,8 +1,13 @@
 // Mesure la fréquence d'aboutissement des order blocks sur l'historique.
 //
 //   node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01
+//   node scripts/backtest.mjs --csv XAUUSD_M1_2025.csv --spread 0.25
 //
-// Chaîne : bougies Binance → pivots → cassures de structure → order blocks
+// Deux sources, une seule chaîne : Binance pour ce qu'il cote, un fichier CSV
+// pour le reste — or, forex, indices. Les détecteurs ne savent pas d'où
+// viennent les bougies, et n'ont pas à le savoir.
+//
+// Chaîne : bougies → pivots → cassures de structure → order blocks
 // → plan hypothétique par order block → résolution par le MÊME algorithme que
 // le journal → fréquence observée avec son intervalle de confiance.
 //
@@ -10,7 +15,12 @@
 // point sur la totalité d'un historique décrit ce passé-là et rien d'autre ;
 // la seconde moitié est la seule chose qui ressemble à l'avenir.
 
+import { readFile } from 'node:fs/promises';
+import { basename } from 'node:path';
+
 import { recuperer, dureeUnite, nombreDeRequetes, UNITES } from '../src/lib/marche/bougies.js';
+import { analyser as analyserCsv, agreger as agregerBougies, decrire } from '../src/lib/marche/csv.js';
+import { coutEnRDuPlan, distributionDesStops, seuilDeRentabilite } from '../src/lib/marche/couts.js';
 import { cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER, INDETERMINE } from '../src/lib/marche/structure.js';
 import { detecter, anomalieVolume } from '../src/lib/marche/orderblocks.js';
 import { intervalleWilson, conclusionPossible, esperanceEnR } from '../src/lib/marche/statistiques.js';
@@ -19,6 +29,7 @@ import { resoudreIssue, compteDansLesStats, estGagnant } from '../src/lib/journa
 const DEFAUTS = {
   utBiais: '1h', utDetection: '15m', utResolution: '5m',
   fenetre: 5, horizonHeures: 48, coutEnR: 0.05,
+  utCsv: '1m', decalageHeures: 0,
 };
 
 export function parseArgs(argv) {
@@ -41,17 +52,57 @@ export function validerOptions(args) {
   const erreurs = [];
   const o = { ...DEFAUTS };
 
-  if (!args.symbole) erreurs.push('--symbole manquant (ex. BTCUSDT)');
-  else o.symbole = args.symbole.toUpperCase();
+  o.csv = typeof args.csv === 'string' ? args.csv : undefined;
+  if (args.csv === true) erreurs.push('--csv attend un chemin de fichier');
 
+  if (args.symbole) o.symbole = args.symbole.toUpperCase();
+  else if (o.csv) o.symbole = basename(o.csv).replace(/\.[^.]+$/, '').toUpperCase();
+  else erreurs.push('--symbole manquant (ex. BTCUSDT)');
+
+  // Avec un fichier, les bornes sont celles des données : --depuis et --jusqua
+  // ne servent plus qu'à restreindre, et rien n'oblige à les fournir.
   const depuis = Date.parse(args.depuis ?? '');
-  if (!args.depuis) erreurs.push('--depuis manquant (ex. 2026-06-01)');
+  if (!args.depuis) { if (!o.csv) erreurs.push('--depuis manquant (ex. 2026-06-01)'); }
   else if (Number.isNaN(depuis)) erreurs.push(`--depuis "${args.depuis}" n’est pas une date valide`);
   else o.depuisMs = depuis;
 
-  o.jusquaMs = args.jusqua ? Date.parse(args.jusqua) : Date.now();
-  if (args.jusqua && Number.isNaN(o.jusquaMs)) erreurs.push(`--jusqua "${args.jusqua}" n’est pas une date valide`);
-  else if (o.depuisMs && o.jusquaMs <= o.depuisMs) erreurs.push('--jusqua doit être postérieur à --depuis');
+  if (args.jusqua) {
+    o.jusquaMs = Date.parse(args.jusqua);
+    if (Number.isNaN(o.jusquaMs)) erreurs.push(`--jusqua "${args.jusqua}" n’est pas une date valide`);
+  } else if (!o.csv) {
+    o.jusquaMs = Date.now();
+  }
+
+  if (o.depuisMs && o.jusquaMs && o.jusquaMs <= o.depuisMs) {
+    erreurs.push('--jusqua doit être postérieur à --depuis');
+  }
+
+  if (args.utCsv !== undefined) {
+    if (!UNITES[args.utCsv]) erreurs.push(`--ut-csv "${args.utCsv}" inconnue (${Object.keys(UNITES).join(', ')})`);
+    else o.utCsv = args.utCsv;
+  }
+
+  // HistData horodate en EST sans heure d'été : --decalage-heures -5 ramène en
+  // UTC. Une erreur ici décale toute la série sans jamais lever d'exception,
+  // d'où le contrôle strict.
+  if (args.decalageHeures !== undefined) {
+    const n = Number(args.decalageHeures);
+    if (!Number.isFinite(n) || Math.abs(n) > 14) erreurs.push('--decalage-heures doit être un nombre d’heures entre -14 et 14');
+    else o.decalageHeures = n;
+  }
+
+  for (const [cle, option] of [['spread', '--spread'], ['commission', '--commission']]) {
+    if (args[cle] === undefined) continue;
+    const n = Number(args[cle]);
+    if (!Number.isFinite(n) || n < 0) erreurs.push(`${option} doit être un nombre positif, en unités de prix`);
+    else o[cle] = n;
+  }
+
+  if (args.coutEnR !== undefined) {
+    const n = Number(args.coutEnR);
+    if (!Number.isFinite(n) || n < 0) erreurs.push('--cout-en-r doit être un nombre positif');
+    else o.coutEnR = n;
+  }
 
   for (const [cle, option] of [['utBiais', '--ut-biais'], ['utDetection', '--ut-detection'], ['utResolution', '--ut-resolution']]) {
     if (args[cle] !== undefined) {
@@ -74,16 +125,23 @@ export function validerOptions(args) {
 
   o.sansFiltreBiais = Boolean(args.sansFiltreBiais);
   o.baseUrl = typeof args.baseUrl === 'string' ? args.baseUrl : undefined;
+  if (o.csv && o.baseUrl) erreurs.push('--csv et --base-url désignent deux sources : choisis-en une.');
 
   if (dureeUnite(o.utResolution) >= dureeUnite(o.utDetection)) {
     erreurs.push(`--ut-resolution (${o.utResolution}) doit être plus fine que --ut-detection (${o.utDetection}), sinon toute issue devient ambiguë.`);
+  }
+
+  // On agrège, on ne subdivise jamais : un fichier 15 minutes ne produira pas
+  // de bougies 5 minutes, et prétendre le contraire inventerait des prix.
+  if (o.csv && dureeUnite(o.utCsv) > dureeUnite(o.utResolution)) {
+    erreurs.push(`--ut-csv (${o.utCsv}) est plus grossière que --ut-resolution (${o.utResolution}) : il faudrait fabriquer des bougies qui n’existent pas dans le fichier.`);
   }
 
   return erreurs.length ? { erreurs } : o;
 }
 
 /** Applique le filtre de biais et résout chaque order block. */
-export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesResolution, horizonBougies, sansFiltreBiais }) {
+export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesResolution, horizonBougies, sansFiltreBiais, spread = 0, commission = 0 }) {
   const resultats = [];
 
   for (const ob of orderBlocks) {
@@ -104,13 +162,17 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
       ms: ob.ms, sens: ob.sens, typeCassure: ob.typeCassure, biais, aligne,
       plan: ob.plan, statut, detail,
       volume: anomalieVolume(bougiesDetection, ob.index, 20),
+      // Le coût dépend du plan : un stop serré paie le même spread sur un
+      // risque plus petit, donc plus cher en R. Il se calcule ici, trade par
+      // trade, et non en moyenne à la fin.
+      coutEnR: spread || commission ? coutEnRDuPlan(ob.plan, { spread, commission }) : null,
     });
   }
 
   return resultats;
 }
 
-export function agreger(resultats, coutEnR) {
+export function agreger(resultats, coutParDefaut) {
   const parStatut = {};
   for (const r of resultats) parStatut[r.statut] = (parStatut[r.statut] || 0) + 1;
 
@@ -120,7 +182,24 @@ export function agreger(resultats, coutEnR) {
   const intervalle = intervalleWilson(gagnants.length, tranchees.length);
   const ambigus = parStatut.ambigu || 0;
 
+  // Coût mesuré quand le spread est connu, constante supposée sinon. La
+  // moyenne suffit : l'espérance est linéaire en coût.
+  const couts = tranchees.map((r) => r.coutEnR).filter((c) => typeof c === 'number');
+  const coutEnR = couts.length === tranchees.length && couts.length
+    ? Number((couts.reduce((a, c) => a + c, 0) / couts.length).toFixed(4))
+    : coutParDefaut;
+  const coutMesure = couts.length === tranchees.length && couts.length > 0;
+
+  const ratioMoyen = gagnants.length
+    ? gagnants.reduce((a, r) => a + (r.statut === 'tp2' ? 2 : 1), 0) / gagnants.length
+    : 1;
+
   return {
+    coutEnR,
+    coutMesure,
+    ratioMoyen: Number(ratioMoyen.toFixed(3)),
+    seuil: seuilDeRentabilite(ratioMoyen, coutEnR),
+    stops: distributionDesStops(tranchees.map((r) => r.plan)),
     total: resultats.length,
     parStatut,
     tranchees: tranchees.length,
@@ -133,15 +212,13 @@ export function agreger(resultats, coutEnR) {
     esperance: esperanceEnR({
       gagnants: gagnants.length,
       perdants: tranchees.length - gagnants.length,
-      ratioMoyen: gagnants.length
-        ? gagnants.reduce((a, r) => a + (r.statut === 'tp2' ? 2 : 1), 0) / gagnants.length
-        : 1,
+      ratioMoyen,
       coutEnR,
     }),
   };
 }
 
-function afficherBloc(titre, agr, coutEnR) {
+function afficherBloc(titre, agr) {
   console.log(`\n--- ${titre} ---\n`);
 
   if (!agr.total) { console.log('  aucun order block retenu\n'); return; }
@@ -156,7 +233,25 @@ function afficherBloc(titre, agr, coutEnR) {
   const i = agr.intervalle;
   console.log(`\n  atteint 1 R avant le stop  ${(i.proportion * 100).toFixed(1)} %  (${i.succes}/${i.total})`);
   console.log(`  intervalle de confiance    [${(i.bas * 100).toFixed(1)} %, ${(i.haut * 100).toFixed(1)} %]`);
-  console.log(`  espérance par trade        ${agr.esperance} R  (coûts ${coutEnR} R inclus)`);
+  console.log(`  ratio moyen des gagnants   ${agr.ratioMoyen} R`);
+  console.log(`  coût par trade            ${agr.coutEnR} R  ${agr.coutMesure ? '(mesuré sur le spread)' : '(supposé — donne --spread)'}`);
+
+  if (agr.stops) {
+    console.log(`  stop médian               ${agr.stops.medianePrix} (${(agr.stops.medianeRelative * 100).toFixed(3)} % du prix)`);
+  }
+
+  // Le chiffre qui tranche : la borne basse de l'intervalle contre le seuil.
+  // Au-dessus, le système gagne même dans l'hypothèse défavorable ; entre les
+  // deux bornes, on ne sait pas ; au-dessous, il perd.
+  if (agr.seuil !== null) {
+    const seuilPct = (agr.seuil * 100).toFixed(1);
+    const verdict = i.bas > agr.seuil ? '✓ gagnant même au pire de l’intervalle'
+      : i.haut < agr.seuil ? '✗ perdant même au mieux de l’intervalle'
+      : '— indécidable : le seuil tombe dans l’intervalle';
+    console.log(`  seuil de rentabilité      ${seuilPct} %   ${verdict}`);
+  }
+
+  console.log(`  espérance par trade        ${agr.esperance} R`);
 
   if (!agr.conclusion.possible) console.log(`  ⚠  ${agr.conclusion.raison}`);
   if (agr.tauxAmbiguite > 0.15) {
@@ -165,13 +260,90 @@ function afficherBloc(titre, agr, coutEnR) {
   console.log('');
 }
 
+/** Les trois séries depuis Binance, une requête par tranche de 1000 bougies. */
+async function chargerBinance(o) {
+  const plan = ['utBiais', 'utDetection', 'utResolution'].map((k) => ({
+    unite: o[k], ...nombreDeRequetes({ unite: o[k], depuisMs: o.depuisMs, jusquaMs: o.jusquaMs }),
+  }));
+  console.log(`\n  ${plan.map((p) => `${p.unite}: ${p.bougies} bougies`).join('  ·  ')}`);
+  console.log(`  ${plan.reduce((a, p) => a + p.requetes, 0)} requêtes à envoyer\n`);
+
+  const charger = async (unite) => {
+    process.stdout.write(`  ${unite}… `);
+    const bs = await recuperer({ symbole: o.symbole, unite, depuisMs: o.depuisMs, jusquaMs: o.jusquaMs, baseUrl: o.baseUrl });
+    console.log(`${bs.length} bougies`);
+    return bs;
+  };
+
+  return {
+    biaisBougies: await charger(o.utBiais),
+    detectionBougies: await charger(o.utDetection),
+    resolutionBougies: await charger(o.utResolution),
+  };
+}
+
+/**
+ * Les trois séries depuis un seul fichier, par agrégation.
+ *
+ * Un fichier 1 minute porte tout ce qu'il faut : les bougies 5 minutes,
+ * 15 minutes et 1 heure s'en déduisent exactement. Télécharger trois fichiers
+ * exposerait à trois périodes qui ne se recouvrent pas.
+ *
+ * Fixe au passage `o.depuisMs` et `o.jusquaMs` sur ce que le fichier contient
+ * réellement : le découpage en deux moitiés doit porter sur les données, pas
+ * sur une intention.
+ */
+async function chargerFichier(o) {
+  process.stdout.write(`\n  lecture de ${basename(o.csv)}… `);
+  const contenu = await readFile(o.csv, 'utf8');
+  const { bougies, volumeExploitable, separateur } = analyserCsv(contenu, {
+    unite: o.utCsv, decalageHeures: o.decalageHeures,
+  });
+  console.log(`${bougies.length} bougies ${o.utCsv} (séparateur "${separateur === '\t' ? '\\t' : separateur}")`);
+
+  const retenues = bougies.filter((b) =>
+    (o.depuisMs === undefined || b.ouvertureMs >= o.depuisMs)
+    && (o.jusquaMs === undefined || b.ouvertureMs < o.jusquaMs));
+
+  if (!retenues.length) {
+    throw new Error(bougies.length
+      ? `aucune bougie entre les bornes demandées ; le fichier couvre ${iso(bougies[0].ouvertureMs)} → ${iso(bougies.at(-1).ouvertureMs)}`
+      : 'fichier sans bougie exploitable');
+  }
+
+  const bornes = decrire(retenues, o.utCsv);
+  o.depuisMs = bornes.debutMs;
+  o.jusquaMs = bornes.finMs + dureeUnite(o.utCsv);
+
+  // Le forex ferme le week-end : un taux de remplissage autour de 70 % est
+  // normal, beaucoup plus bas signale un fichier troué.
+  console.log(`  couverture ${(bornes.tauxDeRemplissage * 100).toFixed(1)} % des ${o.utCsv} de la période`);
+  if (bornes.tauxDeRemplissage < 0.5) {
+    console.log("  ⚠  moins d'une bougie sur deux : vérifie que le fichier est complet");
+  }
+
+  if (!volumeExploitable) {
+    console.log('  ⚠  fichier sans volume réel — aucune analyse de volume ne sera produite');
+  }
+
+  const vers = (unite) => (dureeUnite(unite) === dureeUnite(o.utCsv) ? retenues : agregerBougies(retenues, unite));
+  const biaisBougies = vers(o.utBiais);
+  const detectionBougies = vers(o.utDetection);
+  const resolutionBougies = vers(o.utResolution);
+
+  console.log(`  ${o.utBiais}: ${biaisBougies.length}  ·  ${o.utDetection}: ${detectionBougies.length}  ·  ${o.utResolution}: ${resolutionBougies.length} bougies`);
+  return { biaisBougies, detectionBougies, resolutionBougies };
+}
+
 async function main() {
   const o = validerOptions(parseArgs(process.argv.slice(2)));
 
   if (o.erreurs) {
     console.error('\nArguments invalides :');
     for (const e of o.erreurs) console.error('  - ' + e);
-    console.error('\nExemple :\n  node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01\n');
+    console.error('\nExemples :');
+    console.error('  node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01');
+    console.error('  node scripts/backtest.mjs --csv XAUUSD_M1_2025.csv --decalage-heures -5 --spread 0.25\n');
     process.exit(1);
   }
 
@@ -183,30 +355,18 @@ async function main() {
     console.log('='.repeat(70));
   }
 
-  console.log(`\n${o.symbole}  du ${iso(o.depuisMs)} au ${iso(o.jusquaMs)}`);
+  console.log(`\n${o.symbole}  — source ${o.csv ? `fichier ${basename(o.csv)}` : 'Binance'}`);
   console.log(`  biais ${o.utBiais}  ·  détection ${o.utDetection}  ·  résolution ${o.utResolution}`);
-  console.log(`  pivots sur ${o.fenetre} bougies  ·  horizon ${o.horizonHeures} h  ·  coûts ${o.coutEnR} R`);
+  console.log(`  pivots sur ${o.fenetre} bougies  ·  horizon ${o.horizonHeures} h`);
+  if (o.spread || o.commission) console.log(`  spread ${o.spread ?? 0}  ·  commission ${o.commission ?? 0}  (unités de prix, aller-retour)`);
+  else console.log(`  coûts ${o.coutEnR} R — valeur supposée, à remplacer par --spread`);
   if (o.sansFiltreBiais) console.log('  filtre de biais DÉSACTIVÉ');
-
-  const plan = ['utBiais', 'utDetection', 'utResolution'].map((k) => ({
-    unite: o[k], ...nombreDeRequetes({ unite: o[k], depuisMs: o.depuisMs, jusquaMs: o.jusquaMs }),
-  }));
-  const total = plan.reduce((a, p) => a + p.requetes, 0);
-  console.log(`\n  ${plan.map((p) => `${p.unite}: ${p.bougies} bougies`).join('  ·  ')}`);
-  console.log(`  ${total} requêtes à envoyer\n`);
-
-  const charger = async (unite) => {
-    process.stdout.write(`  ${unite}… `);
-    const bs = await recuperer({ symbole: o.symbole, unite, depuisMs: o.depuisMs, jusquaMs: o.jusquaMs, baseUrl: o.baseUrl });
-    console.log(`${bs.length} bougies`);
-    return bs;
-  };
 
   let biaisBougies, detectionBougies, resolutionBougies;
   try {
-    biaisBougies = await charger(o.utBiais);
-    detectionBougies = await charger(o.utDetection);
-    resolutionBougies = await charger(o.utResolution);
+    ({ biaisBougies, detectionBougies, resolutionBougies } = o.csv
+      ? await chargerFichier(o)
+      : await chargerBinance(o));
   } catch (err) {
     console.error(`\nÉchec : ${err.message}\n`);
     process.exit(2);
@@ -224,6 +384,7 @@ async function main() {
   const resultats = evaluer({
     orderBlocks, bougiesDetection: detectionBougies, serieBiais,
     bougiesResolution: resolutionBougies, horizonBougies, sansFiltreBiais: o.sansFiltreBiais,
+    spread: o.spread ?? 0, commission: o.commission ?? 0,
   });
 
   console.log(`  retenus après filtre de biais: ${resultats.length}`);
@@ -231,13 +392,14 @@ async function main() {
   // Découpage imposé : réglage sur la première moitié, vérification sur la
   // seconde, jamais l'inverse.
   const milieu = o.depuisMs + (o.jusquaMs - o.depuisMs) / 2;
+  console.log(`  période couverte: ${iso(o.depuisMs)} → ${iso(o.jusquaMs)}`);
   const premiere = resultats.filter((r) => r.ms < milieu);
   const seconde = resultats.filter((r) => r.ms >= milieu);
 
   console.log('\n=== Résultats ===');
-  afficherBloc('Ensemble de la période', agreger(resultats, o.coutEnR), o.coutEnR);
-  afficherBloc(`Première moitié — jusqu'au ${iso(milieu)} (mise au point)`, agreger(premiere, o.coutEnR), o.coutEnR);
-  afficherBloc(`Seconde moitié — à partir du ${iso(milieu)} (vérification)`, agreger(seconde, o.coutEnR), o.coutEnR);
+  afficherBloc('Ensemble de la période', agreger(resultats, o.coutEnR));
+  afficherBloc(`Première moitié — jusqu'au ${iso(milieu)} (mise au point)`, agreger(premiere, o.coutEnR));
+  afficherBloc(`Seconde moitié — à partir du ${iso(milieu)} (vérification)`, agreger(seconde, o.coutEnR));
 
   if (o.baseUrl) {
     console.log('RAPPEL : données non Binance, ces chiffres ne mesurent rien.\n');
