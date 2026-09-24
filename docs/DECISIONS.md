@@ -991,3 +991,87 @@ Mais le pronostic est mauvais après cinq échecs à intervalles serrés, et ce 
 change là-bas ce sont les coûts, pas la structure. Des coûts faibles ne créent
 pas un avantage, ils en préservent un. À garder pour le jour où il y aura
 quelque chose à préserver.
+
+---
+
+## DEC-026 — Pré-enregistrement : la même règle, sur le marché dont elle vient
+
+**2026-09-24 · Retenue, écrite avant les données**
+
+Cinq jeux crypto, cinq refus (DEC-025). Avant de clore la règle mécanique, un
+dernier test — et il ne porte pas sur une variante, mais sur **le choix du
+marché**, qui est une faute de conception qu'on n'avait pas identifiée.
+
+### Le motif, énoncé avant la mesure
+
+ICT s'est construit sur le forex et les futures, autour de choses qui
+**n'existent pas en crypto** : ouvertures de session, kill zones, hauts et bas
+de séance comme réservoirs de liquidité, open journalier. Le crypto tourne 24 h
+sur 24, sans frontières de session, avec d'autres participants.
+
+Tester exclusivement sur BTCUSDT une méthode née sur le forex est un défaut de
+notre protocole, pas une variante à réessayer. Les mesures précédentes écartaient
+l'or pour une raison de **coûts** — c'était incomplet : ce qui change aussi,
+c'est la structure temporelle sur laquelle toute la méthode s'appuie.
+
+### Ce qui ne bouge pas, et pourquoi
+
+**La configuration reste identique au test crypto**, à la virgule près :
+
+```
+--ut-biais 4h  --ut-detection 1h  --ut-resolution 5m
+--objectif 1r  --remplissage cloture  --fenetre 5  --horizon-heures 48
+--cout-en-r 0  --controle 200
+```
+
+Changer le marché **et** l'unité de temps confondrait les deux causes. Si ça
+échoue, on saura que ce n'est pas le marché. Si on change tout et que ça marche,
+on ne saura pas pourquoi.
+
+Seules deux options s'ajoutent, et elles ne sont pas des réglages :
+
+- `--csv` — l'or n'est pas sur Binance ;
+- `--decalage-heures -5` — HistData horodate en EST sans heure d'été.
+
+### Les données, jamais regardées
+
+**XAUUSD, 2023-01-01 → 2024-12-31**, en 1 minute, source HistData ASCII M1.
+
+Si les fichiers ne couvrent pas exactement ces bornes, l'écart est annoncé
+**avant** de lire le moindre résultat, jamais après.
+
+### La règle de décision
+
+Le test porte sur la règle de base, donc la statistique est le contrôle par
+permutation du backtest — le réel contre ses propres bougies mélangées.
+
+| Condition | Verdict |
+|---|---|
+| `p < 0,05` **et** espérance réelle > médiane des tirages **et** au moins 150 issues tranchées | La règle survit sur l'or. On mesure alors les coûts réels au spread Vantage. |
+| `p ≥ 0,05` | **Clôture définitive de la règle mécanique.** Plus aucun marché, plus aucune période. |
+| Moins de 150 issues tranchées | Non concluant. On élargit la période **une seule fois**, en l'annonçant d'avance. |
+
+### Les excuses écartées d'avance
+
+**« Ce n'est pas la bonne unité de temps. »** Refusée. C'est celle du test
+crypto, et en changer ferait de ce test une variante.
+
+**« Le volume manque. »** Vrai — HistData donne volume = 0 sur l'or, donc les
+qualificatifs de volume seront `null`. Mais le test porte sur la règle de base,
+qui n'en a jamais utilisé. Ce n'est pas une excuse recevable.
+
+**« 2023-2024 est une période particulière. »** Refusée, comme pour
+BTCUSDT 2022-2023. Une règle qui ne survit pas à un changement de période n'est
+pas une règle.
+
+### Ce que ce test ne dit pas
+
+Il mesure **l'order block moyen**, pas la sélection d'un opérateur. Notre
+détecteur en prend tous ; un praticien en trade quelques-uns par semaine, avec
+un contexte qu'on n'encode pas. Un échec ici ne réfute pas « une personne
+compétente peut en choisir de bons » — il réfute « les prendre tous rapporte
+quelque chose ».
+
+Cette seconde question n'est pas testable en l'état, et c'est précisément
+pourquoi le projet bascule ensuite vers le chemin vision, où le jugement est
+explicite et mesurable.
