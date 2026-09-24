@@ -70,7 +70,7 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 315 tests
+npm test                         # 338 tests
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 
@@ -80,6 +80,9 @@ node scripts/backtest.mjs --csv XAUUSD_M1_2025.csv --decalage-heures -5 --spread
 
 # Contrôle par permutation : la règle bat-elle le hasard sur ces données ?
 node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100
+
+# Croiser les qualificatifs avec l'issue, corrigé pour la recherche elle-même
+node scripts/analyser-export.mjs cas.jsonl 200
 npm run samples                  # régénère les graphiques de référence
 ```
 
@@ -98,7 +101,12 @@ npm run samples                  # régénère les graphiques de référence
 
 Ce dépôt contient la **documentation du projet** : `docs/DECISIONS.md` pour
 les choix d'architecture et leur motif, `docs/ETAT.md` pour ce qui est vérifié
-et ce qui ne l'est pas.
+et ce qui ne l'est pas, `docs/PISTES.md` pour ce qu'on a rencontré sans
+l'éprouver et `docs/DONNEES.md` pour les sources de bougies.
+
+`PISTES.md` est une **file d'attente, pas un menu** : une piste en sort quand
+une mesure la désigne, jamais parce qu'une mesure décevante donne envie
+d'essayer autre chose. Voir DEC-022.
 
 Il ne contient **aucun registre de mémoire agent**. Ceux-ci vivent dans
 Notion, page « 🧠 Claude » → « 🧠 Memory Claude », différenciés par propriété

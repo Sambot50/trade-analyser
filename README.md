@@ -271,6 +271,29 @@ réellement obtenu :
 
 Étalonné sur une marche aléatoire : faveur 1,01 R, contre 1,01 R, rapport 1,00.
 
+### Analyser l'export — `scripts/analyser-export.mjs`
+
+```bash
+node scripts/analyser-export.mjs cas-btc-2024-2025.jsonl 200
+```
+
+Croise chaque qualificatif avec l'issue : taux de réussite des deux groupes
+avec leurs intervalles de Wilson, quartiles pour les variables continues, et un
+classement.
+
+**Le classement se fait sur `z`, l'écart rapporté à son erreur-type**, jamais
+sur l'écart brut — sinon il trie les variables par la petitesse de leur
+échantillon. Première version, lancée sur une marche aléatoire : un écart de
+57 points en tête, sur un groupe de 14. Corrigé.
+
+Et surtout, une **correction pour la recherche elle-même** : on mélange les
+issues, on relance l'analyse entière, on garde le meilleur écart, deux cents
+fois. La distribution obtenue dit ce que le hasard produit de mieux *quand on
+cherche parmi vingt variables à la fois*.
+
+Éprouvé dans les deux sens — bruit : p = 0,84 · 0,62 · 0,27 ; effet planté :
+p = 0,0099. Voir DEC-021.
+
 ### Le contrôle par permutation — `--controle`
 
 ```bash
