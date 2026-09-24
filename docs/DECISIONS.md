@@ -927,3 +927,67 @@ règle ». Cette excuse est **écartée par avance** : une règle qui ne survit 
 
 Et si le test échoue, **on ne rejoue pas sur l'or**, ni sur ETH, ni sur une
 autre période. Il ne reste qu'une cartouche crypto, elle se dépense une fois.
+
+---
+
+## DEC-025 — Le test pré-enregistré réfute la largeur de zone
+
+**2026-09-24 · Application de DEC-024**
+
+Le test a été lancé sur BTCUSDT 2022-2023, avec la règle gelée, sans rien
+modifier.
+
+| | |
+|---|---|
+| Au-dessus du seuil | 46,8 % · n = 62 |
+| En-dessous | 47,0 % · n = 232 |
+| Écart | **−0,2 point** · z = −0,029 |
+| `p` | **0,559** — 1118 permutations sur 2000 font aussi bien |
+
+**La deuxième ligne du tableau de décision s'applique : écart nul ou inversé,
+donc abandon.** On ne rejoue ni sur l'or, ni sur ETH, ni sur une autre période.
+
+L'effet valait 21,8 points sur les données d'exploration. Il vaut −0,2 point
+sur des données fraîches. C'étaient bien les dix tirages sur deux cents que le
+`p` corrigé signalait à 0,0547.
+
+### Le compte, sur cinq jeux de données
+
+| Jeu | Résultat |
+|---|---|
+| BTCUSDT 2026, détection 15 min | rien |
+| BTCUSDT 2026, détection 1 h | p = 0,129, compris ensuite comme un tirage sur six |
+| BTCUSDT 2024-2025 | 50,0 % exactement · p corrigé 0,0547 sur la meilleure de 25 variables |
+| BTCUSDT 2022-2023 | qualificatif pré-enregistré réfuté |
+| ETHUSDT 2026 | rien |
+
+**La règle mécanique des order blocks, et tous les qualificatifs qu'on sait
+calculer, ne produisent rien de distinguable du hasard sur le crypto.** C'est
+cohérent avec la littérature : une étude sur SPY, QQQ, DIA et IWM n'a trouvé
+aucune des 648 variantes de concepts ICT capable de battre l'achat-conservation.
+
+### Ce que le protocole a évité
+
+Sans pré-enregistrement, on aurait retenu que les zones larges gagnent à 66,3 %
+contre 44,5 %, construit un filtre dessus, et on y aurait cru. L'écart était
+spectaculaire, le `z` valait 3,02, et la littérature SMC le confirmait sur le
+volume.
+
+**Le seul garde-fou qui l'a arrêté est le `p` corrigé à 0,0547**, puis le test
+sur données fraîches. Ni le découpage en deux moitiés, ni le contrôle par
+permutation du backtest n'auraient vu quoi que ce soit : le premier compare
+deux moitiés des mêmes données, le second teste une règle à la fois et ignore
+combien de variables ont été essayées.
+
+### Ce qui n'est pas réfuté
+
+**Le chemin vision.** Le backtest teste une règle mécanique ; la question du
+raisonnement d'un modèle face à une capture est entièrement distincte, et
+n'a jamais reçu la moindre mesure. C'est le point de départ du projet, et il
+reste ouvert.
+
+**L'or** est techniquement permis par DEC-018 — autre marché, pas une variante.
+Mais le pronostic est mauvais après cinq échecs à intervalles serrés, et ce qui
+change là-bas ce sont les coûts, pas la structure. Des coûts faibles ne créent
+pas un avantage, ils en préservent un. À garder pour le jour où il y aura
+quelque chose à préserver.

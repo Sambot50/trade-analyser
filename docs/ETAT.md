@@ -85,6 +85,40 @@ toujours un avantage planté à p = 0,016.
 2026-09-23 — +0,392 R, +0,400 R — mesuraient la convention, pas le marché.
 La mesure sur BTCUSDT est à refaire.
 
+## Le verdict final sur la règle mécanique — 2026-09-24
+
+Test pré-enregistré par DEC-024, lancé sur BTCUSDT 2022-2023 sans rien modifier.
+
+| | |
+|---|---|
+| Au-dessus du seuil | 46,8 % · n = 62 |
+| En-dessous | 47,0 % · n = 232 |
+| Écart | **−0,2 point** · z = −0,029 · p = 0,559 |
+
+L'effet valait 21,8 points à l'exploration. Il vaut **zéro** sur données
+fraîches. Abandon, et on ne rejoue nulle part (DEC-025).
+
+### Cinq jeux, cinq refus
+
+| Jeu | Résultat |
+|---|---|
+| BTCUSDT 2026, 15 min | rien |
+| BTCUSDT 2026, 1 h | p = 0,129, un tirage sur six |
+| BTCUSDT 2024-2025 | 50,0 % exactement, p corrigé 0,0547 |
+| BTCUSDT 2022-2023 | qualificatif pré-enregistré réfuté |
+| ETHUSDT 2026 | rien |
+
+**La question posée le 2026-09-21 — « la règle des order blocks porte-t-elle un
+avantage ? » — a reçu sa réponse, et c'est non.** Sur le crypto, avec tous les
+qualificatifs qu'on sait calculer, rien ne se distingue du hasard.
+
+### Ce que le protocole a coûté et rapporté
+
+Deux jours, et il a tué une hypothèse qui affichait 66,3 % contre 44,5 % avec un
+`z` de 3,02 — confirmée par la littérature SMC sur le volume.
+
+Sans lui, ce filtre serait aujourd'hui dans le code, et on lui ferait confiance.
+
 ## L'exploration des qualificatifs — BTCUSDT 2024-2025, 2026-09-24
 
 Premier export portant de vraies valeurs de volume. 436 order blocks,
@@ -427,29 +461,70 @@ Constatées pendant l'écriture, utiles à connaître avant de les reproduire :
 
 ## Prochaines étapes, par ordre
 
-1. ~~**Le test hors échantillon de DEC-018.**~~ — **fait, négatif** (DEC-019).
-2. ~~**Exporter les enregistrements individuels du backtest.**~~ — **fait**
-   (DEC-020). `--export` écrit un JSONL portant douze qualificatifs et l'issue,
-   et le diagnostic MFE/MAE s'affiche dans chaque bloc de résultats.
-3. **Lancer l'export sur BTCUSDT 2024-2025 et lire le MFE/MAE.** Faveur ≈ contre
-   signifie que le point d'entrée ne porte rien et qu'aucun qualificatif ne
-   sauvera la mise ; faveur > contre signifie que l'information existe et que
-   c'est la géométrie du plan qui la détruit. Ce chiffre commande tout le reste.
-4. **Croiser chaque qualificatif avec l'issue** — taux de réussite par quartile,
-   avec intervalle de Wilson. Exploration sur un seul jeu ; le meilleur candidat
-   se pré-enregistre et se teste sur un autre, comme DEC-018. Avec douze
-   qualificatifs et 318 cas, l'un paraîtra significatif par pur hasard.
-5. **L'or** — permis par DEC-018 puisque c'est un autre marché, mais le
-   pronostic est mauvais : la règle vient d'échouer sur trois jeux crypto avec
-   des intervalles serrés. Les coûts y sont vingt fois moindres, or des coûts
-   faibles ne créent pas un avantage, ils en préservent un. À garder pour le
-   jour où il y aura quelque chose à préserver.
-6. **Accumuler des analyses réelles** par le chemin vision. Vingt suffisent à
-   savoir si le taux de réussite dépasse le seuil d'équilibre. Question
-   distincte de celle du backtest : elle porte sur le modèle, pas sur la règle.
-7. **Dimensionnement de position.** Des niveaux sans taille de position ne sont
-   pas un plan de trade.
-8. **Travailler l'invite** pour que les niveaux découlent du raisonnement —
-   seulement une fois qu'il y aura une mesure de départ.
+**Changement de cap acté le 2026-09-24 :** la règle mécanique est close
+(DEC-025). Le projet revient à sa question d'origine, jamais mesurée.
+
+### La question qui reste
+
+**Un modèle de vision, à qui l'on montre une capture de graphique, produit-il
+des plans qui valent mieux que le hasard ?**
+
+Ce n'est pas la question qu'on vient de fermer. Le backtest testait une règle
+mécanique — dernière bougie opposée, cassure, zone, stop à 10 % au-delà. Un
+modèle ne suit pas cette règle : il lit une image, raisonne, et propose des
+niveaux. Il peut se tromper là où la règle réussissait, ou l'inverse.
+
+Rien de ce qui a été mesuré ne s'y applique.
+
+### Ce qui est déjà construit pour y répondre
+
+| Brique | État |
+|---|---|
+| Lecture de graphique par Ollama local | fonctionne, écart d'axe mesuré à 2,3 px |
+| Rejet des plans incohérents | actif, jamais corrigé en silence |
+| Journal, format v2 | écrit, avec la règle de sortie explicite |
+| Résolution automatique des issues | le même code que le backtest |
+| Excursions MFE/MAE | branché |
+
+**La chaîne est complète. Ce qui manque, ce sont les analyses.**
+
+### Ce qui n'est pas construit, et qui est le vrai problème
+
+**Le témoin.** On ne peut pas mélanger le raisonnement d'un modèle comme on
+mélange des bougies. Sans témoin, un taux de réussite de 55 % sur vingt
+analyses ne voudra rien dire — on l'a appris assez cher.
+
+Trois pistes de témoin, aucune éprouvée :
+
+1. **Même géométrie, moment tiré au sort.** Prendre le plan du modèle — sens,
+   distance au stop, distance à l'objectif — et le rejouer à un instant tiré au
+   hasard sur la même période. Isole ce que le modèle apporte par son **choix du
+   moment**, à géométrie constante.
+2. **Même moment, sens inversé.** Isole ce qu'il apporte par son **choix de
+   direction**.
+3. **Même capture, modèle différent.** Compare les modèles entre eux, mais ne
+   dit rien sur l'avantage absolu.
+
+La première est la plus proche de ce qu'on veut savoir, et elle réutilise tout
+le résolveur. **C'est elle qu'il faut construire avant d'accumuler quoi que ce
+soit** — sinon on collectera vingt analyses qu'on ne saura pas lire.
+
+### L'ordre
+
+1. **Construire le témoin** — plan du modèle rejoué à un instant tiré au sort,
+   n fois, comme le contrôle par permutation du backtest.
+2. **Pré-enregistrer** le nombre d'analyses et le seuil, avant d'en produire
+   une seule. Même protocole que DEC-018 : on ne regarde pas en accumulant.
+3. **Accumuler les analyses** sur des captures réelles, jusqu'au nombre fixé.
+4. **Lire le résultat**, une fois, et l'appliquer.
+
+### Ce qui attend derrière
+
+- **Dimensionnement de position.** Des niveaux sans taille ne sont pas un plan.
+  Sans objet tant qu'aucune mesure n'est positive.
+- **Travailler l'invite** pour que les niveaux découlent du raisonnement —
+  seulement une fois qu'il y aura une mesure de départ.
+- **L'or**, gardé au registre pour le jour où il y aura quelque chose à y
+  préserver.
 
 ~~Intégration continue~~ — faite, Node 20 et 22 à chaque push.
