@@ -15,6 +15,56 @@ const METATRADER = [
   '2025.01.02,00:01,2062.65,2062.90,2062.10,2062.20,131',
 ].join('\n');
 
+describe('lireHorodatage — indépendance au fuseau de la machine', () => {
+  /**
+   * `Date.parse('2026-09-08 00:00:00')` passe par l'analyseur historique de V8,
+   * qui interprète cette forme dans le fuseau LOCAL. Le même fichier lu à Paris
+   * et à New York donnait deux séries décalées, sans aucune erreur pour le dire.
+   *
+   * Les exports FirstRate Data utilisent exactement cette forme.
+   */
+  const avecFuseau = (tz, fn) => {
+    const avant = process.env.TZ;
+    process.env.TZ = tz;
+    try { return fn(); } finally {
+      if (avant === undefined) delete process.env.TZ; else process.env.TZ = avant;
+    }
+  };
+
+  it('lit « 2026-09-08 00:00:00 » en UTC, quel que soit le fuseau', () => {
+    const attendu = Date.UTC(2026, 8, 8, 0, 0, 0);
+    for (const tz of ['UTC', 'Europe/Paris', 'America/New_York', 'Asia/Tokyo']) {
+      const { ms } = avecFuseau(tz, () => lireHorodatage(['2026-09-08 00:00:00', '1', '2', '3', '4']));
+      expect(ms).toBe(attendu);
+    }
+  });
+
+  it('accepte la même forme avec un T, et sans les secondes', () => {
+    expect(lireHorodatage(['2026-09-08T14:30:00']).ms).toBe(Date.UTC(2026, 8, 8, 14, 30, 0));
+    expect(lireHorodatage(['2026-09-08 14:30']).ms).toBe(Date.UTC(2026, 8, 8, 14, 30, 0));
+  });
+
+  it('applique le décalage de fuseau demandé, et lui seul', () => {
+    const { ms } = lireHorodatage(['2026-09-08 00:00:00'], -5);
+    expect(ms).toBe(Date.UTC(2026, 8, 8, 5, 0, 0));
+  });
+
+  it('lit un export FirstRate Data entier sans rien inventer', () => {
+    const contenu = [
+      'timestamp,open,high,low,close,volume',
+      '2026-09-08 00:00:00,4483.5,4487.2,4483.4,4486.4,248',
+      '2026-09-08 00:01:00,4486.3,4486.3,4483.3,4484.0,63',
+    ].join('\n');
+    const { bougies } = analyser(contenu, { unite: '1m' });
+    expect(bougies).toHaveLength(2);
+    expect(bougies[0].ouvertureMs).toBe(Date.UTC(2026, 8, 8, 0, 0, 0));
+    expect(bougies[0].ouverture).toBe(4483.5);
+    expect(bougies[0].volume).toBe(248);
+    // Un export de futures ne porte pas le détail acheteur/vendeur.
+    expect(bougies[0].delta).toBeNull();
+  });
+});
+
 describe('lireHorodatage', () => {
   it('lit le format HistData collé', () => {
     const { ms, colonnesUtilisees } = lireHorodatage(['20250102 000000']);
