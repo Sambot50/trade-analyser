@@ -94,6 +94,60 @@ définir son cadre de mesure.
 
 ---
 
+## Sources de données à acquérir
+
+Celles-ci coûtent de l'argent, donc elles demandent une décision et pas
+seulement du temps.
+
+### COMEX — le flux d'ordres réel sur l'or
+
+**Se déclenche si** le volume ressort discriminant sur BTCUSDT, là où la donnée
+est réelle, gratuite et abondante.
+
+Le problème qu'elle résout : sur XAUUSD chez un courtier CFD, **le volume
+n'existe pas**. Le forex est décentralisé, il n'y a pas de bourse centrale donc
+pas de volume total, et aucune ventilation acheteur/vendeur. Ce que MT5 affiche
+est le *tick volume* — un comptage de changements de prix, sans information
+directionnelle. Les CSV HistData portent volume = 0.
+
+COMEX est la division métaux du CME, une bourse **centralisée** : le volume y
+existe vraiment. Contrat **GC**, 100 onces troy, tick à 0,10 $/once soit 10 $
+par contrat ; micro **MGC** à 10 onces. XAUUSD spot et GC sont arbitrés en
+permanence, corrélation proche de 0,99 — le volume COMEX est donc un proxy
+légitime de l'activité sur l'or, même si l'exécution se fait sur le CFD.
+
+| Finesse | Source | Coût |
+|---|---|---|
+| Volume journalier | Yahoo Finance, `GC=F` | gratuit |
+| Volume intraday (1 min, 5 min) | Databento, IQFeed, Rithmic, CQG | abonnement mensuel |
+| Ventilation acheteur/vendeur | données tick avec drapeau d'agresseur | le palier le plus cher |
+
+Les montants ne sont pas notés ici : les tarifs CME bougent, et un chiffre
+périmé dans un document vaut moins que pas de chiffre. À vérifier chez les
+fournisseurs, en prêtant attention au statut « non-professionnel » qui change
+la facture du tout au tout.
+
+**Deux pièges techniques**, dont les sources de trading ne parlent jamais :
+
+1. **Le roll.** Les contrats expirent ; les mois actifs sur GC sont pairs —
+   février, avril, juin, août, décembre. Une série continue sur deux ans
+   demande de recoller les contrats, et chaque raccord crée un artefact de
+   prix. Mal fait, ça fabrique de faux signaux exactement là où on en cherche.
+2. **Ce n'est pas l'instrument tradé.** Même si COMEX montre un flux
+   institutionnel, l'exécution reste sur le CFD avec son spread. La donnée est
+   **informative**, une entrée de filtre, jamais l'instrument.
+
+**Séquence, si le déclencheur se produit :** d'abord `GC=F` en journalier chez
+Yahoo, gratuit, une heure de travail — si un signal de volume existe, il se
+verra même à cette échelle grossière. L'intraday payant seulement ensuite, avec
+un seuil déjà pré-enregistré.
+
+**Écarté :** le tick volume de MT5 comme substitut. Il est corrélé à l'activité
+réelle, mais il ne portera jamais l'information directionnelle qu'on cherche —
+il ne permettra jamais de dire « les acheteurs dominaient ».
+
+---
+
 ## Questions entières, jamais ouvertes
 
 - **L'or et les instruments à faible spread.** Permis par DEC-018 puisque c'est
