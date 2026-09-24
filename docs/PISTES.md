@@ -64,7 +64,7 @@ définir son cadre de mesure.
 
 | Piste | Pourquoi ça compte |
 |---|---|
-| **`--sans-filtre-biais`** | Le filtre jette 45 % de l'échantillon et personne n'a jamais vérifié qu'il sert. Une commande, zéro code. |
+| ~~**`--sans-filtre-biais`**~~ | **Fait le 2026-09-24 : le filtre ne gagne rien.** Alignés 50,0 %, non alignés 46,6 %, pour une erreur-type de 4,1 points. Il écarte 45 % de l'échantillon sans contrepartie. |
 | **Traitement des `non_declenche`** | 103 cas sur 436 écartés. Les ambiguës ont été éprouvées (DEC-017), ceux-là jamais. |
 | **Le dépassement sous 2 R / clôture** | −0,074 R systématique sur 60 tirages, inexpliqué. Une anomalie non résolue finit par mordre. |
 
@@ -174,3 +174,5 @@ Pour mémoire, afin que la barre reste visible.
 | Remplissage à la clôture | Un plancher de contrôle positif inexpliqué l'a désignée | DEC-016, DEC-017 — cause principale du biais |
 | Traitement des issues ambiguës | Même enquête | DEC-017 — écartée, 0,023 R d'amplitude au maximum |
 | Échelle de détection | Stop médian à 0,169 % du prix, soit le bruit d'une bougie | DEC-020 — le biais était une affaire d'échelle |
+| Filtre de biais | Une commande gratuite jamais lancée | 2026-09-24 — il ne gagne rien, 3,4 points pour 4,1 d'erreur-type |
+| Largeur de zone et volume | Sortis en tête de l'exploration, `p` corrigé à 0,0547 | DEC-024 — pré-enregistrés, un seul test sur 2022-2023 |
