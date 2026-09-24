@@ -191,6 +191,30 @@ Options utiles :
 | `--commission` | coût additionnel par aller-retour, mêmes unités | `0` |
 | `--depuis` / `--jusqua` | restreindre la période du fichier | bornes du fichier |
 | `--ut-biais` / `--ut-detection` / `--ut-resolution` | unités de la chaîne | `1h` / `15m` / `5m` |
+| `--volume-minimum` | volume exigé de la bougie d'origine, en multiples de la moyenne | aucun seuil |
+| `--volume-ecarts-types` | volume exigé, en écarts-types au-dessus de la moyenne | aucun seuil |
+| `--volume-absorption` | déséquilibre acheteur/vendeur exigé dans le sens de l'order block | aucun seuil |
+| `--volume-fenetre` | bougies de référence pour la moyenne et l'écart-type | `20` |
+
+### Poser un seuil de volume
+
+Sans seuil, un order block est validé par sa seule position : dernière bougie
+opposée avant l'impulsion. Les options ci-dessus ajoutent une condition — la
+bougie doit aussi porter une empreinte de volume.
+
+**Le seuil n'est pas transposable d'une unité de temps à l'autre.** L'agrégation
+somme les volumes et écrase leur variance : un rapport qui s'étale de 0,3 à 3,4
+en bougies 1 minute peut tenir dans 0,9–1,1 en bougies 1 heure. Un seuil de 1,5×
+qui filtre utilement en 1 minute rejette alors la totalité en 1 heure, sans que
+rien ne le signale.
+
+D'où la distribution affichée à chaque exécution : les quartiles du volume des
+order blocks détectés, et le nombre de survivants à cinq seuils. **Le seuil se
+lit là, sur tes données, pas dans un article.**
+
+`--volume-absorption` demande la ventilation acheteur/vendeur : Binance et COMEX
+la portent, aucun CFD ni fichier HistData ne l'aura jamais. Le backtest refuse
+de tourner plutôt que de tout rejeter en silence.
 
 ## Vérifier que le fichier est bien lu
 
