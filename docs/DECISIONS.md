@@ -1211,3 +1211,161 @@ un tirage répété jusqu'à obtenir le bon.
    contrat — l'invariant qui donne son sens à toute la méthode.
 
 Aucune mesure n'est lancée avant que ces trois points soient en place et testés.
+
+---
+
+## DEC-028 — Pré-enregistrement : le volume valide l'order block
+
+**2026-09-24 · Retenue, écrite avant les données**
+
+### L'hypothèse, gelée
+
+**Un order block dont la bougie d'origine porte moins de 1,1 fois le volume
+moyen des 20 bougies précédentes est un mauvais order block.**
+
+Champ `volumeRapporteALaMoyenne`, seuil `1.1`. Rien d'autre.
+
+### D'où vient ce seuil, sans maquillage
+
+Exploration sur BTCUSDT 2024-01-01 → 2026-01-01. 800 order blocks, 319 issues
+tranchées, taux de référence 49,8 % et espérance −0,003 R : le hasard, comme
+partout ailleurs dans ce projet.
+
+Découpé en bandes disjointes de volume :
+
+| Volume de la bougie | Taux | Cas |
+|---|---|---|
+| **< 1,1×** | **45,2 %** | 99/219 |
+| 1,1 à 1,25× | 61,9 % | 13/21 |
+| 1,25 à 1,5× | 57,1 % | 16/28 |
+| ≥ 1,5× | 60,8 % | 31/51 |
+
+**Ce n'est pas une pente, c'est une marche.** Au-dessus de 1,1× tout tourne
+autour de 60 % sans progresser ; les écarts entre les trois bandes hautes sont
+du bruit sur 21, 28 et 51 cas. Ce qui se détache, c'est la bande basse.
+
+Et ça retourne la lecture : le critère ne sélectionne pas des order blocks
+d'élite, il **jette les mauvais**. La médiane de tous les candidats est à 0,79×
+— la majorité des order blocks détectés sont des pauses molles, et ce sont
+elles qui plombent la moyenne.
+
+**Trois faits à charge, écrits ici pour qu'on ne les oublie pas :**
+
+1. **Cinq seuils envisagés, trois lancés** (1,1× · 1,25× · 1,5×). Le seuil a
+   donc été choisi après avoir vu les données.
+2. **Le contrôle par permutation a tourné à 1,25× et il ne passe pas :
+   `p = 0,070`.** Treize tirages sur deux cents font aussi bien, et le meilleur
+   tirage a atteint 64,4 % de réussite — au-dessus de notre 59,5 %.
+3. **1,1× a été retenu pour la puissance statistique** — 100 cas tranchés
+   contre 79 — et recommandé *avant* que ce contrôle tourne. Mais relancer le
+   contrôle à 1,1× ne sauverait rien : corrigé pour deux tirages emboîtés, un
+   `p` à 0,03 remonterait vers 0,06. Ce run n'a pas été lancé, délibérément.
+
+BTCUSDT 2024-2025 est désormais retourné dans tous les sens. **Ces données ne
+peuvent plus rien prouver**, quoi qu'on leur fasse dire.
+
+### La tension avec DEC-025, qui n'est pas contournée
+
+Le volume a **déjà été réfuté** sur données fraîches. `volumeRapporteALaMoyenne`
+sortait en tête de l'exploration précédente avec `z` = 2,94, jumeau de
+`zoneSurAtr` — au-dessus du seuil, le volume médian valait 1,58× la moyenne.
+Une seule chose vue deux fois, et DEC-025 l'a tuée : −0,2 point, `p` = 0,559.
+
+La différence entre ce test-là et celui-ci est réelle, et elle est étroite :
+
+- **là-bas**, le volume était testé comme *prédicteur d'issue parmi les order
+  blocks détectés*, croisé avec vingt-quatre autres variables, corrigé en
+  famille ;
+- **ici**, il est testé comme *critère de détection* qui change quels order
+  blocks existent, en hypothèse unique, sans famille à corriger.
+
+Ce sont deux tests différents. **C'est le même nombre sous-jacent.** Je
+n'écris pas que c'est une question neuve : j'écris que ce n'est pas la même
+question, et que la distance entre les deux est faible.
+
+### Pourquoi ce test est quand même légitime
+
+Il ne sort pas d'un menu piocher après un échec. Il sort d'une demande explicite
+— *« je veux que notre analyser se focalise sur les volumes et détermine avec
+eux quand c'est un order block »* — sur le mécanisme que toute la littérature
+SMC place au centre, et qui n'avait jamais été branché sur la **détection**.
+
+Et le signal va dans le même sens sur quatre découpages indépendants : bandes
+de volume, deux moitiés de période, amplitude maximale contre (0,95 R → 0,74 R),
+espérance (−0,003 R → +0,19 R).
+
+Une hypothèse sérieuse. Pas un résultat.
+
+### La borne dure
+
+**C'est la dernière hypothèse de détection mécanique du projet.**
+
+Si elle échoue, la détection mécanique est close : pas d'autre seuil, pas
+d'autre marché, pas d'autre période, pas de variante « volume de l'impulsion »
+repêchée dans la foulée. Le projet bascule sur le chemin vision, et le registre
+des pistes reste fermé sur ce sujet.
+
+### Les données, jamais regardées
+
+Celles de DEC-027 : **Databento `GLBX.MDP3`, `ohlcv-1m`, `GC.v.0`,
+2023-01-01 → 2024-12-31**, découpées par contrat, sans aucun recollage.
+
+Le volume y est réel et l'or y a une bourse centrale. C'est la seule source
+où cette hypothèse peut être testée : sur un CFD, il n'y a rien à seuiller.
+
+### La procédure, en deux commandes
+
+**Le backtest tourne SANS `--volume-minimum`.** C'est le point à ne pas rater :
+le test compare le groupe au-dessus du seuil au groupe en dessous, et filtrer
+à la détection viderait le second. Le seuil s'applique ensuite, à l'analyse.
+
+```
+node scripts/backtest.mjs --csv <fichier COMEX> --symbole GC \
+  --ut-biais 4h --ut-detection 1h --ut-resolution 5m \
+  --objectif 1r --remplissage cloture --cout-en-r 0 \
+  --export cas-or.jsonl
+
+node scripts/tester-hypothese.mjs cas-or.jsonl volumeRapporteALaMoyenne 1.1
+```
+
+### La règle de décision
+
+Celle de DEC-024, déjà codée dans `scripts/tester-hypothese.mjs` et appliquée
+sans négociation :
+
+| Condition | Verdict |
+|---|---|
+| Moins de 40 cas au-dessus du seuil | Non concluant. Ni abandon ni confirmation. |
+| Écart nul ou inversé | Abandon. Un effet de signe opposé n'est pas une confirmation. |
+| Écart positif et `p < 0,05` | La piste survit. Mesurer les coûts réels avant toute autre chose. |
+| Écart positif et `p ≥ 0,05` | **Abandon.** C'étaient les tirages du hasard. |
+
+Le `p` n'est pas corrigé : une seule hypothèse, un seul seuil, écrits ici avant
+que la donnée existe.
+
+### Ce qu'on attend si l'effet est réel
+
+Écrit maintenant pour qu'un écart de trois points ne puisse pas être requalifié
+en succès :
+
+- taux **sous** le seuil autour de **45 %** ;
+- taux **au-dessus** autour de **60 %** ;
+- écart de l'ordre de **15 points**.
+
+Un écart positif mais très inférieur — deux ou trois points — passant `p < 0,05`
+grâce à un grand échantillon serait un succès statistique et un échec pratique.
+Il serait consigné comme tel, et les coûts réels au spread le trancheraient.
+
+### Les excuses écartées d'avance
+
+**« L'or n'a pas assez d'order blocks. »** C'est la ligne « moins de 40 cas »,
+et elle donne « non concluant », pas « à réessayer ailleurs ».
+
+**« 1,1× n'est pas le bon seuil pour l'or. »** Refusée. Un seuil qui doit être
+réajusté par marché n'est pas une règle, c'est un réglage.
+
+**« Il fallait mesurer le volume de l'impulsion, pas celui de la pause. »**
+C'est une hypothèse distincte et peut-être meilleure. Elle ne sera pas testée
+en remplacement de celle-ci après son échec.
+
+**« 2023-2024 est une période particulière. »** Refusée, comme partout ailleurs.

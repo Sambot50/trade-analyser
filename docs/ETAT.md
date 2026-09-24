@@ -1,6 +1,6 @@
 # État du projet
 
-Mis à jour le 2026-09-23.
+Mis à jour le 2026-09-24.
 
 Ce fichier sépare ce qui est **mesuré** de ce qui est **supposé**. Il n'a
 d'intérêt que s'il reste honnête : une ligne qui passe de « non vérifié » à
@@ -528,3 +528,80 @@ soit** — sinon on collectera vingt analyses qu'on ne saura pas lire.
   préserver.
 
 ~~Intégration continue~~ — faite, Node 20 et 22 à chaque push.
+
+
+---
+
+## Le volume comme critère de détection — BTCUSDT 2024-2025, 2026-09-24
+
+Première fois que le volume décide **quels order blocks existent**, au lieu
+d'être mesuré après coup sur ceux qu'on avait déjà.
+
+800 order blocks détectés, 319 issues tranchées, référence à 49,8 % et
+espérance −0,003 R.
+
+### La distribution, qui n'était pas celle attendue
+
+```
+min 0.15  ·  q1 0.55  ·  médiane 0.79  ·  q3 1.17  ·  max 11.99
+```
+
+**La bougie d'order block typique porte moins de volume que la moyenne des
+vingt précédentes.** C'est le contraire de ce qu'annonce la littérature SMC —
+« empreinte institutionnelle », « pic de volume qui valide l'order block ».
+
+La raison est mécanique et sans mystère : notre order block est la dernière
+bougie de **repli** avant l'impulsion. C'est une pause. Le volume est dans le
+mouvement qui suit, pas dans la pause qu'on a désignée.
+
+Mesuré aussi sur trois mois (90 candidats, médiane 0,75×) : même forme.
+
+### Une marche, pas une pente
+
+| Volume de la bougie | Taux | Cas |
+|---|---|---|
+| **< 1,1×** | **45,2 %** | 99/219 |
+| 1,1 à 1,25× | 61,9 % | 13/21 |
+| 1,25 à 1,5× | 57,1 % | 16/28 |
+| ≥ 1,5× | 60,8 % | 31/51 |
+
+Au-dessus de 1,1× le taux ne progresse plus. Le critère **jette les mauvais**
+plutôt qu'il ne sélectionne des élus.
+
+Contraste bande basse contre tout le reste : 14,8 points, erreur-type 5,9,
+`z` = 2,49.
+
+### Le contrôle ne passe pas
+
+Au seuil 1,25×, 200 tirages :
+
+```
+                        réel     médiane   [min – max]
+taux de réussite      59.5 %      48.3 %   [23.8 % – 64.4 %]
+espérance            0.190 R    -0.035 R   [-0.524 R – 0.288 R]
+p (espérance)          0.070
+p (taux)               0.070
+```
+
+**`p` = 0,070.** Au-dessus du seuil de 0,05 écrit d'avance.
+
+Le chiffre qui rend la chose concrète : le meilleur tirage de contrôle a atteint
+**64,4 %** sur des bougies remises dans le désordre — mieux que notre 59,5 %.
+
+### Ce qui reste malgré le refus
+
+L'amplitude maximale **contre** tombe de 0,95 R à 0,74 R, et à 0,58 R sur la
+seconde moitié. Ce n'est pas un comptage binaire sur 79 cas, c'est une médiane
+sur toutes les transactions — le signal le plus robuste des quatre.
+
+L'effet va dans le même sens sur quatre découpages indépendants : bandes de
+volume, deux moitiés de période, amplitude contre, espérance.
+
+### Statut
+
+**Hypothèse, pas résultat.** Gelée par DEC-028, à tester sur COMEX.
+
+Le seuil a été choisi après avoir vu ces données, qui sont désormais brûlées :
+elles ne peuvent plus rien prouver. Le contrôle à 1,1× n'a pas été lancé
+délibérément — corrigé pour deux tirages emboîtés, il ne pourrait pas sauver le
+résultat, seulement en donner l'illusion.
