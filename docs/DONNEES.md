@@ -73,6 +73,36 @@ seule source réelle est COMEX, et elle est payante : voir `PISTES.md`.
 Gratuit, plus complet, mais nécessite leur outil d'export. À réserver au moment
 où l'année d'historique ne suffira plus.
 
+## Le test pré-enregistré sur l'or (DEC-026)
+
+Deux fichiers annuels à télécharger, concaténés en un seul.
+
+1. https://www.histdata.com/download-free-forex-data/ → **ASCII / M1 Bars**
+2. Instrument **XAUUSD**, années **2023** puis **2024**
+3. Décompresser les deux `.zip`
+
+Puis, dans PowerShell :
+
+```powershell
+# Concaténer les deux années dans l'ordre chronologique
+Get-Content DAT_ASCII_XAUUSD_M1_2023.csv, DAT_ASCII_XAUUSD_M1_2024.csv |
+  Set-Content XAUUSD_2023_2024.csv
+
+# Le test, configuration gelée par DEC-026
+node scripts/backtest.mjs --csv XAUUSD_2023_2024.csv --symbole XAUUSD `
+  --decalage-heures -5 --ut-biais 4h --ut-detection 1h --ut-resolution 5m `
+  --objectif 1r --remplissage cloture --cout-en-r 0 --controle 200 `
+  --export cas-xauusd.jsonl | Tee-Object sortie-or.txt
+```
+
+Les noms de fichiers HistData varient d'une année à l'autre ; un `dir *.csv`
+donne les vrais.
+
+**Trois lignes à vérifier avant de croire la sortie** : le nombre de bougies, la
+période couverte — si elle ne colle pas à 2023-2024, le décalage horaire est
+faux — et le taux de couverture, autour de 70 % sur un marché qui ferme le
+week-end.
+
 ## Lancer la mesure
 
 ```bash
