@@ -699,3 +699,87 @@ c'est arithmétique, pas pessimiste.
 **Écarté :** nommer les sessions (Londres, New York). Leurs bornes varient d'une
 source à l'autre, et un découpage inventé ici se retrouverait dans les
 conclusions. On enregistre l'heure UTC brute.
+
+
+---
+
+## DEC-021 — L'analyse se corrige elle-même de sa propre recherche
+
+**2026-09-24 · Retenue**
+
+`scripts/analyser-export.mjs` lit le JSONL du backtest et croise chaque
+qualificatif avec l'issue. Il teste une vingtaine de variables d'un coup — et
+**sous l'hypothèse nulle, la meilleure paraîtra toujours significative.**
+
+D'où la correction par permutation : on mélange les **issues**, on relance
+l'analyse entière, on retient le meilleur écart. Répété deux cents fois, ça
+donne ce que le hasard produit de mieux **quand on cherche partout à la fois**.
+C'est la seule comparaison honnête pour un écart trouvé en cherchant.
+
+Un p corrigé de 0,30 signifie que trois recherches sur dix trouvent aussi bien
+dans du bruit pur.
+
+### Le classement se fait sur z, pas sur l'écart brut
+
+Première version : tri par écart de taux de réussite. Elle a placé en tête, sur
+une **marche aléatoire**, un écart de 57 points — et rendu p = 0,016.
+
+Deux défauts, trouvés en la lançant sur des données sans structure :
+
+1. **Quartiles dégénérés.** `bougiesDansLaZone` valait 0 pour 188 cas sur 191 ;
+   ses « quartiles » comparaient 3 cas à 188. `quartiles()` rend désormais
+   `null` quand les bornes se confondent.
+2. **Le tri par écart brut trie par petitesse d'échantillon.** Un groupe de 14
+   a deux fois l'erreur-type d'un groupe de 48, donc des écarts fortuits deux
+   fois plus gros. Le classement se fait maintenant sur `z`, l'écart rapporté à
+   son erreur-type, et un minimum de 20 cas par groupe est exigé.
+
+### Éprouvé dans les deux sens
+
+| Jeu | p corrigé |
+|---|---|
+| Marche aléatoire, graine 31337 | 0,84 |
+| Marche aléatoire, graine 777 | 0,62 |
+| Marche aléatoire, graine 4242 | 0,27 |
+| Relation implantée sur la largeur de zone | **0,0099** (0/100) |
+
+Aucun faux positif systématique, et l'effet planté est retrouvé.
+
+**Caveat relevé au passage :** sur le jeu à effet planté, la variable arrivée
+en tête n'est pas celle qu'on avait manipulée mais une variable corrélée. Le
+classement désigne un faisceau, jamais une cause.
+
+### MFE et MAE sont exclus des prédicteurs
+
+Ils se mesurent **après** l'entrée : un trade gagnant a forcément une excursion
+favorable élevée. Les traiter comme prédicteurs reviendrait à prédire l'issue
+par elle-même. Ils sont rapportés à part, comme diagnostic.
+
+**Écarté :** comparer les intervalles de Wilson des deux groupes pour juger de
+la significativité. Des bornes qui se chevauchent ne constituent pas un test, et
+la correction par permutation s'en charge proprement.
+
+---
+
+## DEC-022 — Un registre des pistes, tenu comme une file d'attente
+
+**2026-09-24 · Retenue**
+
+`docs/PISTES.md` garde ce qu'on a rencontré sans l'éprouver : concepts ICT non
+implémentés, écarts avec l'implémentation de référence, questions jamais
+ouvertes, et les commandes qui n'ont rien coûté et n'ont jamais été lancées.
+
+**Motif :** une idée rencontrée puis perdue est un coût pur. Mais un registre
+sans règle est pire : le jour d'une mesure décevante, on y pioche jusqu'à ce que
+quelque chose marche.
+
+D'où la règle écrite en tête du fichier : **une piste en sort quand une mesure
+la désigne**, jamais parce qu'on a envie d'essayer. Elle passe ensuite par
+DEC-018 comme les autres.
+
+Chaque entrée porte sa **condition de déclenchement** — ce qu'il faudrait
+mesurer pour qu'elle vaille le coup. C'est ce champ qui fait la différence entre
+une file d'attente et une liste de souhaits.
+
+Le fichier garde aussi trace de ce qui **est sorti** du registre et par quelle
+mesure, pour que la barre reste visible.
