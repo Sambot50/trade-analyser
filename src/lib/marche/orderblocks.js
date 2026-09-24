@@ -75,14 +75,153 @@ function construire(bougies, index, cassure) {
   };
 }
 
-/** Tous les order blocks d'une série, un par cassure exploitable. */
-export function detecter(bougies, evenements) {
-  const trouves = [];
+/**
+ * Critère de volume : ce qui fait qu'une bougie d'origine mérite le nom
+ * d'order block, plutôt que de le recevoir par sa seule position.
+ *
+ * Tous les seuils sont à `null` par défaut, c'est-à-dire inactifs. Un critère
+ * qui s'activerait tout seul changerait en silence toutes les mesures déjà
+ * prises, et on ne saurait plus lesquelles comparer.
+ */
+export const CRITERE_VOLUME = {
+  /** Bougies de référence pour la moyenne et l'écart-type. */
+  fenetre: 20,
+  /** Volume exigé, en multiple de la moyenne des précédentes. `2` = le double. */
+  rapportMinimum: null,
+  /** Volume exigé, en écarts-types au-dessus de la moyenne. */
+  ecartsTypesMinimum: null,
+  /**
+   * Absorption : déséquilibre acheteur/vendeur exigé DANS LE SENS de l'order
+   * block, alors que la bougie est de couleur opposée.
+   *
+   * C'est la seule mesure qui distingue vraiment un order block d'une grosse
+   * bougie : une bougie baissière sur laquelle les acheteurs dominent, c'est
+   * de l'accumulation masquée. `0` exige le bon signe, `0.5` exige en plus que
+   * le déséquilibre atteigne la moitié du déséquilibre moyen.
+   *
+   * Exige un volume ventilé acheteur/vendeur — Binance et COMEX l'ont, aucun
+   * CFD ni fichier HistData ne l'aura jamais.
+   */
+  absorptionMinimum: null,
+};
+
+const critereActif = (c) => Boolean(c)
+  && (c.rapportMinimum !== null && c.rapportMinimum !== undefined
+    || c.ecartsTypesMinimum !== null && c.ecartsTypesMinimum !== undefined
+    || c.absorptionMinimum !== null && c.absorptionMinimum !== undefined);
+
+/**
+ * La bougie d'indice `index` passe-t-elle le critère de volume ?
+ *
+ * Rend toujours la mesure à côté du verdict : un rejet sans le chiffre qui l'a
+ * causé n'apprend rien et ne permet pas de régler le seuil.
+ */
+export function valideParLeVolume(bougies, index, critere = CRITERE_VOLUME, sens = null) {
+  const c = { ...CRITERE_VOLUME, ...critere };
+  const mesure = anomalieVolume(bougies, index, c.fenetre);
+
+  if (!mesure) {
+    return { valide: false, raison: 'volume non mesurable', mesure: null, mesurable: false };
+  }
+
+  if (c.rapportMinimum !== null && c.rapportMinimum !== undefined
+    && mesure.volumeRapporteALaMoyenne < c.rapportMinimum) {
+    return {
+      valide: false, mesurable: true, mesure,
+      raison: `volume ${mesure.volumeRapporteALaMoyenne}× la moyenne, seuil ${c.rapportMinimum}×`,
+    };
+  }
+
+  if (c.ecartsTypesMinimum !== null && c.ecartsTypesMinimum !== undefined) {
+    if (mesure.ecartsTypes === null) {
+      return { valide: false, mesurable: true, mesure, raison: 'volume constant avant : écarts-types sans objet' };
+    }
+    if (mesure.ecartsTypes < c.ecartsTypesMinimum) {
+      return {
+        valide: false, mesurable: true, mesure,
+        raison: `volume à ${mesure.ecartsTypes} écarts-types, seuil ${c.ecartsTypesMinimum}`,
+      };
+    }
+  }
+
+  if (c.absorptionMinimum !== null && c.absorptionMinimum !== undefined) {
+    if (mesure.deltaRapporteAuMoyen === null) {
+      return { valide: false, mesurable: true, mesure, raison: 'déséquilibre acheteur/vendeur indisponible' };
+    }
+    // Un order block haussier est posé sur une bougie BAISSIÈRE. L'absorption,
+    // c'est un delta positif malgré cette bougie rouge — des acheteurs qui
+    // prennent le papier pendant que le prix descend.
+    const signe = sens === HAUSSIER ? 1 : -1;
+    const absorption = arrondir(mesure.deltaRapporteAuMoyen * signe, 2);
+    if (absorption < c.absorptionMinimum) {
+      return {
+        valide: false, mesurable: true, mesure: { ...mesure, absorption },
+        raison: `absorption ${absorption}, seuil ${c.absorptionMinimum}`,
+      };
+    }
+    return { valide: true, mesurable: true, mesure: { ...mesure, absorption } };
+  }
+
+  return { valide: true, mesurable: true, mesure };
+}
+
+/**
+ * Tous les order blocks d'une série, un par cassure exploitable.
+ *
+ * Sans critère de volume, le comportement est celui d'avant : une cassure, un
+ * order block. Avec critère, la bougie doit en plus porter l'empreinte de
+ * volume qu'on lui demande.
+ */
+export function detecter(bougies, evenements, options = {}) {
+  return detecterEnDetail(bougies, evenements, options).retenus;
+}
+
+/**
+ * Comme `detecter`, mais rend aussi les candidats écartés et la raison.
+ *
+ * Un filtre dont on ne voit que ce qui passe n'est pas réglable : on ne sait
+ * ni ce qu'on perd, ni de combien on a manqué le seuil.
+ */
+export function detecterEnDetail(bougies, evenements, { volume = null } = {}) {
+  const retenus = [];
+  const rejetes = [];
+  const actif = critereActif(volume);
+  let mesurables = 0;
+  let candidats = 0;
+
   for (const cassure of evenements) {
     const ob = orderBlockDe(bougies, cassure);
-    if (ob) trouves.push(ob);
+    if (!ob) continue;
+
+    // La mesure est faite même sans critère : c'est elle qui permet de choisir
+    // un seuil. Un réglage posé sans voir la distribution est un réglage
+    // deviné — et l'agrégation déplace cette distribution beaucoup plus que
+    // l'intuition ne le suggère.
+    if (!actif) {
+      retenus.push({ ...ob, volumeMesure: anomalieVolume(bougies, ob.index, volume?.fenetre ?? CRITERE_VOLUME.fenetre) });
+      continue;
+    }
+
+    candidats++;
+    const verdict = valideParLeVolume(bougies, ob.index, volume, ob.sens);
+    if (verdict.mesurable) mesurables++;
+
+    if (verdict.valide) retenus.push({ ...ob, volumeMesure: verdict.mesure });
+    else rejetes.push({ ms: ob.ms, index: ob.index, sens: ob.sens, raison: verdict.raison, mesure: verdict.mesure });
   }
-  return trouves;
+
+  // Un critère de volume sur une série sans volume rejetterait tout en
+  // silence, et la sortie ressemblerait à « aucun order block ne qualifie »
+  // alors que la vraie phrase est « le fichier ne porte pas de volume ».
+  if (actif && candidats > 0 && mesurables === 0) {
+    throw new Error(
+      "Critère de volume actif, mais aucun volume mesurable dans la série. "
+      + "Les fichiers HistData donnent volume = 0 sur l'or et le forex ; "
+      + 'il faut une source qui porte un volume réel, ou retirer le critère.',
+    );
+  }
+
+  return { retenus, rejetes };
 }
 
 /**

@@ -26,7 +26,7 @@ import { generateurAleatoire, melangerBougies, valeurP, resumeDistribution } fro
 import { qualifier } from '../src/lib/marche/qualificatifs.js';
 import { calculerExcursions, enUnitesDeRisque } from '../src/lib/journal/excursion.js';
 import { cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER, INDETERMINE } from '../src/lib/marche/structure.js';
-import { detecter, anomalieVolume } from '../src/lib/marche/orderblocks.js';
+import { detecterEnDetail, anomalieVolume } from '../src/lib/marche/orderblocks.js';
 import { intervalleWilson, conclusionPossible, esperanceEnR } from '../src/lib/marche/statistiques.js';
 import { resoudreIssue, gainEnR, OBJECTIFS, REMPLISSAGES, TRAITEMENTS_AMBIGU, reglageObjectif } from '../src/lib/journal/resolve.js';
 
@@ -176,6 +176,27 @@ export function validerOptions(args) {
     else o.export = args.export;
   }
 
+  // Le critère de volume : ce qui fait qu'une bougie d'origine mérite le nom
+  // d'order block. Inactif tant qu'aucun seuil n'est posé, pour que les
+  // mesures antérieures restent comparables.
+  const SEUILS_VOLUME = [
+    { option: '--volume-minimum', arg: 'volumeMinimum', champ: 'rapportMinimum', plancher: 0 },
+    { option: '--volume-ecarts-types', arg: 'volumeEcartsTypes', champ: 'ecartsTypesMinimum', plancher: -10 },
+    { option: '--volume-absorption', arg: 'volumeAbsorption', champ: 'absorptionMinimum', plancher: -10 },
+  ];
+  for (const { option, arg, champ, plancher } of SEUILS_VOLUME) {
+    if (args[arg] === undefined) continue;
+    const n = Number(args[arg]);
+    if (!Number.isFinite(n) || n < plancher) { erreurs.push(`${option} attend un nombre ≥ ${plancher}`); continue; }
+    o.volume = { ...(o.volume ?? {}), [champ]: n };
+  }
+
+  if (args.volumeFenetre !== undefined) {
+    const n = Number(args.volumeFenetre);
+    if (!Number.isInteger(n) || n < 5) erreurs.push('--volume-fenetre attend un entier ≥ 5');
+    else o.volume = { ...(o.volume ?? {}), fenetre: n };
+  }
+
   o.sansFiltreBiais = Boolean(args.sansFiltreBiais);
   o.baseUrl = typeof args.baseUrl === 'string' ? args.baseUrl : undefined;
   if (o.csv && o.baseUrl) erreurs.push('--csv et --base-url désignent deux sources : choisis-en une.');
@@ -259,7 +280,7 @@ export function chaine(fines, o) {
 
   const serieBiais = tendanceAuFilDuTemps(cassures(biaisBougies, o.fenetre));
   const evenements = cassures(detectionBougies, o.fenetre);
-  const orderBlocks = detecter(detectionBougies, evenements);
+  const { retenus: orderBlocks, rejetes } = detecterEnDetail(detectionBougies, evenements, { volume: o.volume });
 
   const horizonBougies = Math.round((o.horizonHeures * 3_600_000) / dureeUnite(o.utResolution));
   const resultats = evaluer({
@@ -270,10 +291,13 @@ export function chaine(fines, o) {
 
   return {
     resultats,
+    retenus: orderBlocks,
+    rejetes,
     compteurs: {
       cassuresBiais: serieBiais.length,
       cassuresDetection: evenements.length,
       orderBlocks: orderBlocks.length,
+      rejetesVolume: rejetes.length,
     },
   };
 }
@@ -611,6 +635,69 @@ async function ecrireExport(chemin, resultats, o) {
   console.log('  Une ligne JSON par order block, qualificatifs et issue compris.');
 }
 
+/** Le critère de volume en une ligne lisible, pour l'en-tête. */
+function decrireCritereVolume(v) {
+  const morceaux = [];
+  if (v.rapportMinimum !== undefined) morceaux.push(`≥ ${v.rapportMinimum}× la moyenne`);
+  if (v.ecartsTypesMinimum !== undefined) morceaux.push(`≥ ${v.ecartsTypesMinimum} écarts-types`);
+  if (v.absorptionMinimum !== undefined) morceaux.push(`absorption ≥ ${v.absorptionMinimum}`);
+  if (!morceaux.length) return 'aucun seuil posé (critère sans effet)';
+  return `${morceaux.join(', ')} sur ${v.fenetre ?? 20} bougies`;
+}
+
+/**
+ * La distribution du volume des order blocks détectés.
+ *
+ * C'est le seul moyen honnête de poser un seuil : l'agrégation écrase la
+ * variance du volume, et le rapport à la moyenne qui s'étale de 0,3 à 3,4 en
+ * bougies 1 minute tient dans 0,9–1,1 en bougies 1 heure. Un seuil transposé
+ * d'une échelle à l'autre ne filtre pas, il rejette tout.
+ */
+function afficherDistributionVolume(retenus, rejetes) {
+  const mesures = [
+    ...retenus.map((r) => r.volumeMesure),
+    ...rejetes.map((r) => r.mesure),
+  ].filter(Boolean);
+
+  const rapports = mesures.map((m) => m.volumeRapporteALaMoyenne).filter(Number.isFinite).sort((a, b) => a - b);
+  if (rapports.length < 8) return;
+
+  const q = (part) => rapports[Math.floor(part * (rapports.length - 1))];
+  console.log(`\n  volume des order blocks, en multiples de la moyenne des ${rapports.length} candidats :`);
+  console.log(`    min ${q(0).toFixed(2)}  ·  q1 ${q(0.25).toFixed(2)}  ·  médiane ${q(0.5).toFixed(2)}`
+    + `  ·  q3 ${q(0.75).toFixed(2)}  ·  max ${q(1).toFixed(2)}`);
+
+  const survivants = [1.1, 1.25, 1.5, 2, 3]
+    .map((seuil) => `${seuil}× → ${rapports.filter((r) => r >= seuil).length}`)
+    .join('   ');
+  console.log(`    combien survivraient : ${survivants}`);
+}
+
+/**
+ * Ce que le critère a écarté, et pourquoi.
+ *
+ * Un filtre dont on ne voit que ce qui passe n'est pas réglable. Les trois
+ * motifs les plus fréquents suffisent à savoir si le seuil est trop haut ou si
+ * c'est la donnée qui manque.
+ */
+function afficherRejets(retenus, rejetes) {
+  if (!rejetes?.length) { console.log('  aucun candidat écarté par le volume'); return; }
+
+  const total = retenus + rejetes.length;
+  const part = ((rejetes.length / total) * 100).toFixed(1);
+  console.log(`  écartés par le volume: ${rejetes.length} sur ${total} candidats (${part} %)`);
+
+  const motifs = new Map();
+  for (const r of rejetes) {
+    // Le chiffre change d'un rejet à l'autre ; c'est le motif qu'on compte.
+    const cle = r.raison.replace(/-?[\d.]+/g, 'N');
+    motifs.set(cle, (motifs.get(cle) ?? 0) + 1);
+  }
+  for (const [motif, n] of [...motifs].sort((a, b) => b[1] - a[1]).slice(0, 3)) {
+    console.log(`    ${String(n).padStart(5)}  ${motif}`);
+  }
+}
+
 async function main() {
   const o = validerOptions(parseArgs(process.argv.slice(2)));
 
@@ -639,6 +726,7 @@ async function main() {
   if (o.spread || o.commission) console.log(`  spread ${o.spread ?? 0}  ·  commission ${o.commission ?? 0}  (unités de prix, aller-retour)`);
   else console.log(`  coûts ${o.coutEnR} R — valeur supposée, à remplacer par --spread`);
   if (o.sansFiltreBiais) console.log('  filtre de biais DÉSACTIVÉ');
+  if (o.volume) console.log(`  order block validé par le volume — ${decrireCritereVolume(o.volume)}`);
 
   let biaisBougies, detectionBougies, resolutionBougies, fines;
   try {
@@ -653,8 +741,16 @@ async function main() {
   if (o.controle) {
     if (!fines.length) { console.error('\nAucune bougie.\n'); process.exit(2); }
 
-    const reel = chaine(fines, o);
+    let reel;
+    try {
+      reel = chaine(fines, o);
+    } catch (err) {
+      console.error(`\nÉchec : ${err.message}\n`);
+      process.exit(2);
+    }
     console.log(`\n  order blocks (réel): ${reel.compteurs.orderBlocks}  ·  retenus après filtre: ${reel.resultats.length}`);
+    if (o.volume) afficherRejets(reel.compteurs.orderBlocks, reel.rejetes);
+    afficherDistributionVolume(reel.retenus ?? [], reel.rejetes ?? []);
 
     process.stdout.write(`  ${o.controle} tirages de contrôle… `);
     const alea = generateurAleatoire(o.graine);
@@ -677,9 +773,17 @@ async function main() {
 
   const serieBiais = tendanceAuFilDuTemps(cassures(biaisBougies, o.fenetre));
   const evenements = cassures(detectionBougies, o.fenetre);
-  const orderBlocks = detecter(detectionBougies, evenements);
+  let orderBlocks, rejetes;
+  try {
+    ({ retenus: orderBlocks, rejetes } = detecterEnDetail(detectionBougies, evenements, { volume: o.volume }));
+  } catch (err) {
+    console.error(`\nÉchec : ${err.message}\n`);
+    process.exit(2);
+  }
 
   console.log(`\n  cassures ${o.utBiais}: ${serieBiais.length}  ·  cassures ${o.utDetection}: ${evenements.length}  ·  order blocks: ${orderBlocks.length}`);
+  if (o.volume) afficherRejets(orderBlocks.length, rejetes);
+  afficherDistributionVolume(orderBlocks, rejetes);
 
   const horizonBougies = Math.round((o.horizonHeures * 3_600_000) / dureeUnite(o.utResolution));
   const resultats = evaluer({
