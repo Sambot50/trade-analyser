@@ -53,6 +53,21 @@ ticks réel. Il est lu directement, sans option. Son horodatage est celui du
 serveur du courtier, souvent UTC+2 ou UTC+3 : vérifie, et corrige avec
 `--decalage-heures`.
 
+### Ce qu'aucune de ces sources ne donnera : le volume
+
+Le forex et les CFD sont **décentralisés**. Il n'y a pas de bourse centrale,
+donc pas de volume total, et **aucune ventilation acheteur/vendeur**. Ce que
+MT5 affiche comme « volume » est le *tick volume* — un comptage de changements
+de prix, pas une quantité échangée.
+
+Toute la narration SMC sur « l'empreinte institutionnelle » et le pic de volume
+qui valide un order block est donc **non mesurable** sur ces fichiers. Pas
+difficile à mesurer : impossible.
+
+Binance, elle, donne le volume acheteur agressif gratuitement — c'est pourquoi
+l'hypothèse du volume se teste sur le crypto avant toute dépense. Pour l'or, la
+seule source réelle est COMEX, et elle est payante : voir `PISTES.md`.
+
 ### Dukascopy — pour la profondeur d'historique
 
 Gratuit, plus complet, mais nécessite leur outil d'export. À réserver au moment
