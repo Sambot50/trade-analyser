@@ -58,6 +58,19 @@ export function lireHorodatage(champs, decalageHeures = 0) {
     return { ms: Date.UTC(+A, +M - 1, +J, +h, +m, +s) - decalageMs, colonnesUtilisees: 2 };
   }
 
+  // « 2026-09-08 00:00:00 » — date et heure séparées par une espace, sans fuseau.
+  //
+  // Traité explicitement, et en UTC, parce que `Date.parse` range cette forme
+  // dans son analyseur historique et l'interprète dans le fuseau de la MACHINE.
+  // Le même fichier lu à Paris et à Londres donnerait deux séries décalées
+  // d'une heure, sans qu'aucune erreur ne le signale. Le fuseau se corrige avec
+  // `decalageHeures`, jamais par accident.
+  const dateEtHeure = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/.exec(a);
+  if (dateEtHeure) {
+    const [, A, M, J, h, m, sec = '0'] = dateEtHeure;
+    return { ms: Date.UTC(+A, +M - 1, +J, +h, +m, +sec) - decalageMs, colonnesUtilisees: 1 };
+  }
+
   // Millisecondes ou secondes depuis l'époque
   if (/^\d{10}$/.test(a)) return { ms: Number(a) * 1000 - decalageMs, colonnesUtilisees: 1 };
   if (/^\d{13}$/.test(a)) return { ms: Number(a) - decalageMs, colonnesUtilisees: 1 };
