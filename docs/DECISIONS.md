@@ -1075,3 +1075,139 @@ quelque chose ».
 Cette seconde question n'est pas testable en l'état, et c'est précisément
 pourquoi le projet bascule ensuite vers le chemin vision, où le jugement est
 explicite et mesurable.
+
+---
+
+## DEC-027 — L'or se mesure sur COMEX, pas sur un flux de courtier
+
+**2026-09-24 · Retenue, écrite avant les données · amende DEC-026**
+
+### Ce qui change
+
+DEC-026 gelait « XAUUSD spot, HistData ASCII M1 ». **Cette source est
+abandonnée.** Le test sur l'or se fait sur **COMEX**, contrat GC, données
+d'échange.
+
+Tout le reste de DEC-026 est repris sans une virgule de changement : réglages,
+seuils, règle de décision, excuses écartées d'avance.
+
+Amender un pré-enregistrement est légitime ici parce qu'**aucune donnée n'a été
+regardée** — ni HistData, ni COMEX. Après un premier chiffre, ça ne le serait
+plus.
+
+### Ce qu'il faut reconnaître avant tout le reste
+
+**Cette piste n'est pas sortie du registre par la porte prévue.**
+
+`PISTES.md` lui donnait un déclencheur écrit : *« se déclenche si le volume
+ressort discriminant sur BTCUSDT, là où la donnée est réelle, gratuite et
+abondante »*.
+
+Il ne s'est pas produit. Le volume est bien sorti en tête de l'exploration —
+`volumeRapporteALaMoyenne`, `z` = 2,94 — mais il était le **jumeau** de
+`zoneSurAtr` : au-dessus du seuil, le volume médian valait 1,58× la moyenne,
+parce qu'une zone large est une grosse bougie et qu'une grosse bougie a un gros
+volume. Une seule chose, vue deux fois. Et cette chose a été réfutée sur
+données fraîches par DEC-025 : −0,2 point, `p` = 0,559.
+
+Le déclencheur est donc **éteint, pas en attente**. COMEX sort du registre
+**par décision**, contre la règle « c'est une file d'attente, pas un menu ».
+C'est écrit ici pour que la barre reste visible, et pour qu'on ne se raconte
+pas plus tard que la mesure l'avait désigné.
+
+### Ce qui rend la décision défendable malgré ça
+
+Le motif n'est pas le volume, et ce n'est pas non plus « un marché de plus
+après cinq refus ».
+
+HistData XAUUSD est le flux **synthétique d'un agrégateur** : provenance non
+auditable, volume à zéro, aucun horodatage d'appariement, aucun moyen de
+vérifier qu'une bougie correspond à une transaction. COMEX GC est une **bourse
+centralisée** : les bougies viennent du moteur d'appariement, elles sont
+horodatées par lui, et elles portent des quantités réellement échangées.
+
+Un projet qui vient de passer deux semaines à éliminer trois artefacts de
+mesure — antériorité dans l'horodatage des évènements, antériorité dans la
+règle de sortie, hypothèse de remplissage optimiste — n'a aucune raison de
+jouer sa dernière hypothèse sur la source la moins vérifiable du marché.
+Préférer la donnée d'échange est la continuation de ce travail, pas une
+entorse commode.
+
+### Le roll, et pourquoi on ne recolle rien
+
+Les contrats GC expirent. Une série continue sur deux ans demande de les
+raccorder, et chaque raccord crée un saut de prix qui n'est pas un mouvement de
+marché. Notre détecteur lit les pivots et les impulsions sur le prix brut : il
+lirait ce saut comme un déplacement suivi d'une cassure de structure. Une
+machine à faux order blocks, placée exactement là où on cherche les vrais.
+
+Personne ne règle ce problème à notre place. Databento livre ses contrats
+continus en **prix bruts, non ajustés**, par principe : un ajustement opaque
+introduit des erreurs de fournisseur. Leur feuille de route porte une demande
+de continu ajusté, non livrée.
+
+**Décision : on ne construit aucune série continue.**
+
+Les données sont découpées **par contrat**. La chaîne complète tourne sur chaque
+segment séparément, et les issues sont mises en commun à la fin. Aucun raccord,
+donc aucun artefact ; aucun ajustement, donc aucun choix arbitraire à défendre.
+
+Le découpage ne demande pas de calendrier codé en dur. En demandant le symbole
+continu `GC.v.0` — roulement au volume — chaque ligne porte le symbole réel du
+contrat sous-jacent. **On coupe quand ce champ change** : c'est la donnée qui
+décide.
+
+**Coût de la méthode, annoncé d'avance :** les order blocks situés à moins de
+48 h d'une frontière de contrat sont écartés, faute d'horizon pour les résoudre.
+Sur deux ans et une douzaine de contrats, cela retire de l'ordre de 3 % de la
+période. C'est le prix d'une mesure sans artefact.
+
+### Les données, jamais regardées
+
+**Databento**, dataset `GLBX.MDP3`, schéma `ohlcv-1m`, symbole continu
+`GC.v.0`, du **2023-01-01 au 2024-12-31**.
+
+Si l'export ne couvre pas exactement ces bornes, l'écart est annoncé **avant**
+de lire le moindre résultat.
+
+### Le volume est disponible, et délibérément inutilisé
+
+Pour la première fois, l'or vient avec un volume réel et une bourse centrale.
+
+**Il n'entre pas dans ce test.** La règle gelée n'a jamais utilisé de volume ;
+l'ajouter maintenant changerait deux choses à la fois — le marché et les
+entrées — et un succès ne dirait pas laquelle a joué. C'est exactement la faute
+que DEC-026 a été écrite pour empêcher.
+
+Le volume sur l'or devient une **question distincte**, pré-enregistrée
+séparément, et seulement si quelque chose survit ici.
+
+L'excuse « le volume manque », écartée d'avance par DEC-026, devient donc sans
+objet plutôt que recevable : il ne manque plus, on choisit de ne pas s'en
+servir.
+
+### La règle de décision — inchangée, et COMEX est dedans
+
+| Condition | Verdict |
+|---|---|
+| `p < 0,05` **et** espérance réelle > médiane des tirages **et** au moins 150 issues tranchées | La règle survit. On mesure alors les coûts réels au spread Vantage. |
+| `p ≥ 0,05` | **Clôture définitive de la règle mécanique.** Plus aucun marché, plus aucune période, **COMEX compris**. |
+| Moins de 150 issues tranchées | Non concluant. Période élargie **une seule fois**, annoncée d'avance. |
+
+Le point important est la deuxième ligne. Ce test est le **dernier** de la règle
+mécanique, quel que soit son résultat autre que la survie. Aller chercher un
+septième jeu de données après celui-ci ne serait plus une recherche, ce serait
+un tirage répété jusqu'à obtenir le bon.
+
+### Ce qui reste à construire avant de pouvoir mesurer
+
+1. L'importateur du format Databento — **la forme exacte de l'export n'est pas
+   connue**, notamment l'échelle des prix, qui sort en flottants ou en entiers
+   au milliardième selon le client. Un échantillon d'une journée tranche la
+   question ; l'écrire sans l'avoir vu, c'est l'écrire deux fois.
+2. Le découpage par contrat et la mise en commun des issues, avec l'exclusion
+   des 48 h de bord.
+3. Un test qui vérifie qu'aucun order block ne chevauche une frontière de
+   contrat — l'invariant qui donne son sens à toute la méthode.
+
+Aucune mesure n'est lancée avant que ces trois points soient en place et testés.

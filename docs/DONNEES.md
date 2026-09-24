@@ -64,44 +64,110 @@ Toute la narration SMC sur « l'empreinte institutionnelle » et le pic de volum
 qui valide un order block est donc **non mesurable** sur ces fichiers. Pas
 difficile à mesurer : impossible.
 
-Binance, elle, donne le volume acheteur agressif gratuitement — c'est pourquoi
-l'hypothèse du volume se teste sur le crypto avant toute dépense. Pour l'or, la
-seule source réelle est COMEX, et elle est payante : voir `PISTES.md`.
+Binance, elle, donne le volume acheteur agressif gratuitement. Pour l'or, la
+seule source réelle est **COMEX**, et c'est désormais celle du test
+pré-enregistré : voir DEC-027 et la section ci-dessous.
 
 ### Dukascopy — pour la profondeur d'historique
 
 Gratuit, plus complet, mais nécessite leur outil d'export. À réserver au moment
 où l'année d'historique ne suffira plus.
 
-## Le test pré-enregistré sur l'or (DEC-026)
+## Le test pré-enregistré sur l'or (DEC-026, amendé par DEC-027)
 
-Deux fichiers annuels à télécharger, concaténés en un seul.
+**La source HistData est abandonnée pour ce test.** Le flux spot d'un
+agrégateur n'est pas auditable et ne porte aucun volume ; l'or se mesure sur
+COMEX, la bourse où il s'échange réellement. Les deux sections précédentes
+restent valables pour tout autre usage.
 
-1. https://www.histdata.com/download-free-forex-data/ → **ASCII / M1 Bars**
-2. Instrument **XAUUSD**, années **2023** puis **2024**
-3. Décompresser les deux `.zip`
+### La source
 
-Puis, dans PowerShell :
+| | |
+|---|---|
+| Fournisseur | Databento |
+| Dataset | `GLBX.MDP3` (CME Globex, COMEX compris) |
+| Schéma | `ohlcv-1m` |
+| Symbole | `GC.v.0` — contrat continu, roulement au volume |
+| Période | 2023-01-01 → 2024-12-31 |
 
-```powershell
-# Concaténer les deux années dans l'ordre chronologique
-Get-Content DAT_ASCII_XAUUSD_M1_2023.csv, DAT_ASCII_XAUUSD_M1_2024.csv |
-  Set-Content XAUUSD_2023_2024.csv
+**125 $ de crédit sont offerts à l'inscription.** `ohlcv-1m` est le schéma le
+moins cher du catalogue et la console affiche le coût avant de confirmer le
+téléchargement : lis-le, il n'y a aucune raison d'être surpris par une facture.
 
-# Le test, configuration gelée par DEC-026
-node scripts/backtest.mjs --csv XAUUSD_2023_2024.csv --symbole XAUUSD `
-  --decalage-heures -5 --ut-biais 4h --ut-detection 1h --ut-resolution 5m `
-  --objectif 1r --remplissage cloture --cout-en-r 0 --controle 200 `
-  --export cas-xauusd.jsonl | Tee-Object sortie-or.txt
+**La clé API ne se colle nulle part d'autre que dans `.env.local`**, qui est
+ignoré par Git. Si elle a transité par une conversation, un ticket ou un
+message, elle est à révoquer et à régénérer.
+
+### Ce que `GC.v.0` fait, et ce qu'il ne fait pas
+
+Il **désigne** à chaque instant le contrat le plus actif et bascule
+automatiquement au roulement. Il n'**ajuste** rien : les prix sont bruts, et il
+y a donc un saut à chaque changement de contrat.
+
+C'est voulu, chez eux comme chez nous. Un ajustement opaque introduirait des
+erreurs qu'on ne pourrait pas auditer, et notre protocole entier consiste à
+refuser ça.
+
+### Le découpage par contrat — la règle qui rend la mesure valide
+
+**On ne construit jamais de série continue, et on ne recolle rien.**
+
+Chaque ligne de l'export porte le symbole du contrat réel. On découpe dès que
+ce champ change, on fait tourner la chaîne complète sur chaque segment, et on
+met les issues en commun à la fin.
+
+Un recollage naïf ferait lire le saut de prix comme un déplacement suivi d'une
+cassure de structure — c'est-à-dire qu'il fabriquerait de faux order blocks
+exactement là où on en cherche des vrais.
+
+Les order blocks à moins de 48 h d'une frontière de contrat sont écartés :
+l'horizon de résolution n'y tient pas. Environ 3 % de la période, annoncés
+d'avance.
+
+### Étape 1 — l'échantillon, avant tout le reste
+
+Avant le téléchargement complet, **une seule journée** de `GC.v.0` en
+`ohlcv-1m`, n'importe laquelle en 2023.
+
+La forme exacte de l'export n'est pas connue, et le piège est réel : selon le
+client utilisé, les prix sortent en flottants ou en **entiers au milliardième**.
+Un importateur écrit sans avoir vu le fichier est un importateur écrit deux
+fois.
+
+### Étape 2 — le téléchargement complet
+
+Par la console Databento, ou par leur client Python :
+
+```python
+import databento as db
+import os
+
+client = db.Historical(os.environ['DATABENTO_API_KEY'])  # jamais la clé en clair
+
+donnees = client.timeseries.get_range(
+    dataset='GLBX.MDP3',
+    schema='ohlcv-1m',
+    symbols='GC.v.0',
+    stype_in='continuous',
+    start='2023-01-01',
+    end='2025-01-01',
+)
+donnees.to_csv('GC_2023_2024.csv')
 ```
 
-Les noms de fichiers HistData varient d'une année à l'autre ; un `dir *.csv`
-donne les vrais.
+### Étape 3 — la mesure
 
-**Trois lignes à vérifier avant de croire la sortie** : le nombre de bougies, la
-période couverte — si elle ne colle pas à 2023-2024, le décalage horaire est
-faux — et le taux de couverture, autour de 70 % sur un marché qui ferme le
-week-end.
+La commande n'est pas encore écrite : le découpage par contrat n'existe pas
+dans `scripts/backtest.mjs`. Elle sera figée ici une fois l'importateur et le
+découpage en place et testés, avec la configuration gelée par DEC-026 —
+`--ut-biais 4h --ut-detection 1h --ut-resolution 5m --objectif 1r
+--remplissage cloture --fenetre 5 --horizon-heures 48 --cout-en-r 0
+--controle 200`.
+
+**Trois lignes à vérifier avant de croire quoi que ce soit** : le nombre de
+bougies, la période couverte, et le **nombre de contrats détectés** — une
+douzaine sur deux ans. Un seul contrat signalerait que le découpage n'a pas
+fonctionné, et la mesure serait à jeter.
 
 ## Lancer la mesure
 

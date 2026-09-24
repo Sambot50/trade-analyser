@@ -101,8 +101,14 @@ seulement du temps.
 
 ### COMEX — le flux d'ordres réel sur l'or
 
-**Se déclenche si** le volume ressort discriminant sur BTCUSDT, là où la donnée
-est réelle, gratuite et abondante.
+> **Sortie de ce registre le 2026-09-24, par décision et non par son
+> déclencheur — voir DEC-027.** Le déclencheur écrit ci-dessous ne s'est jamais
+> produit : il s'est éteint avec DEC-025, le volume étant le jumeau de
+> `zoneSurAtr`, réfuté sur données fraîches. La section est conservée telle
+> quelle, déclencheur compris, pour que la barre reste visible.
+
+**Se déclenchait si** le volume ressortait discriminant sur BTCUSDT, là où la
+donnée est réelle, gratuite et abondante.
 
 Le problème qu'elle résout : sur XAUUSD chez un courtier CFD, **le volume
 n'existe pas**. Le forex est décentralisé, il n'y a pas de bourse centrale donc
@@ -176,3 +182,4 @@ Pour mémoire, afin que la barre reste visible.
 | Échelle de détection | Stop médian à 0,169 % du prix, soit le bruit d'une bougie | DEC-020 — le biais était une affaire d'échelle |
 | Filtre de biais | Une commande gratuite jamais lancée | 2026-09-24 — il ne gagne rien, 3,4 points pour 4,1 d'erreur-type |
 | Largeur de zone et volume | Sortis en tête de l'exploration, `p` corrigé à 0,0547 | DEC-024 puis **DEC-025 — réfutés** : −0,2 point sur données fraîches |
+| COMEX | **Par décision, pas par son déclencheur** — celui-ci s'était éteint avec DEC-025 | DEC-027 — devient la source du dernier test de la règle mécanique |
