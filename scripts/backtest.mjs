@@ -16,13 +16,15 @@
 // point sur la totalité d'un historique décrit ce passé-là et rien d'autre ;
 // la seconde moitié est la seule chose qui ressemble à l'avenir.
 
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 
 import { recuperer, dureeUnite, nombreDeRequetes, UNITES } from '../src/lib/marche/bougies.js';
 import { analyser as analyserCsv, agreger as agregerBougies, decrire } from '../src/lib/marche/csv.js';
 import { coutEnRDuPlan, distributionDesStops, seuilDeRentabilite } from '../src/lib/marche/couts.js';
 import { generateurAleatoire, melangerBougies, valeurP, resumeDistribution } from '../src/lib/marche/controle.js';
+import { qualifier } from '../src/lib/marche/qualificatifs.js';
+import { calculerExcursions, enUnitesDeRisque } from '../src/lib/journal/excursion.js';
 import { cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER, INDETERMINE } from '../src/lib/marche/structure.js';
 import { detecter, anomalieVolume } from '../src/lib/marche/orderblocks.js';
 import { intervalleWilson, conclusionPossible, esperanceEnR } from '../src/lib/marche/statistiques.js';
@@ -169,6 +171,11 @@ export function validerOptions(args) {
     else o.ambigu = args.ambigu;
   }
 
+  if (args.export !== undefined) {
+    if (typeof args.export !== 'string') erreurs.push('--export attend un chemin de fichier');
+    else o.export = args.export;
+  }
+
   o.sansFiltreBiais = Boolean(args.sansFiltreBiais);
   o.baseUrl = typeof args.baseUrl === 'string' ? args.baseUrl : undefined;
   if (o.csv && o.baseUrl) erreurs.push('--csv et --base-url désignent deux sources : choisis-en une.');
@@ -204,9 +211,26 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
     const suite = bougiesResolution.slice(depart, depart + horizonBougies);
     const { statut, detail } = resoudreIssue({ plan: ob.plan, bougies: suite, horizonBougies, objectif, remplissage });
 
+    // Amplitudes maximales, en unités de risque, rapportées au prix
+    // RÉELLEMENT obtenu : c'est ce qui distingue « le stop était trop serré »
+    // de « la lecture était fausse ». Le module existait depuis le premier
+    // jour sans que le backtest l'appelle.
+    const planReel = { ...ob.plan, prixEntree: detail.prixEntreeReel ?? ob.plan.prixEntree };
+    const iDeclenchement = detail.declencheLe === null || detail.declencheLe === undefined
+      ? -1
+      : suite.findIndex((b) => b.ouvertureMs === detail.declencheLe);
+    const excursions = iDeclenchement >= 0
+      ? enUnitesDeRisque(
+          calculerExcursions(planReel, suite.slice(iDeclenchement, detail.bougiesExaminees)),
+          planReel,
+        )
+      : null;
+
     resultats.push({
       ms: ob.ms, sens: ob.sens, typeCassure: ob.typeCassure, biais, aligne,
-      plan: ob.plan, statut, detail,
+      plan: ob.plan, statut, detail, excursions,
+      qualificatifs: qualifier(bougiesDetection, ob),
+      delaiEntreeMs: detail.declencheLe ? detail.declencheLe - ob.valideAPartirDeMs : null,
       volume: anomalieVolume(bougiesDetection, ob.index, 20),
       // Le coût dépend du plan : un stop serré paie le même spread sur un
       // risque plus petit, donc plus cher en R. Il se calcule ici, trade par
@@ -254,6 +278,35 @@ export function chaine(fines, o) {
   };
 }
 
+/**
+ * Médianes des amplitudes maximales, en unités de risque.
+ *
+ * Le diagnostic qui sépare deux diagnostics très différents. Faveur ≈ contre :
+ * le point d'entrée ne porte aucune information et il n'y a rien à régler.
+ * Faveur > contre : l'information existe et c'est la géométrie du plan qui la
+ * détruit — la distribution dit alors où poser stop et objectif.
+ */
+export function medianesExcursions(resultats) {
+  const faveurs = resultats.map((r) => r.excursions?.faveurEnR).filter((v) => typeof v === 'number');
+  const contres = resultats.map((r) => r.excursions?.contreEnR).filter((v) => typeof v === 'number');
+  if (!faveurs.length || !contres.length) return null;
+
+  return {
+    nombre: faveurs.length,
+    faveurMediane: mediane(faveurs),
+    contreMediane: mediane(contres),
+    // Au-dessus de 1, le prix va plus loin en faveur qu'à l'encontre.
+    rapport: Number((mediane(faveurs) / (mediane(contres) || 1)).toFixed(3)),
+  };
+}
+
+function mediane(valeurs) {
+  const tri = [...valeurs].sort((a, b) => a - b);
+  const milieu = Math.floor(tri.length / 2);
+  const m = tri.length % 2 ? tri[milieu] : (tri[milieu - 1] + tri[milieu]) / 2;
+  return Number(m.toFixed(3));
+}
+
 export function agreger(resultats, coutParDefaut, objectif = '2r', ambigu = 'exclu') {
   const reglage = reglageObjectif(objectif);
   const parStatut = {};
@@ -289,6 +342,7 @@ export function agreger(resultats, coutParDefaut, objectif = '2r', ambigu = 'exc
     ratioMoyen,
     seuil: seuilDeRentabilite(ratioMoyen, coutEnR),
     stops: distributionDesStops(tranchees.map((r) => r.plan)),
+    excursions: medianesExcursions(tranchees),
     total: resultats.length,
     parStatut,
     tranchees: tranchees.length,
@@ -327,6 +381,13 @@ function afficherBloc(titre, agr) {
 
   if (agr.stops) {
     console.log(`  stop médian               ${agr.stops.medianePrix} (${(agr.stops.medianeRelative * 100).toFixed(3)} % du prix)`);
+  }
+
+  if (agr.excursions) {
+    const e = agr.excursions;
+    console.log(`  amplitude max en faveur   ${e.faveurMediane} R   (médiane sur ${e.nombre} trades)`);
+    console.log(`  amplitude max contre      ${e.contreMediane} R`);
+    console.log(`  rapport faveur / contre   ${e.rapport}${e.rapport > 1.15 ? "   ← le prix va plus loin en faveur : géométrie à revoir" : ''}`);
   }
 
   // Le chiffre qui tranche : la borne basse de l'intervalle contre le seuil.
@@ -501,6 +562,55 @@ function afficherControle(reel, controles, o) {
   console.log('');
 }
 
+/**
+ * Un enregistrement par order block, en JSONL.
+ *
+ * Le backtest agrégeait puis jetait les cas individuels. Les qualificatifs
+ * existaient sans que rien ne les croise avec l'issue : la consigne « mesurer
+ * d'abord, filtrer ensuite » n'avait jamais atteint son second temps.
+ *
+ * Format de journal, une ligne indépendante par cas, pour qu'un agent comme un
+ * tableur puisse le lire sans connaître le code qui l'a produit.
+ */
+async function ecrireExport(chemin, resultats, o) {
+  const lignes = resultats.map((r) => JSON.stringify({
+    horodatage: new Date(r.ms).toISOString(),
+    ms: r.ms,
+    symbole: o.symbole,
+    utDetection: o.utDetection,
+    objectif: o.objectif,
+    remplissage: o.remplissage,
+
+    sens: r.sens,
+    typeCassure: r.typeCassure,
+    biais: r.biais,
+    aligne: r.aligne,
+
+    statut: r.statut,
+    gainEnR: gainEnR(r.statut, o.objectif, o.ambigu),
+    coutEnR: r.coutEnR,
+    delaiEntreeMs: r.delaiEntreeMs,
+    prixEntreePlan: r.plan.prixEntree,
+    prixEntreeReel: r.detail?.prixEntreeReel ?? null,
+    prixStopLoss: r.plan.prixStopLoss,
+    risque: r.plan.risque,
+    risqueRelatif: r.plan.prixEntree ? Number((r.plan.risque / Math.abs(r.plan.prixEntree)).toFixed(6)) : null,
+
+    faveurMaxEnR: r.excursions?.faveurEnR ?? null,
+    contreMaxEnR: r.excursions?.contreEnR ?? null,
+
+    volumeEcartsTypes: r.volume?.ecartsTypes ?? null,
+    volumeRapporteALaMoyenne: r.volume?.volumeRapporteALaMoyenne ?? null,
+    deltaRapporteAuMoyen: r.volume?.deltaRapporteAuMoyen ?? null,
+
+    ...r.qualificatifs,
+  }));
+
+  await writeFile(chemin, lignes.join('\n') + '\n', 'utf8');
+  console.log(`\n  ${lignes.length} enregistrements écrits dans ${chemin}`);
+  console.log('  Une ligne JSON par order block, qualificatifs et issue compris.');
+}
+
 async function main() {
   const o = validerOptions(parseArgs(process.argv.slice(2)));
 
@@ -559,6 +669,7 @@ async function main() {
     const agrege = agreger(reel.resultats, o.coutEnR, o.objectif, o.ambigu);
     afficherBloc('Réel — ensemble de la période', agrege);
     afficherControle(agrege, controles, o);
+    if (o.export) await ecrireExport(o.export, reel.resultats, o);
     return;
   }
 
@@ -594,6 +705,8 @@ async function main() {
   if (o.baseUrl) {
     console.log('RAPPEL : données non Binance, ces chiffres ne mesurent rien.\n');
   }
+
+  if (o.export) await ecrireExport(o.export, resultats, o);
 
   console.log('Lecture :');
   console.log('  Seule la seconde moitié a valeur de preuve. Si elle diffère nettement');

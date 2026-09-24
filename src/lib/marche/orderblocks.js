@@ -51,6 +51,11 @@ function construire(bougies, index, cassure) {
     ms: b.ouvertureMs,
     sens: cassure.sens,
     typeCassure: cassure.type,
+    // Indices de l'impulsion, indispensables aux qualificatifs : tout ce qui
+    // les calcule doit rester en deçà de `indexCassure`.
+    indexCassure: cassure.index,
+    indexOrigine: cassure.indexOrigine,
+    prixCasse: cassure.prixCasse,
     zone: { bas, haut, hauteur },
     volume: b.volume,
     delta: b.delta,

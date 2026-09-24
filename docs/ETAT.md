@@ -10,7 +10,7 @@ d'intérêt que s'il reste honnête : une ligne qui passe de « non vérifié »
 
 | Quoi | Comment | Résultat |
 |---|---|---|
-| Logique pure | 293 tests unitaires | tous passent |
+| Logique pure | 315 tests unitaires | tous passent |
 | Build de production | `npm run build` | 221 kB JS (71 kB gzip) |
 | Projection prix → pixel | lecture des pixels du canvas en navigateur | écart max **1,1 px** sur 4 niveaux |
 | Lecture d'axe sur graphique synthétique | banc d'essai, échelle connue | `qwen3.8:27b` à **2,3 px** |
@@ -357,23 +357,28 @@ Constatées pendant l'écriture, utiles à connaître avant de les reproduire :
 ## Prochaines étapes, par ordre
 
 1. ~~**Le test hors échantillon de DEC-018.**~~ — **fait, négatif** (DEC-019).
-2. **Exporter les enregistrements individuels du backtest**, puis chercher
-   quelle variable sépare les gagnants des perdants. 436 order blocks portent
-   déjà leur anomalie de volume, leur type de cassure et leur alignement de
-   biais ; aucun n'a jamais été examiné. C'est la seule piste qui reste après
-   DEC-019, et elle exige la discipline de DEC-018 : explorer sur un jeu,
-   pré-enregistrer, tester sur un autre.
-3. **L'or** — permis par DEC-018 puisque c'est un autre marché, mais le
+2. ~~**Exporter les enregistrements individuels du backtest.**~~ — **fait**
+   (DEC-020). `--export` écrit un JSONL portant douze qualificatifs et l'issue,
+   et le diagnostic MFE/MAE s'affiche dans chaque bloc de résultats.
+3. **Lancer l'export sur BTCUSDT 2024-2025 et lire le MFE/MAE.** Faveur ≈ contre
+   signifie que le point d'entrée ne porte rien et qu'aucun qualificatif ne
+   sauvera la mise ; faveur > contre signifie que l'information existe et que
+   c'est la géométrie du plan qui la détruit. Ce chiffre commande tout le reste.
+4. **Croiser chaque qualificatif avec l'issue** — taux de réussite par quartile,
+   avec intervalle de Wilson. Exploration sur un seul jeu ; le meilleur candidat
+   se pré-enregistre et se teste sur un autre, comme DEC-018. Avec douze
+   qualificatifs et 318 cas, l'un paraîtra significatif par pur hasard.
+5. **L'or** — permis par DEC-018 puisque c'est un autre marché, mais le
    pronostic est mauvais : la règle vient d'échouer sur trois jeux crypto avec
    des intervalles serrés. Les coûts y sont vingt fois moindres, or des coûts
    faibles ne créent pas un avantage, ils en préservent un. À garder pour le
    jour où il y aura quelque chose à préserver.
-3. **Accumuler des analyses réelles** par le chemin vision. Vingt suffisent à
+6. **Accumuler des analyses réelles** par le chemin vision. Vingt suffisent à
    savoir si le taux de réussite dépasse le seuil d'équilibre. Question
    distincte de celle du backtest : elle porte sur le modèle, pas sur la règle.
-4. **Dimensionnement de position.** Des niveaux sans taille de position ne sont
+7. **Dimensionnement de position.** Des niveaux sans taille de position ne sont
    pas un plan de trade.
-5. **Travailler l'invite** pour que les niveaux découlent du raisonnement —
+8. **Travailler l'invite** pour que les niveaux découlent du raisonnement —
    seulement une fois qu'il y aura une mesure de départ.
 
 ~~Intégration continue~~ — faite, Node 20 et 22 à chaque push.
