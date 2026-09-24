@@ -107,6 +107,12 @@ export function melangerBougies(bougies, alea, taillePaquet = 1) {
     return {
       ouvertureMs: origine.ouvertureMs,
       fermetureMs: origine.fermetureMs,
+      // Le contrat appartient à l'INSTANT, pas à la forme de la bougie : au
+      // roulement, c'est le calendrier qui change de contrat, pas le marché.
+      // Il reste donc sur son créneau pendant que les formes se mélangent, et
+      // les frontières de contrat tombent au même endroit pour le réel et
+      // pour chaque tirage.
+      symbole: origine.symbole ?? null,
       ouverture,
       plusHaut: ouverture * Math.exp(f.haut),
       plusBas: ouverture * Math.exp(f.bas),
