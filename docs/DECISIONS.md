@@ -839,3 +839,91 @@ C'est `visitesAnterieures`, en continu, qui portera l'information.
 distincts. Une visite de dix bougies et dix visites d'une bougie ne racontent
 pas la même chose, et c'est la seconde forme que le vocabulaire SMC décrit. Les
 deux sont enregistrées, l'épisode sert de mesure principale.
+
+---
+
+## DEC-024 — Pré-enregistrement : la largeur de zone, un seul test
+
+**2026-09-24 · Retenue, écrite avant les données**
+
+L'exploration du 2026-09-24 sur BTCUSDT 2024-2025 a fait ressortir une
+variable, `zoneSurAtr` — la hauteur de l'order block rapportée à la volatilité
+ambiante. Ce document fixe ce qui sera testé et comment le résultat sera lu,
+**avant** que les données servant à trancher soient examinées.
+
+### D'où ça vient, et pourquoi ce n'est pas une preuve
+
+| | |
+|---|---|
+| Seuil (3ᵉ quartile de l'exploration) | **1,1915** |
+| Au-dessus | 80 cas · **66,3 %** |
+| En-dessous | 238 cas · 44,5 % |
+| `p` corrigé pour la recherche | **0,0547** |
+
+**Le `p` échoue le seuil de 0,05.** Dix recherches sur deux cents dans du bruit
+pur trouvent aussi bien. Ce n'est pas rien, et ce n'est pas assez — c'est
+exactement la zone grise qu'un seuil écrit d'avance existe pour trancher.
+
+`volumeRapporteALaMoyenne` arrive deuxième avec un z presque identique (2,94
+contre 3,02). Ce n'est pas une seconde découverte : au-dessus du seuil, le
+volume médian vaut **1,58× la moyenne**. Une zone large EST une grosse bougie,
+et une grosse bougie a un gros volume. Une seule trouvaille, vue deux fois.
+
+### Une explication mécanique proposée, puis réfutée
+
+Soupçon initial : sous `--remplissage cloture`, le glissement d'entrée vaut à
+peu près une bougie 5 minutes quelle que soit la largeur de zone, donc il
+pénalise les zones étroites bien davantage.
+
+**Mesuré, et l'asymétrie existe** : inflation médiane du risque de **0,257**
+sur le premier quartile contre **0,109** sur le dernier, un facteur 2,4.
+
+**Mais elle n'explique pas l'écart de taux.** Sous `cloture`, l'objectif est
+redérivé depuis le prix réellement obtenu, à 1 R du risque réel : stop à −R',
+objectif à +R'. La géométrie reste symétrique quelle que soit la valeur de R',
+et une géométrie symétrique donne 50 % sur une marche sans dérive.
+
+L'effet reste donc **inexpliqué**. C'est une raison de le tester, pas d'y
+croire.
+
+### La règle, gelée
+
+```
+--ut-biais 4h  --ut-detection 1h  --ut-resolution 5m
+--objectif 1r  --remplissage cloture  --fenetre 5  --horizon-heures 48
+--cout-en-r 0
+
+Filtre : ne retenir que les order blocks dont zoneSurAtr >= 1.1915
+```
+
+Aucun paramètre ne bouge. Le seuil est celui de l'exploration, à la quatrième
+décimale, sans arrondi de confort.
+
+### Les données, jamais regardées
+
+`BTCUSDT --depuis 2022-01-01 --jusqua 2023-12-31`
+
+C'est la dernière période crypto intacte. 2026 et 2024-2025 sont dépensées.
+
+### La règle de décision
+
+Un seul test, une seule hypothèse — donc **pas de correction familiale** : la
+correction sert à payer une recherche, et il n'y a plus de recherche.
+
+| Condition | Verdict |
+|---|---|
+| `p < 0,05` **et** au-dessus > en-dessous **et** au moins 40 cas au-dessus | La piste survit. On mesure alors les coûts réels avant toute autre chose. |
+| `p ≥ 0,05` | **Abandon.** C'étaient les dix tirages sur deux cents. |
+| Écart significatif mais **inversé** | Abandon. Un effet de signe opposé n'est pas une confirmation. |
+| Moins de 40 cas au-dessus | Non concluant. Ni abandon ni confirmation — on ne rejoue pas ailleurs pour autant. |
+
+### Ce qui est écrit d'avance pour ne pas en discuter après
+
+**2022-2023 est un régime différent** — effondrement de FTX, marché baissier
+prolongé. Si le test échoue, la tentation sera de dire « c'est le régime, pas la
+règle ». Cette excuse est **écartée par avance** : une règle qui ne survit pas
+à un changement de régime n'est pas une règle, c'est une description de
+2024-2025.
+
+Et si le test échoue, **on ne rejoue pas sur l'or**, ni sur ETH, ni sur une
+autre période. Il ne reste qu'une cartouche crypto, elle se dépense une fois.

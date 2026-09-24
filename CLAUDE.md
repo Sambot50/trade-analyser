@@ -70,7 +70,7 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 344 tests
+npm test                         # 354 tests
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 
@@ -83,6 +83,9 @@ node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100
 
 # Croiser les qualificatifs avec l'issue, corrigé pour la recherche elle-même
 node scripts/analyser-export.mjs cas.jsonl 200
+
+# Confirmer UNE hypothèse pré-enregistrée, sur données jamais regardées
+node scripts/tester-hypothese.mjs cas.jsonl zoneSurAtr 1.1915
 npm run samples                  # régénère les graphiques de référence
 ```
 

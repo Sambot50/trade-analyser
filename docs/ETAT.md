@@ -85,6 +85,77 @@ toujours un avantage planté à p = 0,016.
 2026-09-23 — +0,392 R, +0,400 R — mesuraient la convention, pas le marché.
 La mesure sur BTCUSDT est à refaire.
 
+## L'exploration des qualificatifs — BTCUSDT 2024-2025, 2026-09-24
+
+Premier export portant de vraies valeurs de volume. 436 order blocks,
+318 issues tranchées, 25 variables croisées avec l'issue.
+
+### Trois mesures, trois refus
+
+| Question | Résultat | Règle |
+|---|---|---|
+| La règle globale gagne-t-elle ? | 50,0 % · 0,000 R sur 318 cas | — |
+| Un qualificatif sépare-t-il ? | **p corrigé = 0,0547** | seuil 0,05 → échoue |
+| Le filtre de biais sert-il ? | 48,4 % sans, 50,0 % avec | aucun apport |
+| Le point d'entrée porte-t-il une information ? | MFE/MAE = 1,095 | sous le seuil de 1,15 |
+
+### Le filtre de biais ne gagne rien — c'est tranché
+
+Alignés 50,0 % sur 318 ; non alignés **46,6 %** sur 283, déduit des deux runs.
+Écart de 3,4 points pour une erreur-type de 4,1 : du bruit.
+
+**Le filtre écarte 45 % de l'échantillon sans contrepartie mesurable.** C'est
+la première piste sortie du registre par la porte prévue — une commande
+gratuite, jamais lancée en deux jours.
+
+### La largeur de zone, et pourquoi elle n'est pas une découverte
+
+```
+zoneSurAtr                Q4 66,3 %   Q1 42,5 %   z = 3,02
+volumeRapporteALaMoyenne  Q4 60,0 %   Q1 37,2 %   z = 2,94
+```
+
+Ce n'est pas deux trouvailles : au-dessus du seuil, le volume médian vaut
+**1,58× la moyenne**. Une zone large est une grosse bougie, une grosse bougie a
+un gros volume. Une seule chose, vue deux fois — et c'est ce que la littérature
+SMC annonce sur le volume.
+
+Trois réserves :
+
+1. **La forme est mauvaise.** `zoneSurAtr` donne 42,5 · 46,8 · 44,3 · 66,3 :
+   seul le dernier quartile décroche. `volumeRapporteALaMoyenne` zigzague —
+   37,2 · 57,9 · 46,1 · 60,0. Un effet réel monte graduellement.
+2. **Le rapport MFE/MAE est instable entre moitiés** : 1,02 puis 1,226.
+3. **Le `p` corrigé échoue**, de 0,0047.
+
+### Une explication proposée, mesurée, puis réfutée
+
+Soupçon : le remplissage à la clôture pénalise les zones étroites, dont le
+glissement d'entrée pèse plus lourd par rapport au risque.
+
+**L'asymétrie existe** — inflation médiane du risque de **0,257** sur le
+premier quartile contre **0,109** sur le dernier, un facteur 2,4.
+
+**Elle n'explique pas l'écart de taux.** Sous `cloture`, l'objectif est
+redérivé depuis le prix obtenu, à 1 R du risque réel : stop à −R', objectif à
++R'. Symétrique quelle que soit la valeur de R', donc 50 % sur une marche sans
+dérive.
+
+L'effet reste inexpliqué. C'est une raison de le tester (DEC-024), pas d'y
+croire.
+
+### Ce que le script de confirmation a révélé sur lui-même
+
+Éprouvé sur une série **sans aucune structure**, au seuil de DEC-024, il a rendu
+`p = 0,00998` — significatif. Seul le minimum de 40 cas l'a empêché de conclure.
+
+Ce n'est pas un défaut : un test unique à `p < 0,05` se trompe **une fois sur
+vingt**, par définition. La protection ne vient pas du `p`, elle vient de ce
+que le test soit **unique** et sur des **données fraîches**.
+
+D'où la clause de DEC-024 : en cas d'échec, on ne rejoue ni sur l'or, ni sur
+ETH, ni sur une autre période. Chaque reprise est un nouveau tirage à 5 %.
+
 ## Le verdict — test hors échantillon, 2026-09-23
 
 Configuration gelée par DEC-018, lancée sur deux jeux jamais examinés.
