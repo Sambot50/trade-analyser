@@ -34,7 +34,8 @@ import { generateurAleatoire, melanger } from '../src/lib/marche/controle.js';
 export const EXCLUES = ['faveurMaxEnR', 'contreMaxEnR', 'gainEnR', 'statut', 'coutEnR', 'ms', 'horodatage'];
 
 export const BINAIRES = [
-  'fvgPresente', 'fvgChevauchante', 'liquiditePrise', 'zoneIntacte',
+  'fvgPresente', 'fvgChevauchante', 'liquiditePrise',
+  'aucunRetourPendantImpulsion', 'niveauVierge',
   'ote', 'enZoneFavorable', 'aligne', 'definitionAlternativeIdentique',
 ];
 
@@ -42,7 +43,8 @@ export const CONTINUES = [
   'fvgTailleRelative', 'liquiditeProfondeur', 'deplacementAmpleur',
   'deplacementCorpsMoyen', 'deplacementBougies', 'significativiteNiveau',
   'positionDansLaJambe', 'zoneSurAtr', 'risqueRelatif', 'delaiEntreeMs',
-  'definitionAlternativeEcart', 'impulsionEnBougies', 'bougiesDansLaZone',
+  'definitionAlternativeEcart', 'impulsionEnBougies',
+  'bougiesRevenuesPendantImpulsion', 'visitesAnterieures', 'bougiesDepuisDerniereVisite',
   'volumeEcartsTypes', 'volumeRapporteALaMoyenne', 'deltaRapporteAuMoyen',
 ];
 

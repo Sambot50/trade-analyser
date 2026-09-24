@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { HAUSSIER, BAISSIER } from './structure.js';
 import {
-  qualifier, fvgDeLImpulsion, priseDeLiquidite, deplacement,
-  significativiteDuNiveau, premiumDiscount, fraicheur, zoneSurAtr, definitionAlternative,
+  qualifier, fvgDeLImpulsion, priseDeLiquidite, deplacement, significativiteDuNiveau,
+  premiumDiscount, fraicheur, virginiteNiveau, zoneSurAtr, definitionAlternative,
 } from './qualificatifs.js';
 
 const MINUTE = 60_000;
@@ -217,5 +217,84 @@ describe('qualifier', () => {
     // `cassures` et non un vrai pivot : l'écart entre définitions n'y veut
     // plus dire grand-chose.
     expect(qualifier(BOUGIES, OB).impulsionEnBougies).toBe(6);
+  });
+});
+
+describe('virginiteNiveau', () => {
+  /** Zone 99,0 – 100,0 posée à l'indice `index`, dans la série fournie. */
+  const obA = (index) => ({ ...OB, index, indexCassure: index + 2, indexOrigine: Math.max(0, index - 2) });
+
+  it('déclare vierge un niveau jamais visité auparavant', () => {
+    // Le prix descend depuis 105 et n'atteint la zone qu'à la toute fin :
+    // l'approche finale doit être sautée, pas comptée comme une visite.
+    const descente = serie([
+      [105, 105.2, 104.5, 104.6], [104.6, 104.8, 103.9, 104.0], [104.0, 104.2, 103.2, 103.3],
+      [103.3, 103.5, 102.4, 102.5], [102.5, 102.7, 101.6, 101.7], [101.7, 101.9, 100.8, 100.9],
+      [100.9, 101.0, 99.8, 99.9],   // 6 : entre dans la zone — approche finale
+      [99.9, 100.0, 99.0, 99.2],    // 7 : order block
+      [99.2, 100.5, 99.1, 100.4], [100.4, 102.5, 100.3, 102.4],
+    ]);
+    const r = virginiteNiveau(descente, obA(7));
+    expect(r.vierge).toBe(true);
+    expect(r.visites).toBe(0);
+    expect(r.bougiesDepuisDerniereVisite).toBeNull();
+  });
+
+  it('compte une visite antérieure séparée de l’approche', () => {
+    const revisite = serie([
+      [99.5, 100.0, 99.2, 99.8],    // 0 : DANS la zone — visite antérieure
+      [99.8, 100.1, 99.4, 100.0],   // 1 : encore dedans, même visite
+      [100.0, 103.0, 99.9, 102.8],  // 2 : sort largement
+      [102.8, 103.2, 102.4, 102.6], [102.6, 102.8, 101.5, 101.7],
+      [101.7, 101.9, 100.5, 100.7],
+      [100.7, 100.9, 99.7, 99.9],   // 6 : approche finale
+      [99.9, 100.0, 99.0, 99.2],    // 7 : order block
+      [99.2, 100.5, 99.1, 100.4], [100.4, 102.5, 100.3, 102.4],
+    ]);
+    const r = virginiteNiveau(revisite, obA(7));
+    expect(r.vierge).toBe(false);
+    expect(r.visites).toBe(1);
+    // Trois bougies dans la zone pour une seule visite : la bougie 2 sort
+    // largement par le haut mais son plus-bas reste à 99,9, donc dedans.
+    expect(r.bougiesDedans).toBe(3);
+    expect(r.bougiesDepuisDerniereVisite).toBeGreaterThan(0);
+  });
+
+  it('distingue deux visites séparées d’une seule longue', () => {
+    const deuxFois = serie([
+      [99.5, 100.0, 99.2, 99.8],    // 0 : première visite
+      [99.8, 103.0, 99.7, 102.8],   // 1 : sort
+      [102.8, 103.0, 102.5, 102.7],
+      [102.7, 102.9, 99.4, 99.6],   // 3 : deuxième visite
+      [99.6, 103.0, 99.5, 102.9],   // 4 : ressort
+      [102.9, 103.1, 102.6, 102.8], [102.8, 103.0, 99.8, 99.9], // 6 : approche
+      [99.9, 100.0, 99.0, 99.2],    // 7 : order block
+      [99.2, 100.5, 99.1, 100.4], [100.4, 102.5, 100.3, 102.4],
+    ]);
+    expect(virginiteNiveau(deuxFois, obA(7)).visites).toBe(2);
+  });
+
+  it('ne regarde jamais après l’order block', () => {
+    const avant = serie([
+      [99.5, 100.0, 99.2, 99.8], [99.8, 103.0, 99.7, 102.8], [102.8, 103.0, 99.9, 99.9],
+      [99.9, 100.0, 99.0, 99.2],  // 3 : order block
+    ]);
+    const prolonge = [...avant, ...serie([[99.2, 100.0, 99.0, 99.5], [99.5, 100.0, 99.1, 99.8]])];
+    const ob = { ...OB, index: 3, indexCassure: 5, indexOrigine: 0 };
+    expect(virginiteNiveau(prolonge, ob)).toEqual(virginiteNiveau(avant, ob));
+  });
+
+  it('rend null quand il n’y a aucune histoire à examiner', () => {
+    expect(virginiteNiveau(serie([[99.9, 100.0, 99.0, 99.2]]), { ...OB, index: 0 })).toBeNull();
+  });
+});
+
+describe('qualifier — virginité et retour, deux champs distincts', () => {
+  it('expose les deux séparément', () => {
+    const q = qualifier(BOUGIES, OB);
+    expect(q).toHaveProperty('aucunRetourPendantImpulsion');
+    expect(q).toHaveProperty('niveauVierge');
+    expect(q).toHaveProperty('visitesAnterieures');
+    expect(q).not.toHaveProperty('zoneIntacte');
   });
 });

@@ -70,7 +70,7 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 338 tests
+npm test                         # 344 tests
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 

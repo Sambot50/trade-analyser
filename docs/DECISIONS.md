@@ -783,3 +783,59 @@ une file d'attente et une liste de souhaits.
 
 Le fichier garde aussi trace de ce qui **est sorti** du registre et par quelle
 mesure, pour que la barre reste visible.
+
+---
+
+## DEC-023 — La virginité du niveau, quatrième critère qu'on croyait couvert
+
+**2026-09-24 · Retenue**
+
+Le vocabulaire SMC pose quatre critères de validation : displacement, FVG,
+cassure de structure, et **virginité du bloc** — « le niveau ne doit pas avoir
+déjà été testé et mitigé par le passé ».
+
+Les trois premiers étaient dans `qualificatifs.js` depuis DEC-020. **Le
+quatrième ne l'était pas, et je croyais le contraire.**
+
+### La confusion
+
+`fraicheur` regarde si le prix est revenu dans la zone **entre l'order block et
+la cassure** — une fenêtre de quelques bougies, pendant l'impulsion. Elle
+portait un nom qui laissait croire que le critère SMC était couvert.
+
+La virginité est une autre question, sur une fenêtre disjointe : **ce niveau de
+prix avait-il déjà été travaillé avant que l'order block se forme ?** Une zone
+posée sur un palier traversé vingt fois en deux mois n'a rien à voir avec une
+zone sur un niveau jamais visité.
+
+Les champs exportés portent désormais des noms qui les distinguent :
+`aucunRetourPendantImpulsion` et `bougiesRevenuesPendantImpulsion` d'un côté,
+`niveauVierge`, `visitesAnterieures` et `bougiesDepuisDerniereVisite` de
+l'autre.
+
+### Le même piège, à l'autre bout
+
+Les bougies qui précèdent immédiatement l'order block chevauchent la zone par
+continuité — le prix est bien arrivé là. Cette approche finale est **sautée**
+avant tout décompte, faute de quoi chaque zone paraîtrait visitée au moins une
+fois et le qualificatif ne séparerait rien.
+
+C'est exactement la faute déjà corrigée sur `fraicheur`, qui comptait la bougie
+suivant l'order block — laquelle part de la zone par construction.
+
+### Mesuré sur la série d'essai
+
+| | |
+|---|---|
+| Niveaux vierges | 9 sur 209 |
+| Visites antérieures, médiane | 6 |
+| Visites antérieures, maximum | 18 |
+
+**`niveauVierge` sera probablement inutilisable comme binaire** : 9 cas
+n'atteignent pas le minimum de 20 par groupe qu'impose l'analyse (DEC-021).
+C'est `visitesAnterieures`, en continu, qui portera l'information.
+
+**Écarté :** compter les bougies dans la zone plutôt que les épisodes
+distincts. Une visite de dix bougies et dix visites d'une bougie ne racontent
+pas la même chose, et c'est la seconde forme que le vocabulaire SMC décrit. Les
+deux sont enregistrées, l'épisode sert de mesure principale.
