@@ -23,6 +23,7 @@ import { recuperer, dureeUnite, nombreDeRequetes, UNITES } from '../src/lib/marc
 import { analyser as analyserCsv, agreger as agregerBougies, decrire } from '../src/lib/marche/csv.js';
 import { coutEnRDuPlan, distributionDesStops, seuilDeRentabilite } from '../src/lib/marche/couts.js';
 import { generateurAleatoire, melangerBougies, valeurP, resumeDistribution } from '../src/lib/marche/controle.js';
+import { decouperParContrat, minimumPourResoudre } from '../src/lib/marche/contrats.js';
 import { qualifier } from '../src/lib/marche/qualificatifs.js';
 import { calculerExcursions, enUnitesDeRisque } from '../src/lib/journal/excursion.js';
 import { cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER, INDETERMINE } from '../src/lib/marche/structure.js';
@@ -270,7 +271,11 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
  * exactement le même chemin — y compris l'agrégation. Deux chemins distincts
  * introduiraient une différence sans rapport avec ce qu'on mesure.
  */
-export function chaine(fines, o) {
+/**
+ * La chaîne entière sur UN segment homogène — un seul contrat, ou une série
+ * qui n'en nomme aucun.
+ */
+function chaineDUnSegment(fines, o) {
   const memeUnite = (unite) => dureeUnite(unite) === dureeUnite(o.uniteFine);
   const vers = (unite) => (memeUnite(unite) ? fines : agregerBougies(fines, unite));
 
@@ -300,6 +305,57 @@ export function chaine(fines, o) {
       rejetesVolume: rejetes.length,
     },
   };
+}
+
+/**
+ * La chaîne entière depuis une seule série fine, contrat par contrat.
+ *
+ * **Aucun recollage.** Les futures expirent ; le passage d'un contrat au
+ * suivant crée un saut de prix qui n'est pas un mouvement de marché, et que le
+ * détecteur lirait comme un déplacement suivi d'une cassure de structure. On
+ * mesure chaque contrat séparément et on met les issues en commun. Voir
+ * DEC-027 et `contrats.js`.
+ *
+ * Une série sans contrat nommé — Binance, HistData, un CSV de CFD — donne un
+ * segment unique et se comporte exactement comme avant.
+ *
+ * L'agrégation se fait DANS chaque segment, jamais au travers : une bougie
+ * 1 heure à cheval sur un roulement mélangerait les prix de deux contrats.
+ * Elle devient deux bougies tronquées, une par contrat, ce qui est la vérité.
+ *
+ * Le contrôle par permutation exige que le réel et le hasard passent par
+ * exactement le même chemin — y compris ce découpage. Comme le contrat est une
+ * propriété de l'instant et non de la forme de la bougie, les frontières
+ * tombent au même endroit dans les deux cas.
+ */
+export function chaine(fines, o) {
+  const minimumBougies = minimumPourResoudre({
+    fenetre: o.fenetre,
+    dureeDetectionMs: dureeUnite(o.utDetection),
+    horizonHeures: o.horizonHeures,
+    dureeFineMs: dureeUnite(o.uniteFine),
+  });
+
+  const { segments, ecartes } = decouperParContrat(fines, { minimumBougies });
+
+  const resultats = [];
+  const retenus = [];
+  const rejetes = [];
+  const compteurs = { cassuresBiais: 0, cassuresDetection: 0, orderBlocks: 0, rejetesVolume: 0 };
+
+  for (const segment of segments) {
+    const r = chaineDUnSegment(segment.bougies, o);
+    resultats.push(...r.resultats);
+    retenus.push(...r.retenus);
+    rejetes.push(...r.rejetes);
+    for (const cle of Object.keys(compteurs)) compteurs[cle] += r.compteurs[cle];
+  }
+
+  // Les segments sont chronologiques entre eux, mais le découpage en deux
+  // moitiés et l'export attendent un ordre global.
+  resultats.sort((a, b) => a.ms - b.ms);
+
+  return { resultats, retenus, rejetes, compteurs, segments, ecartes };
 }
 
 /**
@@ -635,6 +691,27 @@ async function ecrireExport(chemin, resultats, o) {
   console.log('  Une ligne JSON par order block, qualificatifs et issue compris.');
 }
 
+/**
+ * Les contrats détectés, et ceux écartés faute de place.
+ *
+ * Le chiffre à regarder est le NOMBRE de contrats. Un seul, sur deux ans de
+ * futures, signifierait que le découpage n'a pas fonctionné — et que la
+ * mesure porte sur une série recollée, ce que DEC-027 interdit.
+ */
+function afficherContrats(segments, ecartes) {
+  const nommes = segments.filter((s) => s.symbole !== null).length + (ecartes?.length ?? 0);
+  if (!nommes) return;
+
+  console.log(`\n  ${segments.length} contrats mesurés séparément, sans aucun recollage`);
+  for (const s of segments) {
+    console.log(`    ${String(s.symbole).padEnd(10)} ${String(s.nombre).padStart(7)} bougies   ${iso(s.debutMs)} → ${iso(s.finMs)}`);
+  }
+  if (ecartes?.length) {
+    const total = ecartes.reduce((n, e) => n + e.nombre, 0);
+    console.log(`    ${ecartes.length} segment(s) écarté(s), ${total} bougies — trop courts pour héberger un order block résoluble`);
+  }
+}
+
 /** Le critère de volume en une ligne lisible, pour l'en-tête. */
 function decrireCritereVolume(v) {
   const morceaux = [];
@@ -749,6 +826,7 @@ async function main() {
       process.exit(2);
     }
     console.log(`\n  order blocks (réel): ${reel.compteurs.orderBlocks}  ·  retenus après filtre: ${reel.resultats.length}`);
+    afficherContrats(reel.segments, reel.ecartes);
     if (o.volume) afficherRejets(reel.compteurs.orderBlocks, reel.rejetes);
     afficherDistributionVolume(reel.retenus ?? [], reel.rejetes ?? []);
 
@@ -771,26 +849,48 @@ async function main() {
 
   if (!detectionBougies.length) { console.error('\nAucune bougie de détection.\n'); process.exit(2); }
 
-  const serieBiais = tendanceAuFilDuTemps(cassures(biaisBougies, o.fenetre));
-  const evenements = cassures(detectionBougies, o.fenetre);
-  let orderBlocks, rejetes;
-  try {
-    ({ retenus: orderBlocks, rejetes } = detecterEnDetail(detectionBougies, evenements, { volume: o.volume }));
-  } catch (err) {
-    console.error(`\nÉchec : ${err.message}\n`);
-    process.exit(2);
+  // Un fichier passe par `chaine`, qui découpe par contrat. Les deux chemins
+  // sont équivalents sur une série à contrat unique — mais sur des futures,
+  // seul `chaine` refuse de mesurer au travers d'un roulement.
+  //
+  // Binance garde le chemin direct : ses trois séries sont téléchargées
+  // séparément plutôt que déduites de la série fine, et aucune bougie Binance
+  // ne porte de contrat.
+  let resultats, orderBlocks, rejetes;
+  if (o.csv) {
+    let r;
+    try {
+      r = chaine(fines, o);
+    } catch (err) {
+      console.error(`\nÉchec : ${err.message}\n`);
+      process.exit(2);
+    }
+    ({ resultats, retenus: orderBlocks, rejetes } = r);
+    console.log(`\n  cassures ${o.utBiais}: ${r.compteurs.cassuresBiais}  ·  cassures ${o.utDetection}: ${r.compteurs.cassuresDetection}  ·  order blocks: ${orderBlocks.length}`);
+    afficherContrats(r.segments, r.ecartes);
+    if (o.volume) afficherRejets(orderBlocks.length, rejetes);
+    afficherDistributionVolume(orderBlocks, rejetes);
+  } else {
+    const serieBiais = tendanceAuFilDuTemps(cassures(biaisBougies, o.fenetre));
+    const evenements = cassures(detectionBougies, o.fenetre);
+    try {
+      ({ retenus: orderBlocks, rejetes } = detecterEnDetail(detectionBougies, evenements, { volume: o.volume }));
+    } catch (err) {
+      console.error(`\nÉchec : ${err.message}\n`);
+      process.exit(2);
+    }
+
+    console.log(`\n  cassures ${o.utBiais}: ${serieBiais.length}  ·  cassures ${o.utDetection}: ${evenements.length}  ·  order blocks: ${orderBlocks.length}`);
+    if (o.volume) afficherRejets(orderBlocks.length, rejetes);
+    afficherDistributionVolume(orderBlocks, rejetes);
+
+    const horizonBougies = Math.round((o.horizonHeures * 3_600_000) / dureeUnite(o.utResolution));
+    resultats = evaluer({
+      orderBlocks, bougiesDetection: detectionBougies, serieBiais,
+      bougiesResolution: resolutionBougies, horizonBougies, sansFiltreBiais: o.sansFiltreBiais,
+      objectif: o.objectif, remplissage: o.remplissage, spread: o.spread ?? 0, commission: o.commission ?? 0,
+    });
   }
-
-  console.log(`\n  cassures ${o.utBiais}: ${serieBiais.length}  ·  cassures ${o.utDetection}: ${evenements.length}  ·  order blocks: ${orderBlocks.length}`);
-  if (o.volume) afficherRejets(orderBlocks.length, rejetes);
-  afficherDistributionVolume(orderBlocks, rejetes);
-
-  const horizonBougies = Math.round((o.horizonHeures * 3_600_000) / dureeUnite(o.utResolution));
-  const resultats = evaluer({
-    orderBlocks, bougiesDetection: detectionBougies, serieBiais,
-    bougiesResolution: resolutionBougies, horizonBougies, sansFiltreBiais: o.sansFiltreBiais,
-    objectif: o.objectif, remplissage: o.remplissage, spread: o.spread ?? 0, commission: o.commission ?? 0,
-  });
 
   console.log(`  retenus après filtre de biais: ${resultats.length}`);
 

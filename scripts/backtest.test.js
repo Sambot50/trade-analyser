@@ -316,3 +316,70 @@ describe('agreger — les ambiguës encadrent la mesure', () => {
     expect(exclu).toBeLessThan(optimiste);
   });
 });
+
+
+describe('le roulement ne fabrique pas de structure', () => {
+  /**
+   * Deux contrats, et un saut de 5 % au passage de l'un à l'autre — ce que
+   * produit un roulement.
+   *
+   * Le premier contrat porte UN sommet net, à 2010, que le prix ne dépasse
+   * plus ensuite : aucune cassure de structure ne s'y produit. Le second est
+   * plat à 2100.
+   *
+   * Recollée, la série voit donc une clôture à 2100 franchir un sommet à
+   * 2010 — une cassure haussière franche, entièrement fabriquée par le
+   * calendrier d'expiration. Découpée, elle n'en voit aucune.
+   */
+  const serieAvecRoulement = (contratChange) => {
+    const N = 400;
+    const prixDe = (i) => {
+      if (i >= N) return 2100;
+      // Un sommet triangulaire strict entre les bougies 100 et 110.
+      if (i >= 100 && i <= 110) return 2000 + (5 - Math.abs(105 - i)) * 2;
+      return 2000;
+    };
+
+    return Array.from({ length: 2 * N }, (_, i) => {
+      const p = prixDe(i);
+      return {
+        ouvertureMs: i * 60_000,
+        fermetureMs: i * 60_000 + 59_999,
+        ouverture: p, plusHaut: p + 1, plusBas: p - 1, cloture: p,
+        volume: 100, volumeAcheteur: null, volumeVendeur: null, delta: null, nombreTrades: null,
+        symbole: contratChange && i >= N ? '9467' : '9466',
+      };
+    });
+  };
+
+  const reglages = {
+    uniteFine: '1m', utBiais: '1h', utDetection: '5m', utResolution: '1m',
+    fenetre: 5, horizonHeures: 1, objectif: '1r', remplissage: 'cloture',
+  };
+
+  it('découpe en autant de segments que de contrats', () => {
+    const r = chaine(serieAvecRoulement(true), reglages);
+    expect(r.segments).toHaveLength(2);
+    expect(r.segments.map((s) => s.symbole)).toEqual(['9466', '9467']);
+  });
+
+  /**
+   * Le cœur de DEC-027. Sur une série rigoureusement plate, la seule chose
+   * qui puisse produire une cassure de structure est le saut de roulement.
+   * Découpée, elle n'en produit aucune ; recollée, elle en invente.
+   */
+  it("n'invente aucune cassure quand les contrats sont séparés", () => {
+    const decoupe = chaine(serieAvecRoulement(true), reglages);
+    const recolle = chaine(serieAvecRoulement(false), reglages);
+
+    expect(decoupe.compteurs.cassuresDetection).toBe(0);
+    expect(recolle.compteurs.cassuresDetection).toBeGreaterThan(0);
+  });
+
+  it('traite une série sans contrat comme un segment unique', () => {
+    const sans = serieAvecRoulement(true).map((b) => ({ ...b, symbole: null }));
+    const r = chaine(sans, reglages);
+    expect(r.segments).toHaveLength(1);
+    expect(r.segments[0].symbole).toBeNull();
+  });
+});
