@@ -207,11 +207,17 @@ export function premiumDiscount(bougies, ob) {
 }
 
 /**
- * La zone a-t-elle été entamée avant la cassure ?
+ * Le prix est-il revenu dans la zone PENDANT l'impulsion, avant la cassure ?
  *
- * Une zone « fraîche » n'a pas encore été retouchée. Celles que le prix a déjà
- * traversées ont vu une partie de leurs ordres absorbés, si tant est que
- * l'histoire soit vraie — ce qui est précisément ce qu'on mesure.
+ * ┌───────────────────────────────────────────────────────────────────────┐
+ * │ À ne pas confondre avec la « virginité » du vocabulaire SMC, qui      │
+ * │ demande si le NIVEAU avait déjà été travaillé AVANT que l'order block │
+ * │ se forme. Ce sont deux fenêtres disjointes, et deux questions         │
+ * │ différentes — `virginiteNiveau` répond à la seconde.                  │
+ * │                                                                       │
+ * │ La confusion a existé : ce qualificatif a longtemps porté le nom de   │
+ * │ « fraîcheur » en laissant croire que le critère SMC était couvert.    │
+ * └───────────────────────────────────────────────────────────────────────┘
  *
  * On ne compte qu'un RETOUR : la bougie qui suit l'order block démarre dans la
  * zone par construction, puisque l'impulsion en part. Compter celle-là
@@ -229,6 +235,62 @@ export function fraicheur(bougies, ob) {
   }
 
   return { intacte: retours === 0, bougiesDansLaZone: retours };
+}
+
+/**
+ * Le niveau avait-il déjà été travaillé avant que l'order block se forme ?
+ *
+ * C'est le quatrième critère de validation du vocabulaire SMC, et celui que
+ * `fraicheur` ne couvrait pas : une zone posée sur un palier que le prix a
+ * traversé vingt fois en deux mois n'a rien à voir avec une zone sur un niveau
+ * jamais visité.
+ *
+ * Difficulté : les bougies qui précèdent immédiatement l'order block
+ * chevauchent la zone par continuité — le prix est bien arrivé là. Cette
+ * approche finale est donc SAUTÉE avant de compter quoi que ce soit, faute de
+ * quoi toute zone paraîtrait visitée au moins une fois et le qualificatif ne
+ * séparerait rien. Même piège que pour `fraicheur`, à l'autre bout.
+ */
+export function virginiteNiveau(bougies, ob, profondeur = 200) {
+  const debut = Math.max(0, ob.index - profondeur);
+  const precedentes = bougies.slice(debut, ob.index);
+  if (!precedentes.length) return null;
+
+  const chevauche = (b) => b.plusBas <= ob.zone.haut && b.plusHaut >= ob.zone.bas;
+
+  // Remonter le temps, en sautant l'approche finale.
+  let i = precedentes.length - 1;
+  while (i >= 0 && chevauche(precedentes[i])) i--;
+
+  let visites = 0;
+  let dedans = false;
+  let bougiesDedans = 0;
+  let indexDerniereVisite = null;
+
+  for (; i >= 0; i--) {
+    if (chevauche(precedentes[i])) {
+      bougiesDedans++;
+      if (!dedans) {
+        visites++;
+        if (indexDerniereVisite === null) indexDerniereVisite = i;
+      }
+      dedans = true;
+    } else {
+      dedans = false;
+    }
+  }
+
+  return {
+    vierge: visites === 0,
+    visites,
+    bougiesDedans,
+    examinees: precedentes.length,
+    // Distance à la visite la plus récente : un niveau intouché depuis cent
+    // bougies n'a pas le même statut qu'un niveau quitté il y a dix.
+    bougiesDepuisDerniereVisite: indexDerniereVisite === null
+      ? null
+      : precedentes.length - indexDerniereVisite,
+  };
 }
 
 /** Hauteur de zone rapportée à la volatilité ambiante (ATR sur `periode`). */
@@ -291,6 +353,7 @@ export function qualifier(bougies, ob) {
   const impulsion = deplacement(visibles, ob);
   const zone = premiumDiscount(visibles, ob);
   const neuve = fraicheur(visibles, ob);
+  const vierge = virginiteNiveau(visibles, ob);
   const alternative = definitionAlternative(visibles, ob);
 
   return {
@@ -311,8 +374,15 @@ export function qualifier(bougies, ob) {
     enZoneFavorable: zone?.enZoneFavorable ?? null,
     ote: zone?.ote ?? null,
 
-    zoneIntacte: neuve.intacte,
-    bougiesDansLaZone: neuve.bougiesDansLaZone,
+    // Retour dans la zone PENDANT l'impulsion — à ne pas confondre avec la
+    // virginité du niveau, qui regarde ce qui s'est passé AVANT.
+    aucunRetourPendantImpulsion: neuve.intacte,
+    bougiesRevenuesPendantImpulsion: neuve.bougiesDansLaZone,
+
+    niveauVierge: vierge?.vierge ?? null,
+    visitesAnterieures: vierge?.visites ?? null,
+    bougiesDepuisDerniereVisite: vierge?.bougiesDepuisDerniereVisite ?? null,
+
     zoneSurAtr: zoneSurAtr(visibles, ob),
 
     definitionAlternativeIdentique: alternative.identique,

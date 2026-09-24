@@ -30,12 +30,33 @@ Le MFE/MAE de l'export BTCUSDT décide de ces quatre-là.
 | **Invalidation sur clôture** au lieu de mèche | Littérature ICT | MAE médian proche de 1,0 R — on sort d'un cheveu |
 | **Entrée à 50 % de la zone** (mean threshold) | Littérature ICT | MFE > MAE avec beaucoup de `non_declenche` |
 | **Objectifs structurels** (pool de liquidité, FVG non comblée) au lieu de 1 R / 2 R | Littérature ICT | MFE médian nettement > 1 R |
+| **Entrée au mean threshold, variante « corps »** : milieu de `(ouverture + clôture) / 2` | Littérature ICT | Beaucoup de `non_declenche` dans l'export |
+| **Entrée au mean threshold, variante « range »** : milieu de `(plusBas + plusHaut) / 2` | Littérature ICT | Idem — les deux se mesurent ensemble ou pas du tout |
 | **Sortie partielle** : moitié à 1 R, stop au point mort | Écartée dans DEC-015 | MFE entre 1 et 2 R avec beaucoup de retours au stop |
 
 **Coût annoncé pour l'invalidation sur clôture :** la perte cesse de valoir
 exactement −1 R, puisqu'on sort au prix de clôture. Il faut calculer le R
 réalisé trade par trade, comme il a fallu le faire pour le remplissage à la
 clôture. Ce n'est pas une option d'une ligne.
+
+### L'entrée à 50 % et les objectifs structurels sont une seule piste
+
+Les sources présentent l'entrée au mean threshold comme un gain de ratio :
+« cela réduit le stop et augmente le rapport gain/risque ». **La première
+moitié est vraie, la seconde est fausse dans notre cadre.**
+
+Nos objectifs sont posés à 1 R et 2 R **depuis l'entrée**. Si le risque
+diminue, les objectifs se rapprochent d'autant : le ratio reste exactement
+1:1 et 2:1, par construction. Entrer à mi-bloc ne change alors qu'une chose —
+**le taux de déclenchement**, puisque le prix doit pénétrer plus profond.
+
+Le gain de ratio n'existe que si l'objectif est fixé **en prix** et non en
+multiple du risque. Donc : adopter l'entrée à 50 % sans les objectifs
+structurels ne gagne rien, et les deux pistes se testent ensemble ou pas du
+tout.
+
+C'est le genre de chose qu'une source de trading ne dit jamais, faute de
+définir son cadre de mesure.
 
 ---
 
@@ -95,6 +116,7 @@ Pour mémoire, afin que la barre reste visible.
 
 | Piste | Sortie | Résultat |
 |---|---|---|
+| Virginité du niveau | Un quatrième critère de validation SMC que `fraicheur` ne couvrait pas | DEC-023 — ajoutée aux qualificatifs |
 | Remplissage à la clôture | Un plancher de contrôle positif inexpliqué l'a désignée | DEC-016, DEC-017 — cause principale du biais |
 | Traitement des issues ambiguës | Même enquête | DEC-017 — écartée, 0,023 R d'amplitude au maximum |
 | Échelle de détection | Stop médian à 0,169 % du prix, soit le bruit d'une bougie | DEC-020 — le biais était une affaire d'échelle |
