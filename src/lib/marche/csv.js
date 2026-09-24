@@ -82,6 +82,79 @@ export function lireHorodatage(champs, decalageHeures = 0) {
   throw new Error(`Horodatage illisible : "${a}"${b ? ` (suivant : "${b}")` : ''}`);
 }
 
+/**
+ * Noms de colonnes reconnus, par rôle. Le premier trouvé gagne.
+ *
+ * L'ordre n'est pas décoratif : un export MetaTrader porte `<TICKVOL>` et
+ * `<VOL>`, et c'est le comptage de ticks que la lecture positionnelle prenait
+ * déjà. Changer ce choix en passant à la lecture par nom aurait modifié en
+ * silence toutes les mesures antérieures.
+ */
+const ALIAS = {
+  horodatage: ['tsevent', 'timestamp', 'datetime', 'opentime', 'date', 'time', 'horodatage'],
+  ouverture: ['open', 'ouverture', 'o'],
+  plusHaut: ['high', 'plushaut', 'h'],
+  plusBas: ['low', 'plusbas', 'l'],
+  cloture: ['close', 'cloture', 'c'],
+  volume: ['volume', 'tickvol', 'vol', 'v'],
+  // Identifiant NUMÉRIQUE du contrat réellement coté sur la ligne.
+  contrat: ['instrumentid', 'contractid'],
+  // Étiquette textuelle. Voir `contratDe` : ce n'est pas forcément le contrat.
+  symbole: ['symbol', 'symbole', 'ticker', 'instrument', 'contract', 'contrat'],
+};
+
+const normaliser = (nom) => String(nom).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Associe chaque rôle à un indice de colonne, depuis la ligne d'en-tête.
+ *
+ * Rend `null` si les quatre prix ne sont pas tous nommés : le fichier retombe
+ * alors sur la lecture positionnelle, qui couvre HistData et les exports sans
+ * en-tête. Un export Databento intercale `rtype`, `publisher_id` et
+ * `instrument_id` entre l'horodatage et l'ouverture — seule la lecture par nom
+ * le supporte.
+ */
+export function repererColonnes(noms) {
+  const normalises = noms.map(normaliser);
+  const indice = (role) => {
+    for (const alias of ALIAS[role]) {
+      const i = normalises.indexOf(alias);
+      if (i !== -1) return i;
+    }
+    return null;
+  };
+
+  const colonnes = Object.fromEntries(Object.keys(ALIAS).map((role) => [role, indice(role)]));
+  const prix = ['ouverture', 'plusHaut', 'plusBas', 'cloture'];
+  if (prix.some((role) => colonnes[role] === null)) return null;
+  if (colonnes.horodatage === null) colonnes.horodatage = 0;
+  return colonnes;
+}
+
+/**
+ * Le contrat d'une ligne — la clé qui décidera du découpage.
+ *
+ * **`instrument_id` l'emporte sur `symbol`, et ce n'est pas un détail.**
+ *
+ * Une requête Databento sur un contrat continu renvoie un `symbol` qui vaut
+ * `GC.v.0` sur TOUTES les lignes : c'est le symbole demandé, réécrit tel quel,
+ * pas le contrat coté. S'en servir pour découper donnerait un segment unique
+ * couvrant deux ans — c'est-à-dire la série recollée que DEC-027 interdit,
+ * obtenue sans qu'aucune erreur ne le signale.
+ *
+ * `instrument_id` change, lui, à chaque roulement. C'est le seul champ de cet
+ * export qui dit où passe la frontière entre deux contrats.
+ */
+export function contratDe(champs, colonnes) {
+  if (!colonnes) return null;
+  for (const role of ['contrat', 'symbole']) {
+    if (colonnes[role] === null) continue;
+    const valeur = String(champs[colonnes[role]] ?? '').trim();
+    if (valeur) return valeur;
+  }
+  return null;
+}
+
 const estEntete = (ligne) => /[a-zA-Z<]/.test(ligne.split(/[;,\t]/)[0]?.replace(/[TZ:.\- ]/g, '') ?? '');
 
 /**
@@ -97,10 +170,12 @@ export function analyser(contenu, { unite, decalageHeures = 0 } = {}) {
   const lignes = contenu.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   if (!lignes.length) throw new Error('Fichier vide.');
 
-  const corps = estEntete(lignes[0]) ? lignes.slice(1) : lignes;
+  const aEntete = estEntete(lignes[0]);
+  const corps = aEntete ? lignes.slice(1) : lignes;
   if (!corps.length) throw new Error("Fichier sans données : il n'y a qu'un en-tête.");
 
   const sep = detecterSeparateur(corps);
+  const colonnes = aEntete ? repererColonnes(lignes[0].split(sep)) : null;
   const bougies = [];
   let sansVolume = 0;
 
@@ -108,13 +183,16 @@ export function analyser(contenu, { unite, decalageHeures = 0 } = {}) {
     const champs = ligne.split(sep);
     let horodatage;
     try {
-      horodatage = lireHorodatage(champs, decalageHeures);
+      horodatage = lireHorodatage(champs.slice(colonnes ? colonnes.horodatage : 0), decalageHeures);
     } catch (err) {
       throw new Error(`Ligne ${i + 1} : ${err.message}`);
     }
 
-    const d = horodatage.colonnesUtilisees;
-    const [o, h, l, c, v] = champs.slice(d, d + 5).map((x) => Number(String(x).trim()));
+    const nombre = (x) => Number(String(x ?? '').trim());
+    const [o, h, l, c, v] = colonnes
+      ? [colonnes.ouverture, colonnes.plusHaut, colonnes.plusBas, colonnes.cloture, colonnes.volume]
+        .map((j) => (j === null ? NaN : nombre(champs[j])))
+      : champs.slice(horodatage.colonnesUtilisees, horodatage.colonnesUtilisees + 5).map(nombre);
 
     if (![o, h, l, c].every(Number.isFinite)) {
       throw new Error(`Ligne ${i + 1} : OHLC illisible dans "${ligne.slice(0, 60)}"`);
@@ -129,6 +207,10 @@ export function analyser(contenu, { unite, decalageHeures = 0 } = {}) {
       fermetureMs: horodatage.ms + duree - 1,
       ouverture: o, plusHaut: h, plusBas: l, cloture: c,
       volume,
+      // Le contrat auquel appartient la bougie, quand le fichier le nomme.
+      // C'est lui, et rien d'autre, qui décidera du découpage : aucun
+      // calendrier d'expiration n'est codé nulle part. Voir DEC-027.
+      symbole: contratDe(champs, colonnes),
       // Un CSV de CFD ne porte jamais le détail acheteur/vendeur : le
       // déséquilibre est indisponible, et doit rester null plutôt que d'être
       // inventé à partir du sens de la bougie.

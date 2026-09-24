@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { analyser, agreger, decrire, detecterSeparateur, lireHorodatage } from './csv.js';
+import { analyser, agreger, decrire, detecterSeparateur, lireHorodatage, repererColonnes, contratDe } from './csv.js';
 import { dureeUnite } from './bougies.js';
 import { cassures } from './structure.js';
 
@@ -247,5 +247,68 @@ describe('decrire', () => {
 
   it('rend null sur une série vide', () => {
     expect(decrire([], '1m')).toBeNull();
+  });
+});
+
+
+describe("lecture par nom de colonne — l'export Databento", () => {
+  const ENTETE = 'ts_event,rtype,publisher_id,instrument_id,open,high,low,close,volume,symbol';
+  const ligne = (ts, id, o, h, l, c, v) => `${ts},33,1,${id},${o},${h},${l},${c},${v},GC.v.0`;
+
+  it('repère les colonnes malgré trois champs intercalés avant le prix', () => {
+    const cols = repererColonnes(ENTETE.split(','));
+    expect(cols).not.toBeNull();
+    expect(cols.horodatage).toBe(0);
+    expect(cols.ouverture).toBe(4);
+    expect(cols.volume).toBe(8);
+    expect(cols.contrat).toBe(3);
+    expect(cols.symbole).toBe(9);
+  });
+
+  it('lit les prix aux bonnes colonnes, pas aux mauvaises', () => {
+    const contenu = [ENTETE, ligne('2023-06-01T00:00:00.000000000Z', 9466, '1983.600000000', '1983.700000000', '1983.500000000', '1983.500000000', 36)].join('\n');
+    const { bougies } = analyser(contenu, { unite: '1m' });
+    expect(bougies[0].ouvertureMs).toBe(Date.UTC(2023, 5, 1, 0, 0, 0));
+    expect(bougies[0].ouverture).toBe(1983.6);
+    expect(bougies[0].plusHaut).toBe(1983.7);
+    expect(bougies[0].plusBas).toBe(1983.5);
+    expect(bougies[0].cloture).toBe(1983.5);
+    expect(bougies[0].volume).toBe(36);
+  });
+
+  /**
+   * Le piège central de ce format, et celui qui aurait ruiné le test de l'or
+   * en silence : `symbol` vaut `GC.v.0` sur toutes les lignes — le symbole
+   * DEMANDÉ, pas le contrat coté. Découper là-dessus donnerait un segment
+   * unique sur deux ans, c'est-à-dire la série recollée que DEC-027 interdit.
+   */
+  it('prend instrument_id comme contrat, jamais le symbole continu', () => {
+    const contenu = [
+      ENTETE,
+      ligne('2023-06-01T00:00:00.000000000Z', 9466, 1983.6, 1983.7, 1983.5, 1983.5, 36),
+      ligne('2023-06-01T00:01:00.000000000Z', 9467, 1983.7, 1983.8, 1983.7, 1983.7, 20),
+    ].join('\n');
+    const { bougies } = analyser(contenu, { unite: '1m' });
+    expect(bougies.map((b) => b.symbole)).toEqual(['9466', '9467']);
+  });
+
+  it('retombe sur le symbole textuel quand aucun identifiant numérique n’existe', () => {
+    expect(contratDe(['x', 'GCZ3'], { contrat: null, symbole: 1 })).toBe('GCZ3');
+    expect(contratDe(['x', ''], { contrat: null, symbole: 1 })).toBeNull();
+  });
+
+  it('nomme le contrat null quand le fichier n’en porte aucun', () => {
+    const contenu = ['timestamp,open,high,low,close,volume', '2026-09-08 00:00:00,4483.5,4487.2,4483.4,4486.4,248'].join('\n');
+    const { bougies } = analyser(contenu, { unite: '1m' });
+    expect(bougies[0].symbole).toBeNull();
+    expect(bougies[0].ouverture).toBe(4483.5);
+  });
+
+  it('laisse intacte la lecture positionnelle d’un fichier sans en-tête', () => {
+    const contenu = '20240102 000000;2062.51;2063.11;2062.19;2062.65;0';
+    const { bougies } = analyser(contenu, { unite: '1m' });
+    expect(bougies[0].ouverture).toBe(2062.51);
+    expect(bougies[0].cloture).toBe(2062.65);
+    expect(bougies[0].symbole).toBeNull();
   });
 });
