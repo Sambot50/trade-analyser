@@ -500,3 +500,85 @@ pour conclure.
 remède est une unité de résolution plus fine — une bougie de 5 minutes qui
 touche les deux niveaux se décompose en bougies d'une minute qui, elles,
 disent l'ordre.
+
+---
+
+## DEC-020 — Qualifier les order blocks plutôt que les régler
+
+**2026-09-24 · Retenue**
+
+DEC-019 a abandonné la règle mécanique : 50,0 % sur 318 cas, un tirage à pile
+ou face. Reste une question que personne n'avait posée — **la population est-elle
+homogène ?** Le détecteur prend tous les order blocks indistinctement ; la
+moyenne à 50 % peut masquer des sous-populations qui n'ont rien à voir.
+
+`src/lib/marche/qualificatifs.js` calcule douze qualificatifs par order block.
+`--export <fichier>` écrit un JSONL, une ligne par cas, qualificatifs et issue
+compris. **On ne décide pas lesquels comptent : on les enregistre, et la mesure
+tranchera.**
+
+### La liste, et d'où elle vient
+
+Établie en lisant l'implémentation Python la plus utilisée
+(`joshyattridge/smart-money-concepts`) et la littérature des praticiens, avant
+d'écrire une ligne de code.
+
+| Qualificatif | Définition retenue |
+|---|---|
+| FVG de l'impulsion | Motif 3 bougies, née entre l'order block et la cassure |
+| Prise de liquidité | Extrême antérieur percé puis refermé du bon côté |
+| Déplacement | Ampleur en hauteurs de zone, plénitude des corps, durée |
+| Significativité du niveau | Part des bougies antérieures restées en deçà |
+| Premium / discount, OTE | Position dans la jambe ; retracement 62–79 % |
+| Fraîcheur | Retour dans la zone après en être sorti |
+| Zone / ATR | Hauteur rapportée à la volatilité ambiante |
+| Définition alternative | Bougie du plus bas de l'impulsion, et son écart au nôtre |
+| Heure et jour UTC | Bruts, jamais une session nommée |
+| MFE / MAE | `excursion.js`, écrit depuis le premier jour, jamais appelé |
+
+### Deux découvertes faites en lisant l'implémentation de référence
+
+**Notre définition n'est pas la sienne.** Elle prend la bougie du plus bas de
+l'impulsion ; nous prenons la dernière bougie de couleur opposée. Les deux
+divergent souvent — d'où `definitionAlternativeEcart`, enregistré plutôt que
+tranché.
+
+**Sa fenêtre de pivot vaut 50, la nôtre 5.** Nos « structures » sont peut-être
+des micro-pivots. Changer `fenetre` serait la variante interdite par DEC-019 ;
+on enregistre donc `significativiteNiveau`, et l'analyse dira si les grosses
+cassures se comportent autrement. **La question est répondue sans rien régler.**
+
+### Le diagnostic qui passe avant tout le reste
+
+MFE / MAE médians, en unités de risque, rapportés au prix réellement obtenu :
+
+| Lecture | Conclusion |
+|---|---|
+| Faveur ≈ contre | Le point d'entrée ne porte rien. Il n'y a pas de géométrie à corriger. |
+| Faveur > contre | L'information existe, le plan la détruit — et la distribution dit où poser stop et objectif. |
+
+Étalonné : sur une marche aléatoire, faveur 1,01 R contre 1,01 R, rapport 1,00.
+
+### Ce que dit la littérature, et qu'il faut avoir en tête
+
+Aucune preuve publique rigoureuse que le cadre SMC porte un avantage. Une étude
+sur SPY, QQQ, DIA et IWM : **0 variante sur 648** n'a battu l'achat-conservation.
+Les taux mécaniques bruts rapportés sur les majeures tiennent entre 38 et 45 %.
+
+Ce qui a un appui académique réel, c'est le regroupement des ordres stop à des
+niveaux visibles — la brique « liquidité », pas la narration. **Si un
+qualificatif doit sortir du lot, c'est celui-là**, et on va le mesurer au lieu
+de le croire.
+
+« 648 variantes testées » est exactement le piège que DEC-018 nous fait éviter.
+
+### Contrainte maintenue
+
+Aucun qualificatif n'est adopté sur les données d'exploration. On explore sur un
+jeu, on pré-enregistre le meilleur candidat, on le teste sur un autre. Avec
+douze qualificatifs et 318 cas, **l'un paraîtra significatif par pur hasard** —
+c'est arithmétique, pas pessimiste.
+
+**Écarté :** nommer les sessions (Londres, New York). Leurs bornes varient d'une
+source à l'autre, et un découpage inventé ici se retrouverait dans les
+conclusions. On enregistre l'heure UTC brute.

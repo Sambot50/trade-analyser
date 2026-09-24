@@ -236,6 +236,41 @@ Le vrai remède reste une `--ut-resolution` plus fine.
 
 Voir DEC-016, DEC-017 et [docs/ETAT.md](docs/ETAT.md).
 
+### Qualifier les order blocks — `--export`
+
+La règle mécanique rend 50,0 % sur 318 cas (DEC-019). Reste la question qu'on
+n'avait pas posée : **la population est-elle homogène ?** Le détecteur prend tous
+les order blocks indistinctement.
+
+`src/lib/marche/qualificatifs.js` en calcule douze par cas — FVG de l'impulsion,
+prise de liquidité, force du déplacement, significativité du niveau cassé,
+premium/discount, OTE, fraîcheur, zone/ATR, définition alternative, heure UTC —
+et `--export` les écrit avec l'issue.
+
+```bash
+node scripts/backtest.mjs --symbole BTCUSDT --depuis 2024-01-01 --jusqua 2025-12-31   --ut-biais 4h --ut-detection 1h --ut-resolution 5m   --objectif 1r --remplissage cloture --cout-en-r 0 --export cas.jsonl
+```
+
+**Aucun qualificatif n'est décidé d'avance.** Ils sont enregistrés, la mesure
+tranchera — et tout candidat qui en sortirait passe par le protocole de DEC-018
+avant d'être cru.
+
+Chacun est calculé **sans lire le futur** : aucune fonction ne touche une bougie
+postérieure à la cassure. Un test le vérifie en tronquant la série et en
+comparant les résultats.
+
+### Le diagnostic MFE / MAE
+
+Affiché dans chaque bloc de résultats, en unités de risque, rapporté au prix
+réellement obtenu :
+
+| Lecture | Conclusion |
+|---|---|
+| Faveur ≈ contre | Le point d'entrée ne porte rien à corriger |
+| Faveur > contre | L'information existe, la géométrie du plan la détruit |
+
+Étalonné sur une marche aléatoire : faveur 1,01 R, contre 1,01 R, rapport 1,00.
+
 ### Le contrôle par permutation — `--controle`
 
 ```bash
@@ -274,6 +309,7 @@ ne prouvent pas une impossibilité, seulement qu'on n'a pas tiré assez.
 | `--objectif` | `2r` | Règle de sortie, `1r` ou `2r` |
 | `--remplissage` | `meche` | Hypothèse d'exécution, `meche` ou `cloture` |
 | `--ambigu` | `exclu` | Traitement des issues ambiguës : `exclu`, `perdant`, `gagnant` |
+| `--export` | — | Écrit un JSONL, une ligne par order block, qualificatifs et issue compris |
 
 ### Le contrôle a été validé dans les deux sens
 
