@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { mediane, quantile, profilHoraire, scorerSegment, meilleurs, DETECTEURS } from './anomalies.js';
+import {
+  mediane, quantile, profilHoraire, scorerSegment, meilleurs,
+  echantillonStratifie, dansFenetreMacro, DETECTEURS,
+} from './anomalies.js';
 
 /** Bougie calme de référence : amplitude 10, volume 100. */
 const calme = (i) => ({
@@ -146,5 +149,94 @@ describe('sélection des meilleurs', () => {
 
   it('refuse un détecteur inconnu', () => {
     expect(() => meilleurs([], 'intuition', {})).toThrow(/Détecteur inconnu/);
+  });
+});
+
+describe('seuils des détecteurs grossiers', () => {
+  /**
+   * Le défaut relevé après coup : `picVolume` se déclenchait sur 3190 bougies
+   * sur 3190, `gap` sur 2688. Ce n'étaient pas des détecteurs mais des
+   * mesures continues — ils notaient tout le monde sans rien sélectionner.
+   */
+  it('picVolume se tait sous quatre fois la médiane', () => {
+    expect(scoreDe({ volume: 300 }, 'picVolume')).toBe(0);
+    expect(scoreDe({ volume: 450 }, 'picVolume')).toBeGreaterThan(0);
+  });
+
+  it('gap se tait sous une amplitude médiane entière', () => {
+    const s = avecUneBougie({});
+    // Écart de 3 pour une amplitude médiane de 10 : ce n'est pas un gap.
+    s[80] = { ...s[80], ouverture: 2004 };
+    expect(scorerSegment(s, { fenetre: 60 }).at(-1).scores.gap).toBe(0);
+
+    s[80] = { ...s[80], ouverture: 2016 };
+    expect(scorerSegment(s, { fenetre: 60 }).at(-1).scores.gap).toBeGreaterThan(0);
+  });
+});
+
+describe('fenêtres d’annonce américaines', () => {
+  it('marque 8h30, 10h00 et 14h00 à New York, heure d’été comprise', () => {
+    // 8h30 New York : 13h30 UTC en hiver, 12h30 en été.
+    expect(dansFenetreMacro(Date.parse('2023-01-15T13:30:00Z'))).toBe(true);
+    expect(dansFenetreMacro(Date.parse('2023-07-15T12:30:00Z'))).toBe(true);
+    // 10h00 et 14h00 New York, en été.
+    expect(dansFenetreMacro(Date.parse('2023-07-15T14:00:00Z'))).toBe(true);
+    expect(dansFenetreMacro(Date.parse('2023-07-15T18:00:00Z'))).toBe(true);
+  });
+
+  it('ne marque pas une heure ordinaire', () => {
+    expect(dansFenetreMacro(Date.parse('2023-07-15T09:00:00Z'))).toBe(false);
+    expect(dansFenetreMacro(Date.parse('2023-07-15T16:00:00Z'))).toBe(false);
+  });
+
+  it('couvre quelques minutes avant et un quart d’heure après', () => {
+    expect(dansFenetreMacro(Date.parse('2023-07-15T12:29:00Z'))).toBe(true);
+    expect(dansFenetreMacro(Date.parse('2023-07-15T12:45:00Z'))).toBe(true);
+    expect(dansFenetreMacro(Date.parse('2023-07-15T12:46:00Z'))).toBe(false);
+  });
+
+  it('accompagne chaque bougie scorée', () => {
+    const r = scorerSegment(avecUneBougie({ volume: 900 }), { fenetre: 60 });
+    expect(typeof r.at(-1).mesures.macro).toBe('boolean');
+  });
+});
+
+describe('échantillonnage stratifié', () => {
+  const faux = (ms, score) => ({
+    ms, index: 0, mesures: {},
+    scores: Object.fromEntries(DETECTEURS.map((d) => [d, d === 'picVolume' ? score : 0])),
+  });
+  // Cent candidats de scores 1 à 100, espacés d'une journée.
+  const cent = Array.from({ length: 100 }, (_, i) => faux(i * 86_400_000, i + 1));
+
+  it('puise dans les quatre bandes, pas seulement au sommet', () => {
+    const r = echantillonStratifie(cent, 'picVolume', { nombre: 8 });
+    expect(new Set(r.map((x) => x.bande))).toEqual(new Set(['sommet', 'haut', 'milieu', 'bas']));
+  });
+
+  it('dit d’où vient chaque candidat', () => {
+    const r = echantillonStratifie(cent, 'picVolume', { nombre: 4 });
+    const sommet = r.filter((x) => x.bande === 'sommet');
+    const bas = r.filter((x) => x.bande === 'bas');
+    expect(sommet[0].scores.picVolume).toBeGreaterThan(bas[0].scores.picVolume);
+  });
+
+  it('retient le maximum, qui n’appartiendrait sinon à aucune bande', () => {
+    const r = echantillonStratifie(cent, 'picVolume', { nombre: 8 });
+    expect(r.some((x) => x.scores.picVolume === 100)).toBe(true);
+  });
+
+  it('respecte l’écart minimal entre deux retenus', () => {
+    const groupes = [faux(0, 100), faux(60_000, 99), faux(120_000, 98)];
+    const r = echantillonStratifie(groupes, 'picVolume', { nombre: 8, ecartMinimalMs: 30 * 60_000 });
+    expect(r).toHaveLength(1);
+  });
+
+  it('rend une liste vide quand rien ne se déclenche', () => {
+    expect(echantillonStratifie([faux(0, 0)], 'picVolume', { nombre: 8 })).toHaveLength(0);
+  });
+
+  it('refuse un détecteur inconnu', () => {
+    expect(() => echantillonStratifie([], 'intuition', {})).toThrow(/Détecteur inconnu/);
   });
 });

@@ -19,7 +19,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { analyser as analyserCsv, agreger as agregerBougies } from '../src/lib/marche/csv.js';
 import { dureeUnite, UNITES } from '../src/lib/marche/bougies.js';
 import { decouperParContrat } from '../src/lib/marche/contrats.js';
-import { scorerSegment, meilleurs, DETECTEURS } from '../src/lib/marche/anomalies.js';
+import { scorerSegment, meilleurs, echantillonStratifie, DETECTEURS } from '../src/lib/marche/anomalies.js';
 import { parseArgs } from './backtest.mjs';
 
 const DEFAUTS = {
@@ -69,6 +69,10 @@ export function validerOptions(args) {
 
   o.symbole = typeof args.symbole === 'string' ? args.symbole.toUpperCase() : 'INSTRUMENT';
   o.export = typeof args.export === 'string' ? args.export : 'anomalies.jsonl';
+  // Par défaut on échantillonne toute la distribution. `--sommet` revient à
+  // ne regarder que les cas extrêmes, ce qui sur un marché revient surtout à
+  // regarder ses annonces macro.
+  o.sommet = Boolean(args.sommet);
 
   if (dureeUnite(o.ut) < dureeUnite(o.utCsv)) {
     erreurs.push(`--ut (${o.ut}) est plus fine que --ut-csv (${o.utCsv}) : il faudrait inventer des bougies.`);
@@ -121,33 +125,54 @@ async function main() {
 
   const demandes = o.detecteur ? [o.detecteur] : DETECTEURS;
   const lignes = [];
+  let totalMarques = 0;
 
   for (const detecteur of demandes) {
-    const retenus = meilleurs(scores, detecteur, {
-      nombre: o.nombre,
-      ecartMinimalMs: o.ecartMinutes * 60_000,
-    });
+    const options = { nombre: o.nombre, ecartMinimalMs: o.ecartMinutes * 60_000 };
+    const retenus = o.sommet
+      ? meilleurs(scores, detecteur, options).map((r) => ({ ...r, bande: 'sommet' }))
+      : echantillonStratifie(scores, detecteur, options);
 
-    console.log('='.repeat(72));
+    const actifs = scores.filter((s) => s.scores[detecteur] > 0).length;
+
+    console.log('='.repeat(78));
     console.log(`  ${TITRES[detecteur]}`);
-    console.log('='.repeat(72));
+    console.log(`  ${actifs} bougies sur ${scores.length} (${((actifs / scores.length) * 100).toFixed(1)} %)`);
+    console.log('='.repeat(78));
 
     if (!retenus.length) {
       console.log('  aucun candidat\n');
       continue;
     }
 
-    console.log('   score  date (UTC)         vol×méd  ampl×méd  corps  mèche   clôture');
+    console.log('  bande    score  date (UTC)         vol×méd  ampl×méd  corps  mèche  macro');
     for (const r of retenus) {
       const m = r.mesures;
       console.log(
-        `  ${String(r.scores[detecteur]).padStart(6)}  ${iso(r.ms)}  `
+        `  ${r.bande.padEnd(7)} ${String(r.scores[detecteur]).padStart(6)}  ${iso(r.ms)}  `
         + `${String(m.ratioVolume).padStart(7)}  ${String(m.ratioAmplitude).padStart(8)}  `
-        + `${String(m.partDuCorps).padStart(5)}  ${String(m.partDeLaMeche).padStart(5)}  ${String(m.cloture).padStart(9)}`,
+        + `${String(m.partDuCorps).padStart(5)}  ${String(m.partDeLaMeche).padStart(5)}  ${m.macro ? '  ⚠' : ''}`,
       );
-      lignes.push(JSON.stringify({ detecteur, horodatage: new Date(r.ms).toISOString(), score: r.scores[detecteur], ...r.mesures }));
+      lignes.push(JSON.stringify({
+        detecteur, bande: r.bande, horodatage: new Date(r.ms).toISOString(),
+        score: r.scores[detecteur], ...m,
+      }));
     }
+
+    const marques = retenus.filter((r) => r.mesures.macro).length;
+    totalMarques += marques;
+    if (marques) console.log(`  ⚠ ${marques} sur ${retenus.length} tombent dans une fenêtre d'annonce américaine`);
     console.log();
+  }
+
+  // Un marqueur qui ne marque jamais ressemble à « aucune annonce », alors
+  // qu'il dit surtout « les horodatages ne sont pas en UTC ». Les exports
+  // FirstRate sont en heure de New York ; ceux de Databento sont en UTC.
+  if (!totalMarques && lignes.length >= 10) {
+    console.log("⚠  Aucun candidat marqué « macro » sur l'ensemble.");
+    console.log('   Les fenêtres d’annonce supposent des horodatages UTC. Si ton fichier');
+    console.log('   est horodaté autrement, ramène-le avec --decalage-heures, sans quoi');
+    console.log('   ce marqueur reste muet sans que rien ne le signale.\n');
   }
 
   await writeFile(o.export, lignes.join('\n') + '\n');
@@ -155,6 +180,13 @@ async function main() {
 
   console.log('Lecture :');
   console.log('  Ce classement ne prouve rien. Il fabrique des candidats à regarder.');
+  console.log();
+  console.log('  La colonne « bande » dit d’où vient le candidat dans la distribution.');
+  console.log('  Le sommet d’un marché, ce sont surtout ses annonces macro — d’où');
+  console.log('  l’échantillonnage sur toute la hauteur, et la colonne « macro » qui');
+  console.log('  marque 8h30, 10h00 et 14h00 heure de New York. C’est une heuristique');
+  console.log('  d’horaire, pas un calendrier : elle dit qu’une publication avait lieu');
+  console.log('  d’être, pas qu’il y en a eu une.');
   console.log('  Pour voir l’un d’eux, prends sa date et trace le graphique :');
   console.log(`    node scripts/tracer.mjs --csv ${o.csv} --symbole ${o.symbole} --ut 1h --a <date>\n`);
 }
