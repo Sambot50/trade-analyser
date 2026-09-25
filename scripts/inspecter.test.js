@@ -39,14 +39,14 @@ describe('fenêtre autour d’une anomalie', () => {
 
 describe('nom de planche', () => {
   it('trie par score décroissant au sein d’un détecteur et d’une bande', () => {
-    const fort = nomDePlanche({ detecteur: 'absorption', bande: 'sommet', score: 12.5, horodatage: '2023-06-15T14:00:00.000Z' });
-    const faible = nomDePlanche({ detecteur: 'absorption', bande: 'sommet', score: 2.5, horodatage: '2023-06-15T14:00:00.000Z' });
+    const fort = nomDePlanche({ detecteur: 'absorption', sens: 'achat', bande: 'sommet', score: 12.5, horodatage: '2023-06-15T14:00:00.000Z' });
+    const faible = nomDePlanche({ detecteur: 'absorption', sens: 'achat', bande: 'sommet', score: 2.5, horodatage: '2023-06-15T14:00:00.000Z' });
     expect([fort, faible].sort().reverse()[0]).toBe(fort);
   });
 
-  it('porte le détecteur, la bande et la date', () => {
-    const n = nomDePlanche({ detecteur: 'gap', bande: 'milieu', score: 1.5, horodatage: '2023-06-15T14:30:00.000Z' });
-    expect(n).toMatch(/^gap-milieu-/);
+  it('porte le détecteur, le sens, la bande et la date', () => {
+    const n = nomDePlanche({ detecteur: 'gap', sens: 'achat', bande: 'milieu', score: 1.5, horodatage: '2023-06-15T14:30:00.000Z' });
+    expect(n).toMatch(/^gap-achat-milieu-/);
     expect(n).toContain('2023-06-15-14-30');
     expect(n.endsWith('.png')).toBe(true);
   });
@@ -69,5 +69,21 @@ describe('options', () => {
 
   it('refuse une fenêtre avant trop courte pour montrer un contexte', () => {
     expect(validerOptions({ csv: 'x.csv', avant: 3 }).erreurs.join(' ')).toMatch(/--avant/);
+  });
+});
+
+
+describe('filtre par sens', () => {
+  it('refuse autre chose qu’achat ou vente', () => {
+    expect(validerOptions({ csv: 'x.csv', sens: 'haussier' }).erreurs.join(' ')).toMatch(/--sens/);
+    expect(validerOptions({ csv: 'x.csv', sens: 'achat' }).sens).toBe('achat');
+  });
+
+  it('groupe les achats avant les ventes dans un tri alphabétique', () => {
+    const noms = [
+      nomDePlanche({ detecteur: 'absorption', sens: 'vente', bande: 'sommet', score: 9, horodatage: '2023-01-01T00:00:00.000Z' }),
+      nomDePlanche({ detecteur: 'absorption', sens: 'achat', bande: 'bas', score: 1, horodatage: '2023-01-01T00:00:00.000Z' }),
+    ].sort();
+    expect(noms[0]).toContain('-achat-');
   });
 });

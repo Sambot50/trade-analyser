@@ -182,6 +182,14 @@ export function scorerSegment(bougies, { fenetre = 60 } = {}) {
         amplitude: arrondir(amplitude),
         cloture: b.cloture,
         heure,
+        // Côté dominant, par PROXY : la clôture par rapport à l'ouverture.
+        //
+        // Ce n'est pas la ventilation acheteur/vendeur du carnet — `ohlcv-1m`
+        // ne la porte pas, seul le schéma `trades` donne le côté agresseur.
+        // C'est l'approximation que colorent toutes les plateformes, et elle
+        // se trompe sur une bougie qui monte puis redescend en clôturant
+        // plate. Elle vaut ce qu'elle vaut, et elle est nommée pour ça.
+        sens: b.cloture > b.ouverture ? 'achat' : b.cloture < b.ouverture ? 'vente' : 'neutre',
         // Marqué, jamais écarté : c'est à l'œil de trancher, mais il doit
         // savoir qu'une publication pouvait tomber à cet instant.
         macro: dansFenetreMacro(b.ouvertureMs),

@@ -240,3 +240,25 @@ describe('échantillonnage stratifié', () => {
     expect(() => echantillonStratifie([], 'intuition', {})).toThrow(/Détecteur inconnu/);
   });
 });
+
+
+describe('sens dominant, par proxy', () => {
+  const sensDe = (speciale) => scorerSegment(avecUneBougie(speciale), { fenetre: 60 }).at(-1).mesures.sens;
+
+  it('lit l’achat sur une clôture au-dessus de l’ouverture', () => {
+    expect(sensDe({ ouverture: 1990, cloture: 2010, volume: 900 })).toBe('achat');
+  });
+
+  it('lit la vente sur une clôture en dessous', () => {
+    expect(sensDe({ ouverture: 2010, cloture: 1990, volume: 900 })).toBe('vente');
+  });
+
+  /**
+   * La bougie plate est le cas où le proxy n'a rien à dire. On le nomme au
+   * lieu de trancher au hasard : `ohlcv-1m` ne porte pas le côté agresseur,
+   * seul le schéma `trades` le donne.
+   */
+  it('ne tranche pas une clôture égale à l’ouverture', () => {
+    expect(sensDe({ ouverture: 2000, cloture: 2000, volume: 900 })).toBe('neutre');
+  });
+});

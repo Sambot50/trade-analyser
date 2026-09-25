@@ -73,6 +73,9 @@ export function validerOptions(args) {
   // ne regarder que les cas extrêmes, ce qui sur un marché revient surtout à
   // regarder ses annonces macro.
   o.sommet = Boolean(args.sommet);
+  // Les fenêtres d'annonce sont écartées PAR DÉFAUT : le sommet d'un marché,
+  // ce sont ses publications macro, et ce n'est pas ce qu'on cherche.
+  o.avecMacro = Boolean(args.avecMacro);
 
   if (dureeUnite(o.ut) < dureeUnite(o.utCsv)) {
     erreurs.push(`--ut (${o.ut}) est plus fine que --ut-csv (${o.utCsv}) : il faudrait inventer des bougies.`);
@@ -123,49 +126,59 @@ async function main() {
 
   console.log(`${scores.length} bougies ${o.ut} scorées, référence sur ${o.fenetre} bougies glissantes\n`);
 
+  const macro = scores.filter((s) => s.mesures.macro).length;
+  if (!o.avecMacro) {
+    console.log(`${macro} bougies écartées : fenêtre d'annonce américaine (--avec-macro pour les garder)\n`);
+  }
+  const retenusPourScan = o.avecMacro ? scores : scores.filter((s) => !s.mesures.macro);
+
   const demandes = o.detecteur ? [o.detecteur] : DETECTEURS;
   const lignes = [];
   let totalMarques = 0;
 
   for (const detecteur of demandes) {
-    const options = { nombre: o.nombre, ecartMinimalMs: o.ecartMinutes * 60_000 };
-    const retenus = o.sommet
-      ? meilleurs(scores, detecteur, options).map((r) => ({ ...r, bande: 'sommet' }))
-      : echantillonStratifie(scores, detecteur, options);
-
-    const actifs = scores.filter((s) => s.scores[detecteur] > 0).length;
+    const actifs = retenusPourScan.filter((s) => s.scores[detecteur] > 0).length;
 
     console.log('='.repeat(78));
     console.log(`  ${TITRES[detecteur]}`);
-    console.log(`  ${actifs} bougies sur ${scores.length} (${((actifs / scores.length) * 100).toFixed(1)} %)`);
+    console.log(`  ${actifs} bougies sur ${retenusPourScan.length} (${((actifs / retenusPourScan.length) * 100).toFixed(1)} %)`);
     console.log('='.repeat(78));
 
-    if (!retenus.length) {
-      console.log('  aucun candidat\n');
-      continue;
-    }
+    // Achat et vente séparés, et échantillonnés séparément : sans ça, un
+    // marché qui monte remplirait les deux tableaux du même côté.
+    for (const sens of ['achat', 'vente']) {
+      const duSens = retenusPourScan.filter((s) => s.mesures.sens === sens);
+      const options = { nombre: o.nombre, ecartMinimalMs: o.ecartMinutes * 60_000 };
+      const retenus = o.sommet
+        ? meilleurs(duSens, detecteur, options).map((r) => ({ ...r, bande: 'sommet' }))
+        : echantillonStratifie(duSens, detecteur, options);
 
-    console.log('  bande    score  date (UTC)         vol×méd  ampl×méd  corps  mèche  macro');
-    for (const r of retenus) {
-      const m = r.mesures;
-      console.log(
-        `  ${r.bande.padEnd(7)} ${String(r.scores[detecteur]).padStart(6)}  ${iso(r.ms)}  `
-        + `${String(m.ratioVolume).padStart(7)}  ${String(m.ratioAmplitude).padStart(8)}  `
-        + `${String(m.partDuCorps).padStart(5)}  ${String(m.partDeLaMeche).padStart(5)}  ${m.macro ? '  ⚠' : ''}`,
-      );
-      lignes.push(JSON.stringify({
-        detecteur, bande: r.bande, horodatage: new Date(r.ms).toISOString(),
-        // L'unité de scan voyage avec l'anomalie : une planche tracée plus
-        // grossièrement dilue le pic de volume qui a déclenché la détection,
-        // et l'œil ne voit plus ce qu'on lui demande de juger.
-        unite: o.ut,
-        score: r.scores[detecteur], ...m,
-      }));
-    }
+      console.log(`\n  ── ${sens.toUpperCase()} ── ${duSens.filter((s) => s.scores[detecteur] > 0).length} bougies`);
 
-    const marques = retenus.filter((r) => r.mesures.macro).length;
-    totalMarques += marques;
-    if (marques) console.log(`  ⚠ ${marques} sur ${retenus.length} tombent dans une fenêtre d'annonce américaine`);
+      if (!retenus.length) {
+        console.log('     aucun candidat');
+        continue;
+      }
+
+      console.log('     bande    score  date (UTC)         vol×méd  ampl×méd  corps  mèche  macro');
+      for (const r of retenus) {
+        const m = r.mesures;
+        console.log(
+          `     ${r.bande.padEnd(7)} ${String(r.scores[detecteur]).padStart(6)}  ${iso(r.ms)}  `
+          + `${String(m.ratioVolume).padStart(7)}  ${String(m.ratioAmplitude).padStart(8)}  `
+          + `${String(m.partDuCorps).padStart(5)}  ${String(m.partDeLaMeche).padStart(5)}  ${m.macro ? '  ⚠' : ''}`,
+        );
+        lignes.push(JSON.stringify({
+          detecteur, bande: r.bande, horodatage: new Date(r.ms).toISOString(),
+          // L'unité de scan voyage avec l'anomalie : une planche tracée plus
+          // grossièrement dilue le pic de volume qui a déclenché la détection,
+          // et l'œil ne voit plus ce qu'on lui demande de juger.
+          unite: o.ut,
+          score: r.scores[detecteur], ...m,
+        }));
+      }
+      totalMarques += retenus.filter((r) => r.mesures.macro).length;
+    }
     console.log();
   }
 

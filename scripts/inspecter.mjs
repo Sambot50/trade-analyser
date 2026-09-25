@@ -61,6 +61,10 @@ export function validerOptions(args) {
 
   if (typeof args.dossier === 'string') o.dossier = args.dossier;
   if (typeof args.detecteur === 'string') o.detecteur = args.detecteur;
+  if (args.sens !== undefined) {
+    if (!['achat', 'vente'].includes(args.sens)) erreurs.push('--sens attend "achat" ou "vente"');
+    else o.sens = args.sens;
+  }
   o.symbole = typeof args.symbole === 'string' ? args.symbole.toUpperCase() : 'INSTRUMENT';
 
   if (dureeUnite(o.ut) < dureeUnite(o.utCsv)) {
@@ -88,10 +92,13 @@ export function fenetreAutour(bougies, ms, { avant, apres }) {
 }
 
 /** Nom de fichier lisible et triable : détecteur, bande, score, date. */
-export function nomDePlanche({ detecteur, bande, score, horodatage }) {
+export function nomDePlanche({ detecteur, sens, bande, score, horodatage }) {
   const date = horodatage.replace(/[:T]/g, '-').slice(0, 16);
   const rang = String(Math.round(Number(score) * 100)).padStart(6, '0');
-  return `${detecteur}-${bande}-${rang}-${date}.png`;
+  // Le sens vient en second : un tri alphabétique regroupe alors tous les
+  // achats d'un détecteur, puis toutes les ventes. C'est dans cet ordre
+  // qu'on cherche une structure commune, pas en alternant.
+  return `${detecteur}-${sens ?? 'nc'}-${bande}-${rang}-${date}.png`;
 }
 
 const iso = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16);
@@ -119,6 +126,7 @@ async function main() {
   }
 
   if (o.detecteur) anomalies = anomalies.filter((a) => a.detecteur === o.detecteur);
+  if (o.sens) anomalies = anomalies.filter((a) => a.sens === o.sens);
   if (!anomalies.length) {
     console.error('\nAucune anomalie à inspecter.\n');
     process.exit(2);
@@ -164,14 +172,14 @@ async function main() {
     }
 
     const { svg } = tracerGraphique(fenetre.bougies, {
-      libelle: `${o.symbole} · ${a.detecteur} · ${a.bande} · score ${a.score}${a.macro ? ' · ⚠ fenêtre d’annonce' : ''}`,
+      libelle: `${o.symbole} · ${a.detecteur} · ${a.sens ?? '?'} · ${a.bande} · score ${a.score}${a.macro ? ' · ⚠ annonce' : ''}`,
       unite: o.ut,
       marquerMs: fenetre.marquerMs,
     });
 
     const nom = nomDePlanche(a);
     await writeFile(join(o.dossier, nom), new Resvg(svg, { font: { loadSystemFonts: true } }).render().asPng());
-    console.log(`  ${a.detecteur.padEnd(12)} ${a.bande.padEnd(7)} ${iso(Date.parse(a.horodatage))}  ${nom}`);
+    console.log(`  ${a.detecteur.padEnd(12)} ${String(a.sens ?? '?').padEnd(6)} ${a.bande.padEnd(7)} ${iso(Date.parse(a.horodatage))}`);
     traces++;
   }
 
