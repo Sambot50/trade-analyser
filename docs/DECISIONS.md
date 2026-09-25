@@ -1584,3 +1584,84 @@ résultat est nette et cohérente sur trois échelles, mais elle repose sur une
 seule séance. Un mois — 2,52 USD, déjà chiffré — la trancherait définitivement.
 Tant qu'il n'est pas acheté, DEC-030 est établie en direction, pas en
 magnitude.
+
+---
+
+## HYP-001 — Pré-enregistrement, gelé le 2026-09-25
+
+**Gelé AVANT d'avoir ouvert la moindre donnée postérieure au 2024-12-31.**
+Rien de ce qui suit ne peut être modifié après la première exécution du test.
+Un paramètre retouché après coup annule l'épreuve — c'est la seule règle qui
+donne sa valeur au résultat.
+
+### L'énoncé
+
+> Sur GC COMEX, en bougies de quinze minutes, une bougie détectée `picVolume`
+> dont la clôture est au-dessus de son ouverture, à l'intérieur d'une semaine
+> haussière, atteint **3R avant de perdre 1R** plus souvent que les bougies
+> **non détectées de la même famille**.
+
+Écart attendu : **+5,5 points** (59,0 % contre 53,5 % mesurés sur 2023-2024).
+
+### Les paramètres, figés
+
+| | |
+|---|---|
+| Instrument | GC COMEX, contrat continu, découpé par `instrument_id` |
+| Unité | 15 min, agrégée depuis 1 min |
+| Détecteur | `picVolume` seul, seuil `PIC_MINIMUM = 4` |
+| Fenêtre de référence | 60 bougies glissantes |
+| Famille | `hausse-achat` lue sur la semaine (672 bougies en arrière) |
+| Horizon | 24 h = 96 bougies |
+| Objectif / stop | 3R / 1R, R = hauteur de la bougie détectée |
+| Verdicts comptés | `atteint` et `perdu` seuls ; `ambigu` exclu du dénominateur |
+| Fenêtres macro | exclues |
+| Témoin | même famille, `picVolume === 0`, mêmes exclusions |
+
+### La période d'épreuve
+
+**2025-01-01 → 2026-09-01.** Vingt mois, jamais ouverts.
+
+Douze mois ne suffisaient pas : la puissance n'y serait que de 64 %, soit plus
+d'une chance sur trois de manquer un effet réel. Vingt mois portent la
+puissance à **83 %**, pour un écart minimal détectable de 5,28 points — juste
+en dessous des 5,5 attendus.
+
+### La règle de décision
+
+Test **unilatéral** — la direction était prédite — au seuil de 5 %, sur **une
+seule** comparaison. Plus de correction pour vingt-quatre cellules : il n'y a
+plus qu'une cellule.
+
+- écart > 0 **et** p < 0,05 → **CONFIRMÉE**
+- écart > 0 **et** p ≥ 0,05 → **NON CONFIRMÉE**
+- écart ≤ 0 → **RÉFUTÉE**
+
+Aucun quatrième cas. Aucune relecture « en tenant compte de ».
+
+### Ce que HYP-001 n'est pas
+
+Ce n'est **pas** une stratégie. Aucune entrée n'est décidée, aucun coût n'est
+compté, aucun glissement n'est simulé. Un écart de cinq points sur un taux de
+réussite ne dit rien du rendement d'un système qui paierait un spread à chaque
+passage.
+
+C'est la question minimale : **une bougie à volume anormal se comporte-t-elle
+autrement qu'une bougie quelconque ?** Six fois, la réponse a été non.
+
+### Pourquoi celle-ci mérite une épreuve
+
+Sur 2023-2024, vingt-quatre cellules ont été examinées. Une seule dépasse le
+bruit, et elle bascule selon l'arrondi : p × 24 vaut 0,047 avec l'écart
+affiché (+6,0), 0,109 avec l'écart calculé (+5,5). Rien n'est établi.
+
+Deux faits la maintiennent en vie malgré tout. `hausse-achat` est la **seule**
+famille où faveur et contre se séparent franchement — médiane 2,79 R contre
+2,09 R, q90 **8,92 R** contre 5,87 R. Cette asymétrie de queue expliquerait
+qu'un effet n'apparaisse qu'à 3R et nulle part ailleurs.
+
+Contre elle : le miroir échoue. `baisse-vente` devrait monter de même, elle
+est à −1,2. Et l'hypothèse a été formée **après** avoir regardé les données.
+
+C'est précisément pourquoi elle ne vaut qu'une chose : une épreuve sur une
+période jamais ouverte, décidée d'avance, exécutée une fois.
