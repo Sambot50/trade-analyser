@@ -4,3 +4,14 @@ dist/
 .env.local
 *.local
 .DS_Store
+
+# Données de marché et sorties de mesure : volumineuses, reproductibles, et
+# elles n'ont rien à faire dans l'historique. Un export COMEX de deux ans pèse
+# 80 Mo ; un `git add .` distrait l'enverrait sur GitHub pour toujours.
+*.csv
+*.jsonl
+sortie-*.txt
+
+# Scripts jetables de téléchargement et de vérification, écrits au fil des
+# sessions. Ce qui mérite d'être gardé vit dans `scripts/`, versionné et testé.
+*.py
