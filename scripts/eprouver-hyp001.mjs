@@ -146,7 +146,11 @@ async function principal() {
   const r = eprouver(cas, temoin);
 
   console.log('\n' + '='.repeat(74));
-  console.log(`  HYP-001  ·  gelée le ${GEL.enregistreLe}  ·  ${GEL.famille}  ·  ${GEL.multiple}R avant 1R`);
+  // ERRATUM-001 : la mesure est SYMÉTRIQUE. `atteintAvantDePerdre` applique
+  // la même cible des deux côtés, donc +3R contre −3R. L'étiquette annonçait
+  // « 3R avant 1R » — une chaîne fausse, corrigée ici. Aucune valeur gelée
+  // n'est touchée, et les tests d'immuabilité continuent de le vérifier.
+  console.log(`  HYP-001  ·  gelée le ${GEL.enregistreLe}  ·  ${GEL.famille}  ·  +${GEL.multiple}R avant −${GEL.multiple}R`);
   console.log('='.repeat(74));
 
   if (r.verdict === 'IMPOSSIBLE') {

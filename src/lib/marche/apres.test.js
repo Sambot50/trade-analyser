@@ -99,3 +99,81 @@ describe('objectif atteint avant le stop', () => {
       .toBe('ni_lun_ni_lautre');
   });
 });
+
+// ERRATUM-001. Le nom `atteintAvantDePerdre` ne dit pas ce que « perdre »
+// vaut, et personne n'est allé voir : trois documents gelés ont annoncé un
+// stop à 1R pendant que le code en appliquait un à 3R. Rien ne rougissait,
+// rien ne plantait, et le résultat paraissait normal.
+//
+// Ces tests rendent la symétrie EXPLICITE. Si quelqu'un rend la mesure
+// asymétrique — ce qui serait un changement légitime, mais un changement —
+// il devra les modifier, et la modification se verra dans le diff.
+describe('la mesure est SYMÉTRIQUE (ERRATUM-001)', () => {
+  // Bougie d'ancrage : ouverture 100, clôture 110, haut 112, bas 98.
+  // Hauteur = 14, donc 1R = 14 et 3R = 42. Entrée à la clôture, 110.
+  const ancre = { ouverture: 100, plusHaut: 112, plusBas: 98, cloture: 110 };
+  const plat = (prix) => ({ ouverture: prix, plusHaut: prix, plusBas: prix, cloture: prix });
+  const serie = (...suite) => [ancre, ...suite, ...Array(20).fill(plat(110))];
+
+  it('ne rend PAS « perdu » à −1R : le stop est à −3R', () => {
+    // 110 − 14 = 96. Sous un stop à 1R ce serait perdu ; il ne l'est pas.
+    expect(atteintAvantDePerdre(serie(plat(96)), 0, 10, 3)).toBe('ni_lun_ni_lautre');
+  });
+
+  it('rend « perdu » à −3R', () => {
+    // 110 − 42 = 68.
+    expect(atteintAvantDePerdre(serie(plat(68)), 0, 10, 3)).toBe('perdu');
+  });
+
+  it('rend « atteint » à +3R', () => {
+    // 110 + 42 = 152.
+    expect(atteintAvantDePerdre(serie(plat(152)), 0, 10, 3)).toBe('atteint');
+  });
+
+  it('applique la MÊME distance des deux côtés, quel que soit le multiple', () => {
+    for (const multiple of [1, 1.5, 2, 3]) {
+      const cible = multiple * 14;
+      const juste = 0.01;
+      // Juste en deçà de la cible : ni l'un ni l'autre, des deux côtés.
+      expect(atteintAvantDePerdre(serie(plat(110 + cible - juste)), 0, 10, multiple)).toBe('ni_lun_ni_lautre');
+      expect(atteintAvantDePerdre(serie(plat(110 - cible + juste)), 0, 10, multiple)).toBe('ni_lun_ni_lautre');
+      // Juste au-delà : atteint d'un côté, perdu de l'autre.
+      expect(atteintAvantDePerdre(serie(plat(110 + cible + juste)), 0, 10, multiple)).toBe('atteint');
+      expect(atteintAvantDePerdre(serie(plat(110 - cible - juste)), 0, 10, multiple)).toBe('perdu');
+    }
+  });
+
+  it('le miroir donne le verdict miroir — la preuve exacte de la symétrie', () => {
+    // Une marche aléatoire maison aurait été plus parlante, mais un générateur
+    // congruentiel écrit à la main dérive : le mien donnait une moyenne de
+    // 0,4952 au lieu de 0,5, soit −8,6 de biais sur trois cents pas, assez
+    // pour fausser un problème de barrières à ±42. La symétrie se prouve
+    // mieux sans hasard du tout.
+    //
+    // Une série et son reflet autour du prix d'entrée doivent rendre des
+    // verdicts inversés. C'est vrai si et seulement si la même distance
+    // s'applique des deux côtés.
+    const plat = (prix) => ({ ouverture: prix, plusHaut: prix, plusBas: prix, cloture: prix });
+    const remplissage = Array(20).fill(plat(110));
+
+    for (const ecart of [10, 30, 42, 60]) {
+      const monte = [ancre, plat(110 + ecart), ...remplissage];
+      const descend = [ancre, plat(110 - ecart), ...remplissage];
+      const haut = atteintAvantDePerdre(monte, 0, 10, 3);
+      const bas = atteintAvantDePerdre(descend, 0, 10, 3);
+
+      if (haut === 'atteint') expect(bas).toBe('perdu');
+      else if (haut === 'perdu') expect(bas).toBe('atteint');
+      else expect(bas).toBe(haut);
+    }
+  });
+
+  it('le miroir vaut aussi pour une bougie d’ancrage vendeuse', () => {
+    const vendeuse = { ouverture: 110, plusHaut: 112, plusBas: 98, cloture: 100 };
+    const plat = (prix) => ({ ouverture: prix, plusHaut: prix, plusBas: prix, cloture: prix });
+    const suite = Array(20).fill(plat(100));
+    // Vente à 100, hauteur 14, cible 42 : le gain est vers le bas.
+    expect(atteintAvantDePerdre([vendeuse, plat(100 - 43), ...suite], 0, 10, 3)).toBe('atteint');
+    expect(atteintAvantDePerdre([vendeuse, plat(100 + 43), ...suite], 0, 10, 3)).toBe('perdu');
+  });
+});

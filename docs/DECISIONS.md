@@ -1947,3 +1947,143 @@ surestime toujours son effet. La valeur à retenir pour la suite est +3,02, pas
 Pas sur le pétrole. Pas sur les indices. Et toujours **pas une stratégie** :
 aucun coût compté, aucune entrée décidée, et un témoin qui rapporte déjà
 +1,12 R par lui-même — la hausse des métaux sur la période, pas un edge.
+
+---
+
+## ERRATUM-001 — Le stop annoncé n'était pas le stop mesuré
+
+**2026-09-25, en fin de journée.** Découvert en exécutant HYP-003, dont le
+taux de réussite est sorti à 22-26 % là où HYP-001 et HYP-002 donnaient
+53-56 %. Deux mesures censées porter sur la même règle ne peuvent pas
+s'écarter de trente points : l'une des deux ne mesurait pas ce qu'elle
+annonçait.
+
+### Le fait
+
+`atteintAvantDePerdre(bougies, index, horizon, multiple)` calcule une cible
+unique, `multiple × hauteur`, et l'applique **des deux côtés** :
+
+    const cible = multiple * hauteur;
+    const touche = enFaveur   >= cible;
+    const perd   = aLEncontre >= cible;
+
+La mesure est donc **symétrique** : +3R contre −3R.
+
+Or le pré-enregistrement de HYP-001 annonce « atteint **3R avant de perdre
+1R** », et son tableau de paramètres porte « Objectif / stop : **3R / 1R** ».
+L'en-tête affiché par `eprouver-hyp001.mjs` répétait la même chose.
+
+**Le texte disait 3R/1R. Le code faisait 3R/3R.** La formulation a été écrite
+dans HYP-001, reprise telle quelle dans HYP-002, et jamais confrontée au code.
+
+### Ce que les chiffres disaient déjà
+
+| Règle | Marche aléatoire sans dérive | Mesuré |
+|---|---|---|
+| +3R avant −3R | ~50 % | **53-56 %** (HYP-001, HYP-002) |
+| +3R avant −1R | ~25 % | **22-26 %** (HYP-003) |
+
+Les deux séries tombent sur la valeur théorique de leur propre règle. Elles
+sont cohérentes entre elles ; elles ne portaient simplement pas sur la même
+question. Ce recoupement était disponible depuis HYP-001 et n'a pas été fait.
+
+### Ce qui reste valide
+
+**L'écart de +3,02 points sur les métaux.** Les bougies détectées et le témoin
+ont subi **exactement la même mesure**, quelle qu'elle soit. Une comparaison
+reste valide même quand la grandeur comparée est mal nommée. L'effet existe,
+il a été répliqué hors échantillon, et rien de ce qui précède ne le touche.
+
+Les verdicts de HYP-001 (CONFIRMÉE) et HYP-002 (RÉPLIQUÉE) tiennent donc, et
+leurs règles de décision ont été appliquées correctement.
+
+### Ce qui est corrigé
+
+La **description**. L'énoncé exact de ce qui a été mesuré est :
+
+> une bougie détectée atteint **+3R avant de subir −3R** plus souvent qu'une
+> bougie ordinaire de la même famille — d'environ trois points sur les métaux.
+
+Les pré-enregistrements de HYP-001, HYP-002 et HYP-003 ne sont **pas
+réécrits** : les modifier après exécution briserait le gel, qui est la seule
+chose qui donne leur valeur à ces résultats. Cet erratum les corrige par
+ajout, daté, à sa place dans l'ordre chronologique.
+
+L'étiquette affichée par `eprouver-hyp001.mjs` est corrigée — c'est une chaîne
+de caractères, pas un paramètre. Les valeurs gelées restent inchangées, et les
+tests d'immuabilité continuent de le vérifier.
+
+### La leçon, qui vaut plus que la correction
+
+Un nom de fonction n'est pas une spécification. `atteintAvantDePerdre` ne dit
+pas ce que « perdre » vaut, et personne n'est allé voir. Le seul endroit du
+dépôt où la formulation était juste est `comportement.mjs`, qui écrit « objectif
+atteint AVANT le **stop symétrique** ».
+
+C'est la quatrième panne silencieuse de la journée, après la garde d'exécution
+Windows, l'option en tirets ignorée et le caractère illégal dans un nom de
+fichier. Toutes avaient le même profil : **rien ne rougit, rien ne plante, et
+le résultat paraît normal.** Celle-ci a survécu à deux pré-enregistrements
+parce qu'aucun test ne compare un texte à un comportement.
+
+Ce qui l'a trouvée n'est pas une relecture : c'est un troisième test dont le
+chiffre ne collait pas avec les deux précédents.
+
+### La question qui reste ouverte
+
+HYP-003 a établi que viser 3R avec un stop à 1R **détruit** l'avantage :
+−0,105 R par passage sur 6 148 positions. Ce résultat est valide pour cette
+règle, qui n'a jamais été celle dont l'avantage était établi.
+
+L'avantage existe, il est petit, et un rapport 3:1 est trop exigeant pour lui.
+**Quel rapport gain/risque supporte-t-il ?** C'est une question neuve, et elle
+demande son propre pré-enregistrement sur une période jamais ouverte — 2020-2022
+ne l'est plus.
+
+---
+
+### HYP-003 — Résultat, 2026-09-25
+
+**NON RENTABLE.** Exécutée une fois, sur quatre métaux de 2020 à 2022 — trois
+ans jamais ouverts et antérieurs à tout le reste — achetés 14,26 USD après le
+gel.
+
+| marché | positions | espérance nette | objectif | stop | horizon |
+|---|---|---|---|---|---|
+| GC or | 1 114 | **−0,123** ± 0,049 R | 228 | 794 | 92 |
+| HG cuivre | 1 357 | **−0,089** ± 0,047 R | 327 | 958 | 72 |
+| PL platine | 2 102 | **−0,021** ± 0,038 R | 534 | 1 506 | 62 |
+| SI argent | 1 575 | **−0,220** ± 0,042 R | 345 | 1 136 | 94 |
+
+**6 148 positions · espérance nette −0,1053 R · erreur type 0,0217 R.**
+
+z = −4,85. Les quatre métaux sont négatifs. Le garde-fou de puissance n'a pas
+eu à jouer : 0,0217 est très en dessous du maximum utile de 0,10.
+
+#### Ce que ce verdict recouvre, et ce qu'il ne recouvre pas
+
+HYP-003 a implémenté ce que le texte de HYP-001 **annonçait** — objectif 3R,
+stop 1R — et non ce que son code **mesurait**, qui était symétrique. Voir
+ERRATUM-001, découvert précisément en exécutant ce test.
+
+**Le verdict est donc valide pour la règle 3R/1R**, et pour elle seule :
+viser trois fois le risque avec un stop à une fois détruit l'avantage. Les
+taux de réussite — 22 à 26 % — tombent sur la valeur d'une marche aléatoire
+soumise à ces barrières, soit un quart.
+
+**Ce verdict ne réfute ni HYP-001 ni HYP-002.** Elles portaient sur une mesure
+symétrique, leur comparaison détectées/témoin était correcte, et l'écart de
++3,02 points sur les métaux tient toujours.
+
+#### Ce que l'ensemble établit maintenant
+
+Un avantage existe sur les métaux, il est **petit**, et il ne supporte pas un
+rapport gain/risque de 3:1. C'est un résultat, pas un échec : beaucoup de
+règles de trading meurent exactement là, et la plupart de leurs auteurs ne le
+mesurent jamais.
+
+La question neuve — **quel rapport gain/risque cet avantage supporte-t-il ?**
+— demande son propre pré-enregistrement, sur une période jamais ouverte.
+2020-2022 ne l'est plus : ses chiffres sont désormais connus, et y chercher le
+bon ratio reviendrait à l'ajuster sur ce qu'on a déjà vu. 2017-2019 reste
+disponible.
