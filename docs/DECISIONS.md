@@ -2183,3 +2183,122 @@ La question neuve — **quel rapport gain/risque cet avantage supporte-t-il ?**
 2020-2022 ne l'est plus : ses chiffres sont désormais connus, et y chercher le
 bon ratio reviendrait à l'ajuster sur ce qu'on a déjà vu. 2017-2019 reste
 disponible.
+
+---
+
+## DEC-031 — Le volume prédit l'amplitude, jamais la direction
+
+**2026-09-25.** Trois hypothèses gelées, trois verdicts, et la question du
+projet toujours sans réponse : *un gros volume apparaît, que fait le graphique
+ensuite ?* HYP-001 à HYP-003 mesuraient un taux de réussite à 24 heures. Elles
+ne demandaient pas si le volume était corrélé à quoi que ce soit. Cette mesure
+le demande.
+
+### La mesure
+
+**424 821 bougies de 15 minutes**, cinq marchés — SI, PL, HG, CL, ES —
+corrélation de rang de Spearman entre le volume d'une bougie et ce que le prix
+fait après elle, à quatre horizons.
+
+Spearman plutôt que Pearson : la distribution des volumes a une queue épaisse,
+et une poignée de bougies écraserait un coefficient linéaire. Les rangs
+neutralisent cela ; les ex æquo partagent leur rang.
+
+Deux grandeurs mesurées séparément, et c'est tout l'intérêt :
+
+| Le volume est-il corrélé à… | 15 min | 1 h | 4 h | 24 h |
+|---|---|---|---|---|
+| …la **distance parcourue** (amplitude) | **+0,479** | **+0,430** | **+0,285** | −0,003 |
+| …la **variation signée** (direction) | +0,009 | +0,013 | +0,009 | +0,001 |
+
+### Deux faits, et ils ne sont pas du même ordre
+
+**Le volume prédit l'amplitude.** +0,479 à 15 minutes n'est pas un effet
+marginal arraché à la statistique : c'est la relation la plus forte que ce
+projet ait mesurée, sur n'importe quoi, depuis son début.
+
+**Le volume ne dit rien de la direction.** +0,013 est indiscernable de zéro à
+tous les horizons. Cela vaut confirmation indépendante de DEC-030, par une voie
+entièrement différente — non plus le côté de l'agresseur transaction par
+transaction, mais le mouvement qui suit, sur cinq marchés et deux ans.
+
+**Entrer à l'achat parce que le volume est élevé reste un pile ou face.** Le
+volume dit *combien*, jamais *où*.
+
+### Ce que cela explique rétrospectivement
+
+Le signal est **mort à 24 heures** — l'horizon exact des trois hypothèses
+gelées. Elles mesuraient à l'endroit où il ne reste rien.
+
+Ce n'est pas un reproche au protocole : le pré-enregistrement a fait son
+travail, et l'avantage de +3,02 points sur les métaux tient toujours. C'est que
+l'horizon avait été choisi **avant** qu'on sache où vivait le signal, et que
+personne n'avait posé la question du bon horizon. HYP-001 et HYP-002 ont
+trouvé une lueur à l'endroit le plus défavorable qui soit.
+
+### L'or ne se déduit pas des cinq autres, et je l'ai appris à mes dépens
+
+Les chiffres ci-dessus ont d'abord été **transposés à l'or**. C'était une
+erreur, et elle portait sur deux points.
+
+Mesure refaite sur GC seul — `GC_2023_2024`, **46 421 bougies**, excursion
+maximale en 1 heure depuis la **clôture**, par tranche de volume rapportée à la
+médiane des 60 bougies précédentes :
+
+| Volume | n | médiane | q75 | q90 |
+|---|---|---|---|---|
+| 1–1,5× | 7 333 | 0,09 % | 0,16 % | 0,25 % |
+| 1,5–2× | 4 641 | 0,10 % | 0,18 % | 0,28 % |
+| 2–3× | 4 970 | 0,11 % | 0,19 % | 0,34 % |
+| 3–4× | 2 458 | 0,13 % | 0,24 % | 0,41 % |
+| 4–6× | 2 281 | 0,14 % | 0,28 % | 0,46 % |
+| 6–10× | 1 414 | 0,16 % | 0,31 % | 0,51 % |
+| ≥ 10× | 669 | **0,20 %** | 0,35 % | 0,65 % |
+
+**Premier point : les distances étaient deux fois trop grandes.** L'or bouge
+moins que l'argent, le platine, le cuivre, le pétrole et l'indice. Un
+pourcentage transposé d'un marché à l'autre n'est pas un pourcentage, c'est une
+supposition.
+
+**Second point, plus grave : le sens de la relation n'est pas le même.** Sur
+les cinq autres marchés, l'amplitude **retombe** à la tranche ≥ 10×. Sur l'or
+elle **continue de monter** — 0,20 % est la médiane la plus haute de la table.
+La relation y est monotone. La conclusion « le plus gros volume bouge le moins »
+est vraie ailleurs et fausse ici.
+
+### Ce que l'or condamne quand même, et pour une autre raison
+
+La conclusion pratique — éviter les plus gros volumes — tient, mais la raison
+n'est pas celle qu'on croyait. Ce n'est pas le mouvement qui rétrécit, c'est le
+**risque qui enfle plus vite que le gain** :
+
+| Volume | stop (q90, 1 h) | objectif (q75, 4 h) | gain/risque |
+|---|---|---|---|
+| 1–1,5× | 0,25 % | 0,36 % | **1,44** |
+| 2–3× | 0,34 % | 0,39 % | 1,15 |
+| 4–6× | 0,46 % | 0,46 % | 1,00 |
+| ≥ 10× | 0,65 % | 0,52 % | **0,80** |
+
+Le stop nécessaire est multiplié par 2,6 d'un bout à l'autre, l'objectif
+atteignable par 1,4 seulement. Les deux courbes se croisent vers **4–6×**.
+Au-delà, il faut viser juste plus d'une fois sur deux pour rentrer dans ses
+frais.
+
+### Ce que cela ne fait pas
+
+`correlations.mjs` et `dimensionner.mjs` ne produisent **aucun signal
+d'entrée**, et ne doivent jamais être relus comme s'ils en produisaient. Ils
+décrivent des distributions passées. Ils dimensionnent une position dont la
+direction a été décidée ailleurs, par autre chose qu'eux.
+
+Ces mesures ne sont pas pré-enregistrées. Elles ne réfutent ni ne confirment
+rien : elles cartographient. Toute règle qu'on en tirerait devrait être gelée
+puis éprouvée sur une période encore fermée — 2017-2019 reste disponible.
+
+### La leçon
+
+Une grandeur mesurée sur un marché n'est transposable à un autre que si on l'a
+vérifié. Pas en ordre de grandeur, et pas même en **sens** : ici, c'est le sens
+de la relation qui a changé d'un marché à l'autre. Le coût de la vérification
+était d'une commande et de quatre minutes. Le coût de l'avoir sautée a été une
+fiche publiée avec un graphique qui disait l'inverse de la vérité.
