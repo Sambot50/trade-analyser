@@ -155,6 +155,10 @@ async function main() {
       );
       lignes.push(JSON.stringify({
         detecteur, bande: r.bande, horodatage: new Date(r.ms).toISOString(),
+        // L'unité de scan voyage avec l'anomalie : une planche tracée plus
+        // grossièrement dilue le pic de volume qui a déclenché la détection,
+        // et l'œil ne voit plus ce qu'on lui demande de juger.
+        unite: o.ut,
         score: r.scores[detecteur], ...m,
       }));
     }
