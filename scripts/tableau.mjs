@@ -20,7 +20,12 @@ import { decouperParContrat } from '../src/lib/marche/contrats.js';
 import { scorerSegment, mediane } from '../src/lib/marche/anomalies.js';
 import { parseArgs } from './backtest.mjs';
 
-const DEFAUTS = { ut: '15m', utCsv: '1m', fenetre: 60, apres: 96, nombre: 60, sortie: 'tableau.html' };
+const DEFAUTS = {
+  ut: '15m', utCsv: '1m', fenetre: 60, apres: 96, nombre: 60,
+  // Les bougies affichées de part et d'autre de l'évènement. C'est là que
+  // se lit la différence : un pic ne veut rien dire sans ses voisines.
+  autour: 10, sortie: 'tableau.html',
+};
 
 export function validerOptions(args) {
   const o = { ...DEFAUTS };
@@ -32,7 +37,14 @@ export function validerOptions(args) {
     if (!UNITES[args[cle]]) erreurs.push(`${option} "${args[cle]}" inconnue`);
     else o[cle] = args[cle];
   }
-  for (const [option, cle, min] of [['--apres', 'apres', 1], ['--nombre', 'nombre', 1], ['--fenetre', 'fenetre', 20]]) {
+  // --ut2 rend la MÊME fenêtre dans une seconde unité, côte à côte. C'est
+  // la seule façon de voir ce que l'agrégation fait au volume : un pic
+  // d'une minute se dilue dans un quart d'heure, et disparaît dans l'heure.
+  if (args.ut2 !== undefined) {
+    if (!UNITES[args.ut2]) erreurs.push(`--ut2 "${args.ut2}" inconnue`);
+    else o.ut2 = args.ut2;
+  }
+  for (const [option, cle, min] of [['--apres', 'apres', 1], ['--nombre', 'nombre', 1], ['--fenetre', 'fenetre', 20], ['--autour', 'autour', 1]]) {
     if (args[cle] === undefined) continue;
     const n = Number(args[cle]);
     if (!Number.isFinite(n) || n < min) erreurs.push(`${option} attend un nombre ≥ ${min}`);
@@ -74,9 +86,62 @@ export function apresEnPrix(bougies, index, nombre) {
   };
 }
 
+/**
+ * Les bougies encadrant un instant, dans la série fournie.
+ *
+ * Repéré par le TEMPS et non par un index, pour que la même fenêtre se
+ * retrouve dans une autre unité : quinze bougies d'une minute et une bougie
+ * de quinze minutes couvrent le même quart d'heure.
+ */
+export function bougiesAutour(serie, ms, avant, apres) {
+  const i = serie.findIndex((b) => b.ouvertureMs <= ms && ms <= b.fermetureMs);
+  if (i === -1) return null;
+  return {
+    bougies: serie.slice(Math.max(0, i - avant), i + apres + 1),
+    index: i - Math.max(0, i - avant),
+  };
+}
+
 const ech = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const n2 = (x) => (x >= 0 ? '+' : '') + x.toFixed(2);
 const iso = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16);
+
+/**
+ * Une bougie par ligne, avec son volume et une barre proportionnelle.
+ *
+ * La barre est ce qui fait le travail. Un nombre se compare mal de tête ;
+ * une barre deux fois plus longue se voit sans lire. C'est exactement la
+ * question posée — cette bougie est-elle différente des autres.
+ */
+export function rendreBougies(bloc, unite, medianeVolume) {
+  if (!bloc) return `<div class="sans">aucune bougie en ${ech(unite)}</div>`;
+  const volMax = Math.max(...bloc.bougies.map((b) => b.volume || 0), 1);
+
+  const lignes = bloc.bougies.map((b, i) => {
+    const vol = b.volume || 0;
+    const marque = i === bloc.index;
+    const hausse = b.cloture > b.ouverture;
+    const fois = medianeVolume ? vol / medianeVolume : 0;
+    return `<tr class="${marque ? 'marquee' : ''}">
+  <td class="h">${ech(iso(b.ouvertureMs).slice(11))}</td>
+  <td class="p">${b.ouverture.toFixed(2)}</td>
+  <td class="p">${b.plusHaut.toFixed(2)}</td>
+  <td class="p">${b.plusBas.toFixed(2)}</td>
+  <td class="p ${hausse ? 'haut' : 'bas'}">${b.cloture.toFixed(2)}</td>
+  <td class="v">${vol.toLocaleString('fr-FR')}</td>
+  <td class="x">${fois >= 1.5 ? fois.toFixed(1) + '\u00d7' : ''}</td>
+  <td class="barre"><i style="width:${((vol / volMax) * 100).toFixed(1)}%" class="${hausse ? 'haut' : 'bas'}"></i></td>
+</tr>`;
+  }).join('\n');
+
+  return `<div class="serie">
+  <h4>${ech(unite)}</h4>
+  <table class="bougies">
+    <tr><th>heure</th><th>ouv.</th><th>haut</th><th>bas</th><th>clôt.</th><th>volume</th><th></th><th></th></tr>
+    ${lignes}
+  </table>
+</div>`;
+}
 
 export function construirePage(lignes, { symbole, ut, apres, medianeVolume, dureeApresH }) {
   const corps = lignes.map((l) => {
@@ -90,7 +155,8 @@ export function construirePage(lignes, { symbole, ut, apres, medianeVolume, dure
     <span class="bougie ${sens}">bougie ${sens} de ${Math.abs(l.corps).toFixed(2)} $</span>
   </header>
   ${img}
-  <table>
+  <div class="series">${l.series ?? ''}</div>
+  <table class="bilan">
     <tr><th>monte ensuite de</th><td class="haut">${n2(l.monte)} $</td><td class="quand">après ${l.bougiesHaut} bougies</td></tr>
     <tr><th>descend ensuite de</th><td class="bas">−${l.descend.toFixed(2)} $</td><td class="quand">après ${l.bougiesBas} bougies</td></tr>
     <tr><th>au bout de ${dureeApresH} h</th><td class="${l.net >= 0 ? 'haut' : 'bas'}">${n2(l.net)} $</td><td class="quand">${l.complet ? '' : 'horizon tronqué'}</td></tr>
@@ -122,7 +188,24 @@ th{text-align:left;font-weight:400;color:var(--gris);padding:5px 0;width:15em}
 td{padding:5px 0;font-weight:600}
 td.haut{color:var(--haut)}td.bas{color:var(--bas)}
 td.quand{font-weight:400;color:var(--gris);text-align:right}
-@media(max-width:640px){th{width:auto}td.quand{display:none}}
+table.bilan th{width:15em}
+.series{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px}
+.serie{flex:1 1 380px;min-width:0}
+.serie h4{margin:0 0 6px;font-size:13px;color:var(--gris);font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+table.bougies{font-size:13px;table-layout:fixed}
+table.bougies th{padding:3px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;width:auto}
+table.bougies td{padding:3px 6px;font-weight:400}
+table.bougies td.h{color:var(--gris);width:4.5em}
+table.bougies td.p{text-align:right;width:5.5em}
+table.bougies td.v{text-align:right;font-weight:600;width:6em}
+table.bougies td.x{color:var(--or);font-weight:600;width:3.5em;font-size:12px}
+table.bougies td.barre{width:auto;padding-left:8px}
+table.bougies td.barre i{display:block;height:9px;border-radius:2px;min-width:1px}
+table.bougies td.barre i.haut{background:var(--haut)}
+table.bougies td.barre i.bas{background:var(--bas)}
+tr.marquee{background:#2b2512;outline:1px solid var(--or)}
+tr.marquee td{font-weight:700}
+@media(max-width:640px){table.bilan th{width:auto}td.quand{display:none}table.bougies td.p{display:none}}
 </style>
 <h1>${ech(symbole)} · ${ech(ut)} · ${lignes.length} évènements de volume</h1>
 <p class="intro">Classés du plus gros volume au plus petit. La bougie signalée porte le bandeau jaune ;
@@ -151,8 +234,15 @@ async function principal() {
   const candidats = [];
   const volumes = [];
 
+  const series = [];        // une entrée par contrat : la série principale et celle de comparaison
+
   for (const segment of segments) {
     const serie = dureeUnite(o.ut) === dureeUnite(o.utCsv) ? segment.bougies : agregerBougies(segment.bougies, o.ut);
+    const serie2 = o.ut2
+      ? (dureeUnite(o.ut2) === dureeUnite(o.utCsv) ? segment.bougies : agregerBougies(segment.bougies, o.ut2))
+      : null;
+    series.push({ serie, serie2 });
+
     for (const b of serie) volumes.push(b.volume || 0);
     for (const s of scorerSegment(serie, { fenetre: o.fenetre })) {
       if (!s.scores.picVolume) continue;
@@ -161,12 +251,16 @@ async function principal() {
       const b = serie[s.index];
       candidats.push({
         ms: b.ouvertureMs, volume: b.volume || 0, ratio: s.mesures.ratioVolume,
-        hausse: b.cloture > b.ouverture, corps: b.cloture - b.ouverture, ...suite,
+        hausse: b.cloture > b.ouverture, corps: b.cloture - b.ouverture,
+        serie, serie2, ...suite,
       });
     }
   }
 
   const medianeVolume = Math.round(mediane(volumes.filter((v) => v > 0)) || 0);
+
+  // Les séries complètes, gardées par contrat pour que la fenêtre autour d'un
+  // évènement ne traverse jamais un roulement.
   candidats.sort((a, b) => b.volume - a.volume);
   const retenus = candidats.slice(0, o.nombre);
 
@@ -182,6 +276,24 @@ async function principal() {
       const trouve = fichiers.find((f) => f.includes(cle));
       if (trouve) l.planche = join(o.planches, trouve).replace(/\\/g, '/');
     }
+  }
+
+  // La médiane de la seconde unité lui est propre : comparer un volume de
+  // 5 min à la médiane des 15 min ferait paraître toutes les bougies calmes.
+  const volumes2 = o.ut2 ? series.flatMap((s) => (s.serie2 ?? []).map((b) => b.volume || 0)) : [];
+  const medianeVolume2 = volumes2.length ? Math.round(mediane(volumes2.filter((v) => v > 0)) || 0) : 0;
+
+  for (const l of retenus) {
+    const a = bougiesAutour(l.serie, l.ms, o.autour, o.autour);
+    let html = rendreBougies(a, o.ut, medianeVolume);
+    if (o.ut2 && l.serie2) {
+      // Autant de bougies fines qu'il en faut pour couvrir la même durée.
+      const facteur = Math.max(1, Math.round(dureeUnite(o.ut) / dureeUnite(o.ut2)));
+      const b = bougiesAutour(l.serie2, l.ms, o.autour * facteur, o.autour * facteur);
+      html += rendreBougies(b, o.ut2, medianeVolume2);
+    }
+    l.series = html;
+    delete l.serie; delete l.serie2;
   }
 
   const dureeApresH = Math.round((o.apres * dureeUnite(o.ut)) / 3_600_000);
