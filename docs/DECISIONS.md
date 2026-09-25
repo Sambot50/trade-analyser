@@ -1665,3 +1665,97 @@ est à −1,2. Et l'hypothèse a été formée **après** avoir regardé les don
 
 C'est précisément pourquoi elle ne vaut qu'une chose : une épreuve sur une
 période jamais ouverte, décidée d'avance, exécutée une fois.
+
+### HYP-001 — Résultat, 2026-09-25
+
+**CONFIRMÉE.** Exécutée une fois, sur `GC_2025_2026.csv` — 583 218 bougies
+d'une minute, 2025-01-01 → 2026-08-31, 10 contrats, achetées 2,13 USD après le
+gel et jamais ouvertes avant.
+
+| | détectées | témoin |
+|---|---|---|
+| effectif | 272 | 8 788 |
+| 3R atteint avant 1R perdu | **58,1 %** | **53,0 %** |
+
+Écart **+5,11 points** · erreur type 3,078 · z = 1,66 · **p unilatéral = 0,0486**
+
+C'est la première fois, en sept hypothèses, qu'un effet survit à une période
+jamais regardée sous une règle décidée d'avance.
+
+#### Quatre réserves, écrites le même jour que le résultat
+
+**La marge est d'un vingtième de point.** Le seuil de passage était à 5,06
+points ; l'écart obtenu vaut 5,11. Quatre cas classés autrement et le verdict
+s'inversait. Un résultat à p = 0,049 est, statistiquement, le profil type de
+ce qui ne se reproduit pas.
+
+**La puissance annoncée était fausse.** Le pré-enregistrement promettait 83 %,
+sur une prévision de 601 cas extrapolée des 721 de 2023-2024. Il y en a eu
+**272** — moins de la moitié. L'erreur type réelle vaut 3,078 au lieu de
+2,124, ce qui ramène la puissance à **56 %**. La décision de tester vingt mois
+plutôt que douze a donc été prise sur un chiffre erroné. Cela n'invalide pas
+le verdict — un test sous-puissant qui trouve quand même reste un test qui
+trouve — mais la période choisie l'a été pour une raison qui ne tenait pas.
+
+**Les jours dégradés n'ont pas été exclus.** Databento en signale au moins
+trois (2025-09-17, 2025-09-24, 2025-11-28). Le gel n'en parlait pas ; les
+retirer après coup aurait été l'ajustement que tout ce dispositif sert à
+empêcher. Réserve connue, non corrigée.
+
+**Le calcul de p repose sur une approximation.** `phi` implémente Abramowitz &
+Stegun 7.1.26 ; un calcul indépendant en Python donne 0,0484 contre 0,0486.
+L'écart est négligeable en soi, mais à cette marge il méritait d'être vérifié
+plutôt que supposé. Les deux calculs concluent identiquement.
+
+#### Ce qui a le mieux répliqué : l'amplitude, pas le seuil
+
+| | 2023-2024 | 2025-2026 | écart |
+|---|---|---|---|
+| détectées | 59,0 % | 58,1 % | −0,9 |
+| témoin | 53,5 % | 53,0 % | −0,5 |
+| **différence** | **+5,5** | **+5,11** | **−0,39** |
+
+Les trois valeurs atterrissent où elles étaient attendues, sur une autre
+période, un autre régime de prix et un autre jeu de contrats. **C'est la
+partie solide du résultat**, et elle vaut mieux que le p : un hasard franchit
+un seuil bien plus souvent qu'il ne reproduit une forme.
+
+#### La réalité économique, qui refroidit
+
+Espérance par passage, **sans aucun coût** :
+
+| | |
+|---|---|
+| détectées | +1,324 R |
+| témoin | **+1,120 R** |
+| **apport du détecteur** | **+0,204 R** |
+
+Le témoin — une bougie **quelconque** dans une semaine haussière — rapporte
+déjà +1,12 R. Ce n'est pas un edge, c'est la hausse de l'or lue avec un
+objectif à 3R et un stop à 1R. Cela s'inverserait dans un marché baissier et
+ne survivrait pas aux frais.
+
+Ce que le détecteur apporte réellement, c'est **+0,204 R au-dessus de ce
+fond**. Tout chiffre plus flatteur mélange l'effet et la dérive.
+
+#### Ce que HYP-001 n'établit pas
+
+Ni une stratégie, ni une rentabilité, ni un edge exploitable. Aucun spread,
+aucun glissement, aucune règle d'entrée, aucune taille de position. La moitié
+du gain apparent est la tendance du marché sous-jacent.
+
+Ce qui est établi, et seulement cela : *parmi les bougies de quinze minutes
+situées dans une semaine haussière sur GC COMEX, celles dont le volume dépasse
+quatre fois la médiane glissante atteignent 3R avant 1R environ cinq points
+plus souvent que les autres.*
+
+#### La suite : répliquer, pas construire
+
+Un résultat marginal et sous-puissant appelle une **réplication
+indépendante**, pas un système. La même règle gelée, sans en changer une
+virgule, sur d'autres marchés — argent, platine, cuivre. Quelques dollars de
+données OHLCV.
+
+Si l'effet s'y retrouve, il est réel et le système complet se justifie. S'il
+disparaît, HYP-001 rejoint les six autres, et le projet se clôt sur un
+résultat honnête plutôt que sur une conviction.
