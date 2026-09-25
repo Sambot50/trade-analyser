@@ -1947,3 +1947,99 @@ surestime toujours son effet. La valeur à retenir pour la suite est +3,02, pas
 Pas sur le pétrole. Pas sur les indices. Et toujours **pas une stratégie** :
 aucun coût compté, aucune entrée décidée, et un témoin qui rapporte déjà
 +1,12 R par lui-même — la hausse des métaux sur la période, pas un edge.
+## HYP-003 — Le système, frais compris. Gelée le 2026-09-25
+
+**Gelée AVANT d'avoir ouvert la moindre donnée antérieure à 2023.**
+
+### Pourquoi celle-ci, et pourquoi maintenant
+
+HYP-001 puis HYP-002 ont établi qu'un effet existe sur les métaux : environ
+**trois points** de taux de réussite au-dessus d'une bougie ordinaire, hors
+échantillon, sous règle gelée.
+
+Ce n'est pas une stratégie, et les deux pré-enregistrements le disaient déjà.
+Aucune entrée n'était décidée, aucun coût compté, et surtout : **le témoin
+rapportait +1,12 R par lui-même**, ce qui est la hausse des métaux de 2023 à
+2026, pas un avantage.
+
+La question qui reste est donc la seule qui vaille : **une fois tout compté,
+ça rapporte ou pas ?**
+
+### La période est choisie CONTRE l'hypothèse
+
+**2020-01-01 → 2023-01-01.** Trois ans jamais ouverts, et **antérieurs** à
+tout ce qui a servi jusqu'ici.
+
+Le régime y est inverse : choc du COVID au printemps 2020, puis deux ans de
+stagnation et de baisse sur l'or. Si l'effet mesuré n'était que la hausse de
+2023-2026 déguisée, il doit s'y effondrer.
+
+Choisir la période la plus favorable serait l'erreur inverse de celle qu'on
+essaie d'éviter depuis huit hypothèses.
+
+### Ce qui est compté, et qui ne l'était pas
+
+| | |
+|---|---|
+| Détection | identique à HYP-001, `GEL.regle` référencé et non recopié |
+| Marchés | GC, SI, PL, HG — les quatre métaux où l'effet tient |
+| Entrée | **à la clôture** de la bougie signalée |
+| Stop | 1R, R = hauteur de la bougie |
+| Objectif | 3R |
+| Frais | **4 ticks aller-retour**, deux de spread et deux de glissement |
+| Pas de cotation | **lu dans les données**, jamais supposé de mémoire |
+| Ni objectif ni stop | **fermée au marché** en fin d'horizon |
+
+Ces deux derniers points comptent plus qu'ils n'en ont l'air.
+
+Un pas de cotation supposé de mémoire serait faux un jour sur quatre, et rien
+ne le signalerait — c'est la classe d'erreur qui a coûté trois bugs silencieux
+dans la seule journée du 2026-09-25.
+
+Et écarter les positions qui n'atteignent rien retirerait précisément les cas
+où il ne s'est rien passé. L'espérance en sortirait gonflée, d'une façon qui
+paraît anodine et qui ne l'est pas.
+
+### La règle de décision
+
+Test unilatéral sur l'espérance nette moyenne, seuil 5 %, une seule
+comparaison.
+
+| Condition | Verdict |
+|---|---|
+| erreur type > **0,10 R** | **NON CONCLUANTE** |
+| espérance ≤ 0 | **NON RENTABLE** |
+| espérance > 0 et p < 0,05 | **RENTABLE** |
+| espérance > 0 et p ≥ 0,05 | **NON CONCLUANTE SUR LE SIGNE** |
+
+La précision se vérifie **avant** le signe, comme dans HYP-002.
+
+Le seuil de 0,10 R n'est pas arbitraire : il permet de distinguer de zéro une
+espérance de **+0,25 R** à 80 % de puissance. En dessous de +0,25 R par
+passage, rien n'est tradable une fois ajoutées les frictions que ce test ne
+simule pas — carnets creux, exécutions partielles, jours fériés. C'est donc le
+seuil qui compte économiquement, pas seulement statistiquement.
+
+### Le calcul qui a motivé ce test
+
+Fait avant, avec les chiffres de HYP-002 :
+
+```
+apport du détecteur   +0,120 R par passage
+frais à 4 ticks       0,020 à 0,080 R selon la hauteur de la bougie
+net                   +0,040 à +0,100 R
+```
+
+L'arithmétique dit que ça devrait survivre, **parce que l'unité de risque est
+la hauteur d'une bougie à gros volume — donc large — et que les frais sont
+fixes.** Ce test vérifie si l'arithmétique tient sur des données réelles, dans
+un régime qui ne l'aide pas.
+
+### Ce que HYP-003 ne fera toujours pas
+
+Ni dimensionner une position, ni gérer plusieurs positions simultanées, ni
+simuler un carnet. Une espérance positive par passage n'est pas un compte qui
+monte : il y faut encore une taille, une corrélation entre positions, et une
+tolérance au décrochage.
+
+Mais une espérance négative, elle, clôt la question définitivement.
