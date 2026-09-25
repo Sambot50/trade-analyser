@@ -259,14 +259,23 @@ export function scorerSegment(bougies, { fenetre = 60 } = {}) {
         amplitude: arrondir(amplitude),
         cloture: b.cloture,
         heure,
-        // Côté dominant, par PROXY : la clôture par rapport à l'ouverture.
+        // Côté dominant PRÉSUMÉ, d'après la clôture face à l'ouverture.
         //
-        // Ce n'est pas la ventilation acheteur/vendeur du carnet — `ohlcv-1m`
-        // ne la porte pas, seul le schéma `trades` donne le côté agresseur.
-        // C'est l'approximation que colorent toutes les plateformes, et elle
-        // se trompe sur une bougie qui monte puis redescend en clôturant
-        // plate. Elle vaut ce qu'elle vaut, et elle est nommée pour ça.
-        sens,
+        // RÉFUTÉ — DEC-030. Ce n'est pas « approximatif », c'est faux une fois
+        // sur trois. Mesuré contre le côté réel de l'agresseur sur 71 826
+        // transactions COMEX du 2026-06-03 : 71,7 % d'accord en 5 min, 62,6 %
+        // en 15 min, 47,8 % en 1 heure — moins bien que pile ou face. Un seuil
+        // de volume n'améliore rien : le proxy se trompe autant sur les
+        // grosses bougies, celles que ce scanner retient.
+        //
+        // Le prix peut chuter de quatorze dollars pendant que les acheteurs
+        // agressifs dominent : des vendeurs passifs encaissent le flux sans
+        // reculer. C'est de l'absorption, et elle est invisible en OHLCV.
+        //
+        // Conservé parce que la structure servira quand la donnée `trades`
+        // sera là. Nommé `sensApparent` pour qu'aucune lecture ne le prenne
+        // pour un fait — c'est ainsi qu'on fabrique une fausse découverte.
+        sensApparent: sens,
         // La tendance générale à deux échelles bien plus larges que la
         // détection, mais lues sur les MÊMES bougies de quinze minutes. Un
         // volume à contre-courant n'est pas le même évènement qu'un volume

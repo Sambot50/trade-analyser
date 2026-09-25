@@ -1495,3 +1495,92 @@ La première chose à y construire n'est pas une analyse. C'est le **contrôle**
 rejouer la géométrie du plan proposé à des instants tirés au sort. Sans lui, on
 recommencera exactement ce qui vient d'être réfuté, avec un modèle à la place
 d'une formule.
+
+---
+
+## DEC-030 — Le sens déduit de la bougie est réfuté
+
+**2026-09-25.** Le scanner d'anomalies range chaque évènement en « achat » ou
+« vente » sur un seul indice : la bougie a-t-elle clôturé plus haut qu'elle n'a
+ouvert. Cet indice est **faux une fois sur trois**. Mesuré, pas supposé.
+
+### La mesure
+
+Une journée réelle de transactions COMEX — `GC.v.0`, schéma `trades`,
+2026-06-03, **71 826 transactions**, 0,09 USD. Le schéma porte le côté de
+l'agresseur : celui qui a franchi le spread et payé pour que le prix bouge.
+C'est la seule vérité disponible sur qui a voulu le mouvement.
+
+`scripts/verifier-cote.mjs` compare, bougie par bougie, ce que le proxy affirme
+et ce que l'agresseur a fait.
+
+| Unité | Seuil de volume | n jugeables | Accord |
+|---|---|---|---|
+| 5 min | — | 272 | 71,7 % |
+| 5 min | ≥ 500 | 47 | 72,3 % |
+| 15 min | — | 91 | **62,6 %** |
+| 15 min | ≥ 1 266 | 23 | 60,9 % |
+| 1 heure | — | 23 | **47,8 %** |
+
+Volume sans côté connu : 1,53 %. L'échantillon est propre.
+
+### Trois lectures
+
+**Le proxy se dégrade avec la durée de la bougie.** Plus elle est longue, plus
+le prix a le temps de monter puis redescendre pendant que le flux agressif
+pointe dans l'autre sens. À une heure, il fait moins bien que pile ou face.
+
+**Le seuil de volume ne le sauve pas.** L'hypothèse qu'il tiendrait au moins là
+où le scanner regarde — sur les grosses bougies — est réfutée : 72,3 % contre
+71,7 % en 5 min, 60,9 % contre 62,6 % en 15 min. Aucune amélioration.
+
+**À une heure, le vrai côté ne dit plus rien non plus.** Les désaccords y
+portent sur des déséquilibres de 0,6 % à 10,3 % : 2 771 acheteurs contre 2 737
+vendeurs n'est pas une réponse. L'agression se lit court — à 5 min les
+désaccords montent à 38,8 % de déséquilibre, et le proxy s'y trompe quand même.
+
+### Ce que ça condamne
+
+`anomalies.js` calcule `sens` à la clôture. En dépendent : les deux appels à
+`famille()`, donc **les quatre familles jour/semaine × achat/vente** ; le
+marqueur contre-courant ; les sous-tableaux achat/vente de
+`scanner-anomalies.mjs` ; les noms de planches et le filtre `--sens` de
+`inspecter.mjs`.
+
+Le champ est renommé `sensApparent` et l'affichage porte désormais le taux
+d'erreur mesuré. Une devinette ne doit pas se lire comme un fait — c'est
+exactement ainsi qu'on fabrique une fausse découverte.
+
+### Ce que ça ne condamne pas
+
+Les six détecteurs ne regardent que volume et amplitude : aucun côté n'y entre.
+La classification de tendance se calcule sur le prix. `apres.js` mesure la
+direction du mouvement **suivant**, sur le prix également. Tout cela tient.
+
+### Ce que ça règle
+
+La question posée au projet était : *déterminer si un gros mouvement de volume
+a été fait à l'achat ou à la vente.* **On ne peut pas le lire sur un
+graphique.** Ni à la forme de la bougie, ni à sa couleur, ni à sa clôture. Une
+bougie rouge peut être une bougie d'achat — mesuré deux fois sur cette journée,
+sur les deux plus fortes baisses :
+
+```
+13:15   prix -13,8   1669 acheteurs   1274 vendeurs
+01:00   prix -14,1   1289 acheteurs   1108 vendeurs
+```
+
+Des vendeurs passifs postés à l'offre encaissent le flux acheteur sans reculer.
+C'est de l'absorption au sens propre, et elle est invisible en OHLCV.
+
+Il n'y a pas de raccourci : répondre à cette question exige la donnée
+transaction par transaction. Ce n'est plus une option du projet, c'en est le
+prix d'entrée.
+
+### Portée de la mesure
+
+**Une journée.** 272 bougies en 5 min, 91 en 15 min, 23 en 1 h. La direction du
+résultat est nette et cohérente sur trois échelles, mais elle repose sur une
+seule séance. Un mois — 2,52 USD, déjà chiffré — la trancherait définitivement.
+Tant qu'il n'est pas acheté, DEC-030 est établie en direction, pas en
+magnitude.

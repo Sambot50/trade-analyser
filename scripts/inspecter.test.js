@@ -39,13 +39,13 @@ describe('fenêtre autour d’une anomalie', () => {
 
 describe('nom de planche', () => {
   it('trie par score décroissant au sein d’un détecteur et d’une bande', () => {
-    const fort = nomDePlanche({ detecteur: 'absorption', sens: 'achat', bande: 'sommet', score: 12.5, horodatage: '2023-06-15T14:00:00.000Z' });
-    const faible = nomDePlanche({ detecteur: 'absorption', sens: 'achat', bande: 'sommet', score: 2.5, horodatage: '2023-06-15T14:00:00.000Z' });
+    const fort = nomDePlanche({ detecteur: 'absorption', sensApparent: 'achat', bande: 'sommet', score: 12.5, horodatage: '2023-06-15T14:00:00.000Z' });
+    const faible = nomDePlanche({ detecteur: 'absorption', sensApparent: 'achat', bande: 'sommet', score: 2.5, horodatage: '2023-06-15T14:00:00.000Z' });
     expect([fort, faible].sort().reverse()[0]).toBe(fort);
   });
 
   it('porte le détecteur, le sens, la tendance, la bande et la date', () => {
-    const n = nomDePlanche({ detecteur: 'gap', sens: 'achat', bande: 'milieu', score: 1.5, horodatage: '2023-06-15T14:30:00.000Z', tendanceSemaine: 'haussiere' });
+    const n = nomDePlanche({ detecteur: 'gap', sensApparent: 'achat', bande: 'milieu', score: 1.5, horodatage: '2023-06-15T14:30:00.000Z', tendanceSemaine: 'haussiere' });
     expect(n).toMatch(/^gap-achat-semH-milieu-/);
     expect(n).toContain('2023-06-15-14-30');
     expect(n.endsWith('.png')).toBe(true);
@@ -81,8 +81,8 @@ describe('filtre par sens', () => {
 
   it('groupe les achats avant les ventes dans un tri alphabétique', () => {
     const noms = [
-      nomDePlanche({ detecteur: 'absorption', sens: 'vente', bande: 'sommet', score: 9, horodatage: '2023-01-01T00:00:00.000Z' }),
-      nomDePlanche({ detecteur: 'absorption', sens: 'achat', bande: 'bas', score: 1, horodatage: '2023-01-01T00:00:00.000Z' }),
+      nomDePlanche({ detecteur: 'absorption', sensApparent: 'vente', bande: 'sommet', score: 9, horodatage: '2023-01-01T00:00:00.000Z' }),
+      nomDePlanche({ detecteur: 'absorption', sensApparent: 'achat', bande: 'bas', score: 1, horodatage: '2023-01-01T00:00:00.000Z' }),
     ].sort();
     expect(noms[0]).toContain('-achat-');
   });
@@ -90,13 +90,13 @@ describe('filtre par sens', () => {
 
 
 describe('la tendance hebdomadaire dans le nom', () => {
-  const base = { detecteur: 'absorption', sens: 'achat', bande: 'sommet', score: 5, horodatage: '2023-06-15T14:00:00.000Z' };
+  const base = { detecteur: 'absorption', sensApparent: 'achat', bande: 'sommet', score: 5, horodatage: '2023-06-15T14:00:00.000Z' };
 
   it('code la tendance en une lettre', () => {
     expect(nomDePlanche({ ...base, tendanceSemaine: 'haussiere' })).toContain('-semH-');
     expect(nomDePlanche({ ...base, tendanceSemaine: 'baissiere' })).toContain('-semB-');
     expect(nomDePlanche({ ...base, tendanceSemaine: 'plate' })).toContain('-semP-');
-    expect(nomDePlanche({ ...base })).toContain('-sem?-');
+    expect(nomDePlanche({ ...base })).toContain('-semX-');
   });
 
   /**
@@ -106,12 +106,45 @@ describe('la tendance hebdomadaire dans le nom', () => {
    */
   it('range les quatre cases par un tri alphabétique', () => {
     const noms = [
-      nomDePlanche({ ...base, sens: 'vente', tendanceSemaine: 'haussiere' }),
-      nomDePlanche({ ...base, sens: 'achat', tendanceSemaine: 'haussiere' }),
-      nomDePlanche({ ...base, sens: 'vente', tendanceSemaine: 'baissiere' }),
-      nomDePlanche({ ...base, sens: 'achat', tendanceSemaine: 'baissiere' }),
+      nomDePlanche({ ...base, sensApparent: 'vente', tendanceSemaine: 'haussiere' }),
+      nomDePlanche({ ...base, sensApparent: 'achat', tendanceSemaine: 'haussiere' }),
+      nomDePlanche({ ...base, sensApparent: 'vente', tendanceSemaine: 'baissiere' }),
+      nomDePlanche({ ...base, sensApparent: 'achat', tendanceSemaine: 'baissiere' }),
     ].sort();
     expect(noms.map((n) => n.split('-').slice(1, 3).join('-')))
       .toEqual(['achat-semB', 'achat-semH', 'vente-semB', 'vente-semH']);
+  });
+});
+
+// Un nom de fichier illégal n'échoue qu'à l'ÉCRITURE, après que le graphique
+// a été tracé et rasterisé. Sur la machine de travail, treize planches ont été
+// produites puis le script est mort sur ENOENT, la quatorzième tendance
+// hebdomadaire étant inconnue et le nom portant « sem? ». Le point
+// d'interrogation est interdit sous Windows, licite sous Linux : la CI ne
+// pouvait pas le voir.
+describe('noms de planches utilisables sous Windows', () => {
+  // < > : " / \ | ? * et les caractères de contrôle.
+  const INTERDITS = /[<>:"/\\|?*\u0000-\u001f]/;
+
+  const champs = {
+    detecteur: 'picVolume', sensApparent: 'achat', bande: 'milieu',
+    score: 7.37, horodatage: '2023-01-05T14:00:00.000Z',
+  };
+
+  it('n’emploie aucun caractère interdit quand la tendance est inconnue', () => {
+    const n = nomDePlanche({ ...champs, tendanceSemaine: undefined });
+    expect(n).not.toMatch(INTERDITS);
+    expect(n).toContain('semX');
+  });
+
+  it.each(['haussiere', 'baissiere', 'plate', 'indetermine', undefined, null])(
+    'reste légal pour une tendance « %s »',
+    (tendanceSemaine) => {
+      expect(nomDePlanche({ ...champs, tendanceSemaine })).not.toMatch(INTERDITS);
+    },
+  );
+
+  it('garde l’horodatage sans deux-points', () => {
+    expect(nomDePlanche({ ...champs, tendanceSemaine: 'haussiere' })).not.toContain(':');
   });
 });

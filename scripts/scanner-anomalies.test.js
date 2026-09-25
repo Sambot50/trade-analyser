@@ -35,18 +35,18 @@ describe('volume à contre-courant', () => {
    * hausse. Suivre le flot ne demande ni raison ni moyens.
    */
   it('marque l’achat dans une baisse et la vente dans une hausse', () => {
-    expect(contreCourant({ sens: 'achat', tendanceSemaine: 'baissiere' })).toBe(true);
-    expect(contreCourant({ sens: 'vente', tendanceSemaine: 'haussiere' })).toBe(true);
+    expect(contreCourant({ sensApparent: 'achat', tendanceSemaine: 'baissiere' })).toBe(true);
+    expect(contreCourant({ sensApparent: 'vente', tendanceSemaine: 'haussiere' })).toBe(true);
   });
 
   it('ne marque pas la continuation', () => {
-    expect(contreCourant({ sens: 'achat', tendanceSemaine: 'haussiere' })).toBe(false);
-    expect(contreCourant({ sens: 'vente', tendanceSemaine: 'baissiere' })).toBe(false);
+    expect(contreCourant({ sensApparent: 'achat', tendanceSemaine: 'haussiere' })).toBe(false);
+    expect(contreCourant({ sensApparent: 'vente', tendanceSemaine: 'baissiere' })).toBe(false);
   });
 
   it('ne marque rien quand la tendance est plate ou inconnue', () => {
-    expect(contreCourant({ sens: 'achat', tendanceSemaine: 'plate' })).toBe(false);
-    expect(contreCourant({ sens: 'vente', tendanceSemaine: 'indetermine' })).toBe(false);
+    expect(contreCourant({ sensApparent: 'achat', tendanceSemaine: 'plate' })).toBe(false);
+    expect(contreCourant({ sensApparent: 'vente', tendanceSemaine: 'indetermine' })).toBe(false);
   });
 });
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { parseArgs } from './backtest.mjs';
 import { comparer, validerOptions, verdict } from './verifier-cote.mjs';
 
 const bougie = (o, c, acheteur, vendeur) => ({
@@ -59,5 +60,34 @@ describe('verdict', () => {
     expect(verdict(96)).toMatch(/fiable/);
     expect(verdict(55)).toMatch(/INUTILISABLE/);
     expect(verdict(null)).toMatch(/aucune/);
+  });
+});
+
+// Les options passent par parseArgs, qui met les noms en camel : --seuil-volume
+// devient seuilVolume. Lire la forme en tirets rend undefined et le seuil
+// retombe à sa valeur par défaut — sans erreur, sans avertissement, avec une
+// sortie qui a l'air normale. C'est arrivé : une mesure censée ne garder que
+// les grosses bougies les a toutes gardées, et le résultat était identique à
+// celui sans seuil, ce qui aurait pu passer pour une propriété des données.
+//
+// Ces tests passent donc par la ligne de commande réelle, pas par un objet
+// d'options écrit à la main.
+describe('options depuis la ligne de commande', () => {
+  const depuis = (...argv) => validerOptions(parseArgs(argv));
+
+  it('applique --seuil-volume', () => {
+    expect(depuis('--csv', 'x.csv', '--seuil-volume', '1266').seuilVolume).toBe(1266);
+  });
+
+  it('applique --decalage-heures', () => {
+    expect(depuis('--csv', 'x.csv', '--decalage-heures', '-2').decalageHeures).toBe(-2);
+  });
+
+  it('applique --ut', () => {
+    expect(depuis('--csv', 'x.csv', '--ut', '5m').ut).toBe('5m');
+  });
+
+  it('laisse le seuil à zéro quand l’option est absente', () => {
+    expect(depuis('--csv', 'x.csv').seuilVolume).toBe(0);
   });
 });

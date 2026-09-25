@@ -92,12 +92,16 @@ export function fenetreAutour(bougies, ms, { avant, apres }) {
 }
 
 /** Nom de fichier lisible et triable : détecteur, bande, score, date. */
+// La lettre « X » vaut pour tendance inconnue — jamais « ? », interdit dans
+// un nom de fichier sous Windows. Un nom illégal n'échoue qu'à l'écriture,
+// après le tracé : la moitié des planches sont produites, puis ENOENT.
 const LETTRE = { haussiere: 'H', baissiere: 'B', plate: 'P' };
+const INCONNUE = 'X';
 
-export function nomDePlanche({ detecteur, sens, bande, score, horodatage, tendanceSemaine }) {
+export function nomDePlanche({ detecteur, sensApparent: sens, bande, score, horodatage, tendanceSemaine }) {
   const date = horodatage.replace(/[:T]/g, '-').slice(0, 16);
   const rang = String(Math.round(Number(score) * 100)).padStart(6, '0');
-  const semaine = `sem${LETTRE[tendanceSemaine] ?? '?'}`;
+  const semaine = `sem${LETTRE[tendanceSemaine] ?? INCONNUE}`;
   // Le sens vient en second : un tri alphabétique regroupe alors tous les
   // achats d'un détecteur, puis toutes les ventes. C'est dans cet ordre
   // qu'on cherche une structure commune, pas en alternant.
@@ -132,7 +136,7 @@ async function main() {
   }
 
   if (o.detecteur) anomalies = anomalies.filter((a) => a.detecteur === o.detecteur);
-  if (o.sens) anomalies = anomalies.filter((a) => a.sens === o.sens);
+  if (o.sens) anomalies = anomalies.filter((a) => a.sensApparent === o.sens);
   if (!anomalies.length) {
     console.error('\nAucune anomalie à inspecter.\n');
     process.exit(2);
@@ -178,7 +182,7 @@ async function main() {
     }
 
     const { svg } = tracerGraphique(fenetre.bougies, {
-      libelle: `${o.symbole} · ${a.detecteur} · ${a.sens ?? '?'} · jour ${a.tendanceJour ?? '?'}`
+      libelle: `${o.symbole} · ${a.detecteur} · ${a.sensApparent ?? '?'} (présumé) · jour ${a.tendanceJour ?? '?'}`
         + ` · semaine ${a.tendanceSemaine ?? '?'} · ${a.bande} · score ${a.score}${a.macro ? ' · ⚠ annonce' : ''}`,
       unite: o.ut,
       marquerMs: fenetre.marquerMs,
@@ -186,7 +190,7 @@ async function main() {
 
     const nom = nomDePlanche(a);
     await writeFile(join(o.dossier, nom), new Resvg(svg, { font: { loadSystemFonts: true } }).render().asPng());
-    console.log(`  ${a.detecteur.padEnd(12)} ${String(a.sens ?? '?').padEnd(6)} ${a.bande.padEnd(7)} ${iso(Date.parse(a.horodatage))}`);
+    console.log(`  ${a.detecteur.padEnd(12)} ${String(a.sensApparent ?? '?').padEnd(6)} ${a.bande.padEnd(7)} ${iso(Date.parse(a.horodatage))}`);
     traces++;
   }
 
