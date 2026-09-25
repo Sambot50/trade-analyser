@@ -49,3 +49,19 @@ describe('volume à contre-courant', () => {
     expect(contreCourant({ sens: 'vente', tendanceSemaine: 'indetermine' })).toBe(false);
   });
 });
+
+
+describe('taille de contrat, pour le notionnel', () => {
+  it('vaut 1 par défaut — une action, une devise', () => {
+    expect(validerOptions({ csv: 'x.csv' }).tailleContrat).toBe(1);
+  });
+
+  it('accepte le multiplicateur d’un future', () => {
+    expect(validerOptions({ csv: 'x.csv', tailleContrat: '100' }).tailleContrat).toBe(100);
+  });
+
+  it('refuse un multiplicateur nul ou négatif', () => {
+    expect(validerOptions({ csv: 'x.csv', tailleContrat: '0' }).erreurs.join(' ')).toMatch(/--taille-contrat/);
+    expect(validerOptions({ csv: 'x.csv', tailleContrat: '-5' }).erreurs.join(' ')).toMatch(/--taille-contrat/);
+  });
+});

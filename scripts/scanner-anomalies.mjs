@@ -19,7 +19,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { analyser as analyserCsv, agreger as agregerBougies } from '../src/lib/marche/csv.js';
 import { dureeUnite, UNITES } from '../src/lib/marche/bougies.js';
 import { decouperParContrat } from '../src/lib/marche/contrats.js';
-import { scorerSegment, meilleurs, echantillonStratifie, DETECTEURS, FAMILLES } from '../src/lib/marche/anomalies.js';
+import { scorerSegment, meilleurs, echantillonStratifie, mediane, quantile, DETECTEURS, FAMILLES } from '../src/lib/marche/anomalies.js';
 import { parseArgs } from './backtest.mjs';
 
 /**
@@ -101,6 +101,15 @@ export function validerOptions(args) {
   // Les fenêtres d'annonce sont écartées PAR DÉFAUT : le sommet d'un marché,
   // ce sont ses publications macro, et ce n'est pas ce qu'on cherche.
   o.avecMacro = Boolean(args.avecMacro);
+  // Multiplicateur du contrat, pour convertir un volume en notionnel : 100
+  // onces pour le GC, 1 pour une action ou une paire de devises. Sert à
+  // l'affichage seul — aucun détecteur ne s'en sert.
+  o.tailleContrat = 1;
+  if (args.tailleContrat !== undefined) {
+    const n = Number(args.tailleContrat);
+    if (!Number.isFinite(n) || n <= 0) erreurs.push('--taille-contrat attend un nombre positif');
+    else o.tailleContrat = n;
+  }
 
   if (dureeUnite(o.ut) < dureeUnite(o.utCsv)) {
     erreurs.push(`--ut (${o.ut}) est plus fine que --ut-csv (${o.utCsv}) : il faudrait inventer des bougies.`);
@@ -110,6 +119,35 @@ export function validerOptions(args) {
 }
 
 const iso = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16);
+
+const milliers = (n) => Math.round(n).toLocaleString('fr-FR').replace(/\u202f|\u00a0/g, ' ');
+
+/**
+ * L'échelle absolue du marché scanné.
+ *
+ * « Quatre fois la médiane » ne veut rien dire tant qu'on ignore si la médiane
+ * vaut dix contrats ou dix mille. Et le notionnel varie d'un facteur mille
+ * d'un instrument à l'autre : sur le GC, la bougie de quinze minutes la plus
+ * calme brasse déjà un demi-milliard de dollars.
+ */
+function afficherEchelle(scores, o) {
+  const volumes = scores.map((s) => s.mesures.volume).filter((v) => v > 0);
+  if (volumes.length < 20) return;
+
+  const prix = mediane(scores.map((s) => s.mesures.cloture).filter(Number.isFinite));
+  const med = mediane(volumes);
+  const notionnel = (v) => (prix ? `  ≈ ${milliers((v * prix * o.tailleContrat) / 1e6)} M USD` : '');
+
+  console.log(`\n  ÉCHELLE — volume par bougie ${o.ut}`);
+  console.log(`    médiane        ${milliers(med).padStart(9)}${notionnel(med)}`);
+  console.log(`    q90            ${milliers(quantile(volumes, 0.9)).padStart(9)}${notionnel(quantile(volumes, 0.9))}`);
+  console.log(`    q99            ${milliers(quantile(volumes, 0.99)).padStart(9)}${notionnel(quantile(volumes, 0.99))}`);
+  console.log(`    maximum        ${milliers(Math.max(...volumes)).padStart(9)}${notionnel(Math.max(...volumes))}`
+    + `   soit ${(Math.max(...volumes) / med).toFixed(1)}× la médiane`);
+  if (o.tailleContrat !== 1) {
+    console.log(`    1 contrat = ${o.tailleContrat} unités  ·  ≈ ${milliers(prix * o.tailleContrat)} USD de notionnel`);
+  }
+}
 
 const ABREGE = { haussiere: 'haus', baissiere: 'bais', plate: 'plat', indetermine: '—' };
 const abrege = (t) => ABREGE[t] ?? '—';
@@ -188,6 +226,11 @@ async function main() {
 
   console.log(`${scores.length} bougies ${o.ut} scorées, référence sur ${o.fenetre} bougies glissantes\n`);
 
+  // L'échelle absolue, avant tout classement. Sans elle, « 4× la médiane » ne
+  // dit pas si on parle de dix contrats ou de dix mille — et l'intuition d'un
+  // marché se trompe d'un facteur mille d'un instrument à l'autre.
+  afficherEchelle(scores, o);
+
   const sansSemaine = scores.filter((s) => s.mesures.tendanceSemaine === 'indetermine').length;
   if (sansSemaine) {
     console.log(`${sansSemaine} bougies sans tendance hebdomadaire : moins d'une semaine d'historique dans leur contrat`);
@@ -231,12 +274,12 @@ async function main() {
         continue;
       }
 
-      console.log('     bande    score  date (UTC)         vol×méd  ampl×méd   jour   semaine   contre');
+      console.log('     bande    score  date (UTC)          volume  vol×méd   jour   semaine   contre');
       for (const r of retenus) {
         const m = r.mesures;
         console.log(
           `     ${r.bande.padEnd(7)} ${String(r.scores[detecteur]).padStart(6)}  ${iso(r.ms)}  `
-          + `${String(m.ratioVolume).padStart(7)}  ${String(m.ratioAmplitude).padStart(8)}  `
+          + `${milliers(m.volume).padStart(7)}  ${String(m.ratioVolume).padStart(7)}  `
           + `${abrege(m.tendanceJour).padStart(5)}  ${abrege(m.tendanceSemaine).padStart(8)}   `
           + `${contreCourant(m) ? '  ◀' : ''}${m.macro ? ' ⚠' : ''}`,
         );
