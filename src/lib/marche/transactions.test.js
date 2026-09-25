@@ -118,3 +118,45 @@ describe('agregerTransactions', () => {
     expect(() => agregerTransactions('ts_event,price,size\n', { unite: '15m' })).toThrow();
   });
 });
+
+// Le format réel, relevé sur un export Databento du 2026-06-03 (GC.v.0,
+// schéma `trades`). L'agrégateur avait été écrit contre la documentation
+// seule ; ces lignes sont la première confrontation aux vraies données, et
+// elles restent ici pour que le jour où Databento change une colonne, ce
+// soit un test qui le dise et non une mesure fausse.
+describe('format réel Databento', () => {
+  const REEL = [
+    'ts_recv,ts_event,rtype,publisher_id,instrument_id,action,side,depth,price,size,flags,ts_in_delta,sequence,symbol',
+    '2026-06-03T00:00:00.097079988Z,2026-06-03T00:00:00.096831017Z,0,1,42011464,T,A,0,4502.600000000,2,0,13778,48545978,GC.v.0',
+    '2026-06-03T00:00:00.294332674Z,2026-06-03T00:00:00.294056145Z,0,1,42011464,T,B,0,4503.200000000,1,0,14007,48547130,GC.v.0',
+    '2026-06-03T00:00:00.303863857Z,2026-06-03T00:00:00.303609059Z,0,1,42011464,T,B,0,4503.500000000,1,0,14766,48547340,GC.v.0',
+  ].join('\n');
+
+  it('préfère ts_event à ts_recv — l’heure de la bourse, pas celle de la réception', () => {
+    const c = repererColonnesTransactions(REEL.split('\n')[0].split(','));
+    expect(c.horodatage).toBe(1);
+  });
+
+  it('trouve prix, taille, côté et contrat malgré les colonnes intercalées', () => {
+    const c = repererColonnesTransactions(REEL.split('\n')[0].split(','));
+    expect(c).toMatchObject({ prix: 8, taille: 9, cote: 6, action: 5, contrat: 4 });
+  });
+
+  it('encaisse l’horodatage à la nanoseconde', () => {
+    const { bougies } = agregerTransactions(REEL, { unite: '15m' });
+    expect(new Date(bougies[0].ouvertureMs).toISOString()).toBe('2026-06-03T00:00:00.000Z');
+  });
+
+  it('ventile le vrai côté de l’agresseur : A vend, B achète', () => {
+    const { bougies } = agregerTransactions(REEL, { unite: '15m' });
+    expect(bougies[0]).toMatchObject({
+      volume: 4, volumeAcheteur: 2, volumeVendeur: 2, delta: 0, symbole: '42011464',
+    });
+  });
+
+  it('lit un prix à neuf décimales sans le tronquer', () => {
+    const { bougies } = agregerTransactions(REEL, { unite: '15m' });
+    expect(bougies[0].ouverture).toBe(4502.6);
+    expect(bougies[0].plusHaut).toBe(4503.5);
+  });
+});
