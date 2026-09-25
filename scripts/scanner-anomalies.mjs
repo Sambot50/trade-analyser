@@ -22,8 +22,33 @@ import { decouperParContrat } from '../src/lib/marche/contrats.js';
 import { scorerSegment, meilleurs, echantillonStratifie, DETECTEURS } from '../src/lib/marche/anomalies.js';
 import { parseArgs } from './backtest.mjs';
 
+/**
+ * Quinze minutes, et ce n'est pas un réglage arbitraire.
+ *
+ * Trois sources indépendantes encadrent la même fenêtre :
+ *
+ * LA MICROSTRUCTURE, qui porte sur ce qu'on détecte réellement — le temps
+ * qu'un institutionnel met à exécuter. Un ordre valant 0,01 % du volume passe
+ * en ~200 secondes, un ordre à 10 % du volume en ~90 minutes. Le cadre
+ * Almgren–Chriss, standard de l'exécution algorithmique, découpe le temps en
+ * tranches de 5 à 10 minutes ; les algorithmes VWAP profilent le volume par
+ * segments de 15 minutes — exactement ce que fait ce scanner.
+ *
+ * LA PRATIQUE SMC, qui place l'entrée en 15 minutes sous un biais 4 h. C'est
+ * de l'opinion sans mesure, mais elle tombe au même endroit.
+ *
+ * NOTRE PROPRE MESURE sur l'or. Le rapport du volume à sa médiane glissante
+ * se distribue identiquement de 1 à 15 minutes — q90 à 2,75 / 2,64 / 2,61.
+ * Ça se dégrade à 30 minutes et s'effondre à 1 heure, où le maximum tombe de
+ * 38× à 9×. Au-delà de 15 minutes, on efface l'anomalie en l'agrégeant.
+ *
+ * Dans cette fenêtre de 5 à 15, un seul critère départage : le contexte
+ * visible. Quatre-vingt-dix bougies de 15 minutes montrent 22 heures, soit
+ * une séance entière — de quoi juger une structure. À 5 minutes, sept heures
+ * et demie ; à 1 minute, une heure et demie, où rien ne se lit.
+ */
 const DEFAUTS = {
-  ut: '5m', utCsv: '1m', decalageHeures: 0,
+  ut: '15m', utCsv: '1m', decalageHeures: 0,
   fenetre: 60, nombre: 20, ecartMinutes: 120,
 };
 

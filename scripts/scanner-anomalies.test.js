@@ -23,7 +23,7 @@ describe('options du scanner', () => {
 
   it('retient des défauts explicites', () => {
     expect(validerOptions({ csv: 'x.csv' })).toMatchObject({
-      ut: '5m', utCsv: '1m', fenetre: 60, nombre: 20, ecartMinutes: 120,
+      ut: '15m', utCsv: '1m', fenetre: 60, nombre: 20, ecartMinutes: 120,
     });
   });
 });
