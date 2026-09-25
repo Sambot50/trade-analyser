@@ -1369,3 +1369,129 @@ C'est une hypothèse distincte et peut-être meilleure. Elle ne sera pas testée
 en remplacement de celle-ci après son échec.
 
 **« 2023-2024 est une période particulière. »** Refusée, comme partout ailleurs.
+
+---
+
+## DEC-029 — L'hypothèse du volume est réfutée. La détection mécanique est close.
+
+**2026-09-24 · Verdict, rendu par le protocole**
+
+### Le résultat
+
+`node scripts/tester-hypothese.mjs cas-or.jsonl volumeRapporteALaMoyenne 1.1`
+
+```
+  taux global        50.3 % [43.0 % – 57.5 %]
+  au-dessus du seuil 50.0 % [36.6 % – 63.4 %]   n = 50
+  en-dessous         50.4 % [41.9 % – 58.9 %]   n = 129
+  écart              -0.4 pts   (z = -0.047)
+
+  p (non corrigé, une seule hypothèse)   0.57921
+  1158/2000 permutations font aussi bien
+```
+
+**Verdict DEC-024 : abandon.** Écart nul ou inversé — un effet de signe opposé
+n'est pas une confirmation.
+
+### La prédiction, écrite avant les données
+
+DEC-028 a consigné ce qu'on attendait, précisément pour rendre ce moment
+impossible à négocier :
+
+| | Prédit | Mesuré |
+|---|---|---|
+| Sous le seuil | ~45 % | **50,4 %** |
+| Au-dessus | ~60 % | **50,0 %** |
+| Écart | ~+15 points | **−0,4 point** |
+
+Rien n'a répliqué. Pas une atténuation de l'effet : son absence complète.
+
+### Le test est concluant, pas non concluant
+
+**50 cas au-dessus du seuil**, contre 40 exigés par DEC-024. La taille
+d'échantillon ne fournit aucune échappatoire.
+
+### Le mécanisme proposé est mort avec l'hypothèse
+
+L'exploration BTC ne disait pas seulement « un seuil sépare ». Elle disait
+**pourquoi** : les order blocks posés sur une bougie anormalement calme
+perdaient — 45,2 % sous 1,1×, bien en dessous du hasard — et le filtre était
+censé les jeter.
+
+Sur l'or, les order blocks sous le seuil font **50,4 %**. Il n'y a pas de
+mauvais élèves à écarter. L'explication était aussi fausse que l'effet.
+
+### Ce que le contrôle avait déjà dit
+
+Le contrôle par permutation sur BTC au seuil 1,25× donnait `p = 0,070`, et le
+meilleur tirage de hasard atteignait 64,4 % contre nos 59,5 %.
+
+C'était suffisant pour refuser, et ça a quand même été présenté en séance comme
+« le signal le plus intéressant depuis le début du projet ». L'enthousiasme
+portait sur du bruit. Le protocole a rattrapé l'erreur, ce qui est exactement
+sa fonction — mais il ne l'aurait pas fait si on avait cédé à la tentation de
+relancer le contrôle à 1,1× jusqu'à passer sous 0,05.
+
+### La règle de base n'a pas sauvé l'or non plus
+
+Même exécution, sans critère de volume : **50,3 %** sur 179 issues tranchées,
+espérance **+0,006 R**, rapport faveur/contre 1,03.
+
+DEC-027 exige le contrôle par permutation pour un verdict formel. Il peut
+tourner pour la trace, mais une espérance à six millièmes de R ne battra aucune
+distribution de tirages : sur BTC, la médiane des tirages était à −0,035 R avec
+une étendue de −0,52 à +0,29 R.
+
+### La clôture, telle qu'elle était écrite
+
+DEC-028 :
+
+> Si elle échoue, la détection mécanique est close : pas d'autre seuil, pas
+> d'autre marché, pas d'autre période, pas de variante « volume de
+> l'impulsion » repêchée dans la foulée.
+
+Cette variante avait été nommée d'avance parce qu'on savait qu'elle
+reviendrait à l'esprit au moment de l'échec. Elle est revenue. Elle ne se
+testera pas.
+
+**Bilan de la détection mécanique : six jeux de données, six refus.** Cinq en
+crypto (DEC-025), un sur l'or COMEX. Deux marchés, deux structures temporelles,
+avec et sans volume réel, avec et sans bourse centrale.
+
+Le registre `PISTES.md` reste fermé sur ce sujet. Une piste n'en sort que si
+une mesure la désigne — et il n'y a plus de mesure à faire.
+
+### Ce qui survit
+
+**Un fait, établi sur deux marchés et trois échantillons.** La bougie d'order
+block porte **moins** de volume que la moyenne des vingt précédentes :
+
+| Échantillon | Médiane |
+|---|---|
+| BTCUSDT, 3 mois | 0,75× |
+| BTCUSDT, 2 ans | 0,79× |
+| GC COMEX, 2 ans | **0,64×** |
+
+La raison est mécanique : l'order block est la dernière bougie de **repli**
+avant l'impulsion. C'est une pause ; le volume est dans le mouvement qui suit.
+La littérature SMC affirme le contraire — « empreinte institutionnelle », « pic
+de volume qui valide l'order block ». C'est faux, et on peut le montrer.
+
+Ce fait ne dépend d'aucune hypothèse réfutée ici.
+
+**Un appareil de mesure.** En une journée il a tué trois artefacts dans notre
+propre code — antériorité d'horodatage, dépendance au fuseau de la machine,
+lecture positionnelle des colonnes — et il vient de refuser une hypothèse à
+laquelle son auteur croyait. C'est le seul actif réel du projet.
+
+### La suite
+
+**Le chemin vision**, choisi par DEC-025 et jamais touché depuis. Zéro mesure à
+ce jour, alors que c'est le point de départ du projet : la lecture d'un
+graphique par un modèle, où le jugement est explicite plutôt qu'encodé dans une
+règle.
+
+La première chose à y construire n'est pas une analyse. C'est le **contrôle** :
+rejouer la géométrie du plan proposé à des instants tirés au sort. Sans lui, on
+recommencera exactement ce qui vient d'être réfuté, avec un modèle à la place
+d'une formule.

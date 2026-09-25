@@ -154,6 +154,21 @@ il ne permettra jamais de dire « les acheteurs dominaient ».
 
 ---
 
+## La détection mécanique est close
+
+**DEC-029, le 2026-09-24.** Six jeux de données, six refus : cinq en crypto,
+un sur l'or COMEX. Deux marchés, deux structures temporelles, avec et sans
+volume réel, avec et sans bourse centrale.
+
+Aucune piste de ce fichier portant sur la **détection mécanique d'order blocks**
+ne sortira plus : ni un autre seuil, ni un autre marché, ni une autre période,
+ni une variante de définition. Il n'y a plus de mesure à faire, donc plus rien
+qui puisse désigner une piste.
+
+Les entrées correspondantes restent écrites, pour que la barre reste visible.
+
+---
+
 ## Questions entières, jamais ouvertes
 
 - **L'or et les instruments à faible spread.** Permis par DEC-018 puisque c'est
@@ -183,3 +198,5 @@ Pour mémoire, afin que la barre reste visible.
 | Filtre de biais | Une commande gratuite jamais lancée | 2026-09-24 — il ne gagne rien, 3,4 points pour 4,1 d'erreur-type |
 | Largeur de zone et volume | Sortis en tête de l'exploration, `p` corrigé à 0,0547 | DEC-024 puis **DEC-025 — réfutés** : −0,2 point sur données fraîches |
 | COMEX | **Par décision, pas par son déclencheur** — celui-ci s'était éteint avec DEC-025 | DEC-027 — devient la source du dernier test de la règle mécanique |
+| Volume comme critère de détection | Exploration BTC, puis pré-enregistrement | DEC-028 puis **DEC-029 — réfutée** : −0,4 point sur l'or, p = 0,579 |
+| **Volume de l'impulsion** (`OBVolume`) | Nommée d'avance dans les excuses écartées de DEC-028 | **Close sans test** — c'est la variante que la clause de clôture interdit de repêcher |

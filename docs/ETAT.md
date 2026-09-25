@@ -605,3 +605,67 @@ Le seuil a été choisi après avoir vu ces données, qui sont désormais brûl�
 elles ne peuvent plus rien prouver. Le contrôle à 1,1× n'a pas été lancé
 délibérément — corrigé pour deux tirages emboîtés, il ne pourrait pas sauver le
 résultat, seulement en donner l'illusion.
+
+
+---
+
+## Le test de l'or — GC COMEX 2023-2024, 2026-09-24
+
+Premier jeu de données du projet portant **un volume réel sur l'or**, depuis une
+bourse centralisée, découpé contrat par contrat sans aucun recollage.
+
+### Les vérifications, avant tout résultat
+
+| | Attendu | Obtenu |
+|---|---|---|
+| Bougies 1 minute | ~700 000 | 697 994 |
+| Couverture | ~66 % | 66,5 % |
+| **Contrats distincts** | ~12 | **11** |
+| Période | 2023-01 → 2024-12 | 2023-01-02 → 2024-12-31 |
+
+Les bornes des segments reproduisent le calendrier réel du GC — février, avril,
+juin, août, décembre — avec deux périodes de quatre mois là où aucune échéance
+liquide ne s'intercale entre août et décembre. Le découpage ne fait pas que
+fonctionner : il retrouve une structure qu'on ne lui a pas donnée.
+
+Deux écarts annoncés **avant** la lecture des résultats : le fichier commence le
+2023-01-02 à 23:00 UTC (Globex fermé pour le Nouvel An, 1,9 jour manquant), et
+`2024-09-18` est marquée « degraded » par le fournisseur.
+
+### La règle de base
+
+```
+atteint 1 R avant le stop   50,3 %  (90/179)
+intervalle de confiance     [43,0 % – 57,5 %]
+espérance par trade         +0,006 R
+rapport faveur / contre     1,03
+```
+
+Le hasard, comme sur les cinq jeux crypto.
+
+### L'hypothèse du volume — réfutée
+
+```
+au-dessus de 1,1×   50,0 %   n = 50
+en-dessous          50,4 %   n = 129
+écart               −0,4 pt   (z = −0,047)
+p                   0,579     1158/2000 permutations font aussi bien
+```
+
+Prédiction de DEC-028 : ~45 % en dessous, ~60 % au-dessus, écart de ~15 points.
+**Rien n'a répliqué.** Voir DEC-029.
+
+### Le fait qui survit
+
+| Échantillon | Médiane du volume de la bougie d'order block |
+|---|---|
+| BTCUSDT, 3 mois | 0,75× |
+| BTCUSDT, 2 ans | 0,79× |
+| **GC COMEX, 2 ans** | **0,64×** |
+
+La bougie d'order block porte **moins** de volume que la moyenne des vingt
+précédentes. Deux marchés, trois échantillons, une seule direction — et sur
+l'or, le premier quartile tombe à 0,38×.
+
+C'est mesuré, c'est reproductible, et c'est l'inverse de ce qu'annonce la
+littérature SMC. Ce fait ne dépend d'aucune hypothèse réfutée.
