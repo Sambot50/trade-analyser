@@ -1887,3 +1887,63 @@ complet se justifie — pré-enregistré lui aussi, et avec ses coûts.
 
 Si elle est non, HYP-001 rejoint les six réfutations, et le projet se clôt sur
 un résultat honnête plutôt que sur une conviction.
+
+### HYP-002 — Résultat, 2026-09-25
+
+**RÉPLIQUÉE.** Exécutée une fois, sur cinq marchés jamais ouverts, achetés
+22,52 USD après le gel. Six millions de bougies d'une minute, 115 contrats.
+
+| marché | détectées | témoin | écart |
+|---|---|---|---|
+| CL pétrole | 1 732 à 49,1 % | 11 342 à 50,3 % | **−1,19** ± 1,29 |
+| ES indice | 4 787 à 52,2 % | 14 015 à 52,0 % | **+0,21** ± 0,84 |
+| HG cuivre | 1 514 à 54,7 % | 15 853 à 50,3 % | **+4,35** ± 1,34 |
+| PL platine | 1 759 à 51,9 % | 16 086 à 50,3 % | **+1,60** ± 1,26 |
+| SI argent | 1 376 à 53,1 % | 16 849 à 49,8 % | **+3,31** ± 1,40 |
+
+Regroupement en variance inverse : **+1,26 point**, erreur type 0,518,
+z = 2,43, **p unilatéral = 0,0076**. Le garde-fou de puissance n'a pas eu à
+jouer : 0,518 est très en dessous du maximum utile de 2,055.
+
+Première fois en huit hypothèses qu'un effet survit à une épreuve décidée
+d'avance sur des données jamais regardées.
+
+#### Trois réserves, écrites le même jour
+
+**Ce n'est pas un effet universel, c'est un effet de métaux.** Le découpage
+était pré-spécifié, avant tout téléchargement :
+
+| | écart | p |
+|---|---|---|
+| métaux — HG, PL, SI | **+3,02** ± 0,77 | 0,00004 |
+| hors métaux — CL, ES | **−0,21** ± 0,70 | 0,62 |
+
+Le pré-enregistrement disait : *« S'il apparaît aussi sur ES, c'est une
+propriété de microstructure, bien plus surprenante. »* Il n'y apparaît pas.
+Le pétrole est même négatif. La portée de HYP-001 se réduit donc aux métaux.
+
+**Les cinq marchés ne mesurent pas la même chose.** Q de Cochran = 12,70 à
+4 degrés de liberté, p ≈ 0,013, **I² = 69 %**. Les écarts s'étalent de −1,19
+à +4,35, trop largement pour du hasard.
+
+Le regroupement à effets fixes suppose un effet commun ; cette supposition est
+fausse. Le verdict tient — la règle gelée nommait le regroupement, et le
+regroupement est positif — mais **le p de 0,0076 est trop flatteur** et ne
+doit pas être cité comme un chiffre solide.
+
+**L'amplitude vaut le quart de la référence.** +1,26 point contre +5,11 sur
+l'or ; +3,02 sur les métaux seuls, soit 40 % de moins que la référence. C'est
+la régression vers la moyenne ordinaire : un premier résultat marginal
+surestime toujours son effet. La valeur à retenir pour la suite est +3,02, pas
++5,11.
+
+#### Ce qui est établi, et rien de plus
+
+> Sur les métaux — or, argent, platine, cuivre — en bougies de quinze minutes,
+> une bougie dont le volume dépasse quatre fois la médiane glissante, à
+> l'intérieur d'une semaine haussière, atteint 3R avant 1R environ **trois
+> points** plus souvent qu'une bougie ordinaire de la même famille.
+
+Pas sur le pétrole. Pas sur les indices. Et toujours **pas une stratégie** :
+aucun coût compté, aucune entrée décidée, et un témoin qui rapporte déjà
++1,12 R par lui-même — la hausse des métaux sur la période, pas un edge.
