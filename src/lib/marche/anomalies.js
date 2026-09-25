@@ -49,7 +49,22 @@ const MECHE_MINIMALE = 0.6;
  * personne. Un détecteur doit pouvoir répondre non.
  */
 const PIC_MINIMUM = 4;
-const GAP_MINIMUM = 1;
+
+/**
+ * Un demi-écart, et non un écart entier.
+ *
+ * Choisi sur mesure, pas au jugé. L'or s'échange presque sans interruption,
+ * donc les vrais sauts sont rares — comptés sur 15,8 jours de GC :
+ *
+ *   ≥ 0,25 amplitude   20 évènements   ~460 par an
+ *   ≥ 0,50             5               ~116
+ *   ≥ 1,00             2                ~46
+ *
+ * À un écart entier il ne restait que deux évènements, trop peu pour
+ * échantillonner quoi que ce soit. Un demi garde la sélectivité — 0,16 % des
+ * bougies — avec de quoi remplir les quatre bandes.
+ */
+const GAP_MINIMUM = 0.5;
 
 /**
  * Heures de New York où tombent l'essentiel des publications américaines :
@@ -194,7 +209,7 @@ export function scorerSegment(bougies, { fenetre = 60 } = {}) {
         horsSeance: heureCreuse ? arrondir((b.volume || 0) / medHoraire) : 0,
         // Saut de prix entre deux bougies. Jamais calculé au travers d'un
         // roulement, puisque le segment n'en contient aucun. Le saut doit
-        // valoir au moins une bougie entière pour mériter le nom de gap.
+        // valoir au moins une demi-amplitude médiane pour mériter le nom.
         gap: ecartOuverture / medAmplitude >= GAP_MINIMUM ? arrondir(ecartOuverture / medAmplitude) : 0,
         picVolume: ratioVolume >= PIC_MINIMUM ? arrondir(ratioVolume) : 0,
       },
