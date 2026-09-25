@@ -42,6 +42,8 @@ const COULEURS = {
   titre: '#E2E8F0',
   hausse: '#10B981',
   baisse: '#EF4444',
+  marque: '#FACC15',
+  apres: '#F8FAFC',
 };
 
 /** Échelons de grille lisibles : 1, 2 et 5 fois une puissance de dix. */
@@ -93,11 +95,20 @@ const echappe = (t) => String(t).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '
 /**
  * Trace les bougies fournies et rend l'image avec l'échelle exacte utilisée.
  *
- * @param libelle  nom de l'instrument, écrit en haut à gauche
- * @param unite    unité de temps, pour l'étiquette et la durée des bougies
- * @returns { svg, echelle, nombreBougies, debutMs, finMs, avecVolume }
+ * @param libelle   nom de l'instrument, écrit en haut à gauche
+ * @param unite     unité de temps, pour l'étiquette et la durée des bougies
+ * @param marquerMs ouverture d'une bougie à signaler à l'œil. Ce qui suit
+ *                  cette bougie est légèrement éclairci : c'est « ce qui
+ *                  s'est passé ensuite ».
+ *
+ *                  **Réservé à l'inspection.** Une image qui montre la suite
+ *                  ne peut jamais servir à une mesure : le modèle, ou l'œil,
+ *                  y lirait la réponse. Les images de mesure s'arrêtent à
+ *                  l'instant analysé, et `fenetreJusqua` s'en charge.
+ *
+ * @returns { svg, echelle, nombreBougies, debutMs, finMs, avecVolume, indexMarque }
  */
-export function tracerGraphique(bougies, { libelle = '', unite = '1h' } = {}) {
+export function tracerGraphique(bougies, { libelle = '', unite = '1h', marquerMs = null } = {}) {
   if (!Array.isArray(bougies) || !bougies.length) throw new Error('Aucune bougie à tracer.');
 
   const avecVolume = bougies.some((b) => Number.isFinite(b.volume) && b.volume > 0);
@@ -113,7 +124,20 @@ export function tracerGraphique(bougies, { libelle = '', unite = '1h' } = {}) {
   const pas = pasDeGrille(priceTop - priceBottom);
   const decimales = decimalesPour(pas);
 
+  const indexMarque = marquerMs === null ? -1 : bougies.findIndex((b) => b.ouvertureMs === marquerMs);
+  const xDe = (i) => GEOMETRIE.gaucheX + creneau * i;
+
   const parts = [`<rect width="${GEOMETRIE.largeur}" height="${GEOMETRIE.hauteur}" fill="${COULEURS.fond}"/>`];
+
+  // Ce qui suit la bougie marquée, éclairci. Posé AVANT la grille et les
+  // bougies pour rester un fond, pas un voile.
+  if (indexMarque >= 0 && indexMarque < bougies.length - 1) {
+    const x = xDe(indexMarque + 1);
+    parts.push(
+      `<rect x="${x.toFixed(1)}" y="${GEOMETRIE.hautY}" width="${(GEOMETRIE.droiteX - x).toFixed(1)}" `
+      + `height="${GEOMETRIE.volumeBasY - GEOMETRIE.hautY}" fill="${COULEURS.apres}" opacity="0.045"/>`,
+    );
+  }
 
   for (let p = Math.ceil(priceBottom / pas) * pas; p <= priceTop; p += pas) {
     const py = y(p).toFixed(1);
@@ -139,6 +163,20 @@ export function tracerGraphique(bougies, { libelle = '', unite = '1h' } = {}) {
     }
   });
 
+  // La bougie marquée : un bandeau vertical derrière elle ne masque rien et
+  // se repère d'un coup d'œil parmi quatre-vingt-dix bougies.
+  if (indexMarque >= 0) {
+    const x = xDe(indexMarque);
+    parts.push(
+      `<rect x="${x.toFixed(1)}" y="${GEOMETRIE.hautY}" width="${creneau.toFixed(1)}" `
+      + `height="${GEOMETRIE.volumeBasY - GEOMETRIE.hautY}" fill="${COULEURS.marque}" opacity="0.16"/>`,
+    );
+    parts.push(
+      `<text x="${(x + creneau / 2).toFixed(1)}" y="${GEOMETRIE.hautY - 8}" fill="${COULEURS.marque}" `
+      + `font-family="sans-serif" font-size="13" text-anchor="middle">▼</text>`,
+    );
+  }
+
   parts.push(`<line x1="${GEOMETRIE.gaucheX}" y1="${basY}" x2="${GEOMETRIE.droiteX}" y2="${basY}" stroke="${COULEURS.axe}" stroke-width="1"/>`);
   if (avecVolume) {
     parts.push(`<line x1="${GEOMETRIE.gaucheX}" y1="${GEOMETRIE.volumeBasY}" x2="${GEOMETRIE.droiteX}" y2="${GEOMETRIE.volumeBasY}" stroke="${COULEURS.axe}" stroke-width="1"/>`);
@@ -150,6 +188,7 @@ export function tracerGraphique(bougies, { libelle = '', unite = '1h' } = {}) {
     svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${GEOMETRIE.largeur}" height="${GEOMETRIE.hauteur}" viewBox="0 0 ${GEOMETRIE.largeur} ${GEOMETRIE.hauteur}">${parts.join('')}</svg>`,
     echelle,
     nombreBougies: bougies.length,
+    indexMarque,
     debutMs: bougies[0].ouvertureMs,
     finMs: bougies.at(-1).fermetureMs ?? bougies.at(-1).ouvertureMs + dureeUnite(unite) - 1,
     avecVolume,

@@ -103,3 +103,34 @@ describe('tracé', () => {
     expect(() => tracerGraphique([], { libelle: 'X' })).toThrow(/Aucune bougie/);
   });
 });
+
+describe('marquage pour l’inspection', () => {
+  it('marque la bougie dont on donne l’ouverture', () => {
+    const bougies = serie(30);
+    const r = tracerGraphique(bougies, { libelle: 'GC', marquerMs: bougies[12].ouvertureMs });
+    expect(r.indexMarque).toBe(12);
+    expect(r.svg).toContain('▼');
+  });
+
+  it('ne marque rien quand on ne demande rien', () => {
+    const r = tracerGraphique(serie(30), { libelle: 'GC' });
+    expect(r.indexMarque).toBe(-1);
+    expect(r.svg).not.toContain('▼');
+  });
+
+  it('rend -1 plutôt que de marquer au hasard un instant absent', () => {
+    expect(tracerGraphique(serie(30), { libelle: 'GC', marquerMs: 999_999_999 }).indexMarque).toBe(-1);
+  });
+
+  /**
+   * L'éclaircissement du « après » n'a de sens que s'il y a un après. Sur la
+   * dernière bougie, il ne doit rien peindre.
+   */
+  it('n’éclaircit rien quand la bougie marquée est la dernière', () => {
+    const bougies = serie(20);
+    const derniere = tracerGraphique(bougies, { libelle: 'GC', marquerMs: bougies.at(-1).ouvertureMs });
+    const milieu = tracerGraphique(bougies, { libelle: 'GC', marquerMs: bougies[10].ouvertureMs });
+    expect(derniere.svg.match(/opacity="0.045"/g)).toBeNull();
+    expect(milieu.svg.match(/opacity="0.045"/g)).toHaveLength(1);
+  });
+});
