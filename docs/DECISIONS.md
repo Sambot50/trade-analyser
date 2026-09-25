@@ -1584,3 +1584,178 @@ résultat est nette et cohérente sur trois échelles, mais elle repose sur une
 seule séance. Un mois — 2,52 USD, déjà chiffré — la trancherait définitivement.
 Tant qu'il n'est pas acheté, DEC-030 est établie en direction, pas en
 magnitude.
+
+---
+
+## HYP-001 — Pré-enregistrement, gelé le 2026-09-25
+
+**Gelé AVANT d'avoir ouvert la moindre donnée postérieure au 2024-12-31.**
+Rien de ce qui suit ne peut être modifié après la première exécution du test.
+Un paramètre retouché après coup annule l'épreuve — c'est la seule règle qui
+donne sa valeur au résultat.
+
+### L'énoncé
+
+> Sur GC COMEX, en bougies de quinze minutes, une bougie détectée `picVolume`
+> dont la clôture est au-dessus de son ouverture, à l'intérieur d'une semaine
+> haussière, atteint **3R avant de perdre 1R** plus souvent que les bougies
+> **non détectées de la même famille**.
+
+Écart attendu : **+5,5 points** (59,0 % contre 53,5 % mesurés sur 2023-2024).
+
+### Les paramètres, figés
+
+| | |
+|---|---|
+| Instrument | GC COMEX, contrat continu, découpé par `instrument_id` |
+| Unité | 15 min, agrégée depuis 1 min |
+| Détecteur | `picVolume` seul, seuil `PIC_MINIMUM = 4` |
+| Fenêtre de référence | 60 bougies glissantes |
+| Famille | `hausse-achat` lue sur la semaine (672 bougies en arrière) |
+| Horizon | 24 h = 96 bougies |
+| Objectif / stop | 3R / 1R, R = hauteur de la bougie détectée |
+| Verdicts comptés | `atteint` et `perdu` seuls ; `ambigu` exclu du dénominateur |
+| Fenêtres macro | exclues |
+| Témoin | même famille, `picVolume === 0`, mêmes exclusions |
+
+### La période d'épreuve
+
+**2025-01-01 → 2026-09-01.** Vingt mois, jamais ouverts.
+
+Douze mois ne suffisaient pas : la puissance n'y serait que de 64 %, soit plus
+d'une chance sur trois de manquer un effet réel. Vingt mois portent la
+puissance à **83 %**, pour un écart minimal détectable de 5,28 points — juste
+en dessous des 5,5 attendus.
+
+### La règle de décision
+
+Test **unilatéral** — la direction était prédite — au seuil de 5 %, sur **une
+seule** comparaison. Plus de correction pour vingt-quatre cellules : il n'y a
+plus qu'une cellule.
+
+- écart > 0 **et** p < 0,05 → **CONFIRMÉE**
+- écart > 0 **et** p ≥ 0,05 → **NON CONFIRMÉE**
+- écart ≤ 0 → **RÉFUTÉE**
+
+Aucun quatrième cas. Aucune relecture « en tenant compte de ».
+
+### Ce que HYP-001 n'est pas
+
+Ce n'est **pas** une stratégie. Aucune entrée n'est décidée, aucun coût n'est
+compté, aucun glissement n'est simulé. Un écart de cinq points sur un taux de
+réussite ne dit rien du rendement d'un système qui paierait un spread à chaque
+passage.
+
+C'est la question minimale : **une bougie à volume anormal se comporte-t-elle
+autrement qu'une bougie quelconque ?** Six fois, la réponse a été non.
+
+### Pourquoi celle-ci mérite une épreuve
+
+Sur 2023-2024, vingt-quatre cellules ont été examinées. Une seule dépasse le
+bruit, et elle bascule selon l'arrondi : p × 24 vaut 0,047 avec l'écart
+affiché (+6,0), 0,109 avec l'écart calculé (+5,5). Rien n'est établi.
+
+Deux faits la maintiennent en vie malgré tout. `hausse-achat` est la **seule**
+famille où faveur et contre se séparent franchement — médiane 2,79 R contre
+2,09 R, q90 **8,92 R** contre 5,87 R. Cette asymétrie de queue expliquerait
+qu'un effet n'apparaisse qu'à 3R et nulle part ailleurs.
+
+Contre elle : le miroir échoue. `baisse-vente` devrait monter de même, elle
+est à −1,2. Et l'hypothèse a été formée **après** avoir regardé les données.
+
+C'est précisément pourquoi elle ne vaut qu'une chose : une épreuve sur une
+période jamais ouverte, décidée d'avance, exécutée une fois.
+
+### HYP-001 — Résultat, 2026-09-25
+
+**CONFIRMÉE.** Exécutée une fois, sur `GC_2025_2026.csv` — 583 218 bougies
+d'une minute, 2025-01-01 → 2026-08-31, 10 contrats, achetées 2,13 USD après le
+gel et jamais ouvertes avant.
+
+| | détectées | témoin |
+|---|---|---|
+| effectif | 272 | 8 788 |
+| 3R atteint avant 1R perdu | **58,1 %** | **53,0 %** |
+
+Écart **+5,11 points** · erreur type 3,078 · z = 1,66 · **p unilatéral = 0,0486**
+
+C'est la première fois, en sept hypothèses, qu'un effet survit à une période
+jamais regardée sous une règle décidée d'avance.
+
+#### Quatre réserves, écrites le même jour que le résultat
+
+**La marge est d'un vingtième de point.** Le seuil de passage était à 5,06
+points ; l'écart obtenu vaut 5,11. Quatre cas classés autrement et le verdict
+s'inversait. Un résultat à p = 0,049 est, statistiquement, le profil type de
+ce qui ne se reproduit pas.
+
+**La puissance annoncée était fausse.** Le pré-enregistrement promettait 83 %,
+sur une prévision de 601 cas extrapolée des 721 de 2023-2024. Il y en a eu
+**272** — moins de la moitié. L'erreur type réelle vaut 3,078 au lieu de
+2,124, ce qui ramène la puissance à **56 %**. La décision de tester vingt mois
+plutôt que douze a donc été prise sur un chiffre erroné. Cela n'invalide pas
+le verdict — un test sous-puissant qui trouve quand même reste un test qui
+trouve — mais la période choisie l'a été pour une raison qui ne tenait pas.
+
+**Les jours dégradés n'ont pas été exclus.** Databento en signale au moins
+trois (2025-09-17, 2025-09-24, 2025-11-28). Le gel n'en parlait pas ; les
+retirer après coup aurait été l'ajustement que tout ce dispositif sert à
+empêcher. Réserve connue, non corrigée.
+
+**Le calcul de p repose sur une approximation.** `phi` implémente Abramowitz &
+Stegun 7.1.26 ; un calcul indépendant en Python donne 0,0484 contre 0,0486.
+L'écart est négligeable en soi, mais à cette marge il méritait d'être vérifié
+plutôt que supposé. Les deux calculs concluent identiquement.
+
+#### Ce qui a le mieux répliqué : l'amplitude, pas le seuil
+
+| | 2023-2024 | 2025-2026 | écart |
+|---|---|---|---|
+| détectées | 59,0 % | 58,1 % | −0,9 |
+| témoin | 53,5 % | 53,0 % | −0,5 |
+| **différence** | **+5,5** | **+5,11** | **−0,39** |
+
+Les trois valeurs atterrissent où elles étaient attendues, sur une autre
+période, un autre régime de prix et un autre jeu de contrats. **C'est la
+partie solide du résultat**, et elle vaut mieux que le p : un hasard franchit
+un seuil bien plus souvent qu'il ne reproduit une forme.
+
+#### La réalité économique, qui refroidit
+
+Espérance par passage, **sans aucun coût** :
+
+| | |
+|---|---|
+| détectées | +1,324 R |
+| témoin | **+1,120 R** |
+| **apport du détecteur** | **+0,204 R** |
+
+Le témoin — une bougie **quelconque** dans une semaine haussière — rapporte
+déjà +1,12 R. Ce n'est pas un edge, c'est la hausse de l'or lue avec un
+objectif à 3R et un stop à 1R. Cela s'inverserait dans un marché baissier et
+ne survivrait pas aux frais.
+
+Ce que le détecteur apporte réellement, c'est **+0,204 R au-dessus de ce
+fond**. Tout chiffre plus flatteur mélange l'effet et la dérive.
+
+#### Ce que HYP-001 n'établit pas
+
+Ni une stratégie, ni une rentabilité, ni un edge exploitable. Aucun spread,
+aucun glissement, aucune règle d'entrée, aucune taille de position. La moitié
+du gain apparent est la tendance du marché sous-jacent.
+
+Ce qui est établi, et seulement cela : *parmi les bougies de quinze minutes
+situées dans une semaine haussière sur GC COMEX, celles dont le volume dépasse
+quatre fois la médiane glissante atteignent 3R avant 1R environ cinq points
+plus souvent que les autres.*
+
+#### La suite : répliquer, pas construire
+
+Un résultat marginal et sous-puissant appelle une **réplication
+indépendante**, pas un système. La même règle gelée, sans en changer une
+virgule, sur d'autres marchés — argent, platine, cuivre. Quelques dollars de
+données OHLCV.
+
+Si l'effet s'y retrouve, il est réel et le système complet se justifie. S'il
+disparaît, HYP-001 rejoint les six autres, et le projet se clôt sur un
+résultat honnête plutôt que sur une conviction.
