@@ -40,3 +40,23 @@ describe('garde d’exécution des scripts', () => {
     },
   );
 });
+
+// Deuxième défaut silencieux du même genre, trouvé le même jour.
+//
+// `parseArgs` met les noms d'options en camel : `--seuil-volume` arrive dans
+// `args.seuilVolume`. Un script qui lit `args['seuil-volume']` reçoit
+// undefined et retombe sur sa valeur par défaut. Aucune erreur n'est levée,
+// la sortie a l'air normale — elle est simplement calculée avec une option
+// que l'utilisateur croit avoir passée.
+//
+// Le cas réel : une mesure lancée avec `--seuil-volume 1266` a rendu
+// exactement le même résultat que sans seuil. On a failli le prendre pour
+// une propriété des données.
+const KEBAB = /args\[\s*['"][a-z0-9]+-[a-z0-9-]+['"]\s*\]/;
+
+describe('lecture des options de ligne de commande', () => {
+  it.each(scripts)('%s ne lit pas une option en tirets, toujours undefined', (_nom, source) => {
+    const trouve = source.match(KEBAB);
+    expect(trouve?.[0] ?? null).toBeNull();
+  });
+});

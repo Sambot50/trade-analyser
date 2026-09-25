@@ -30,10 +30,12 @@ export function validerOptions(args) {
     if (!UNITES[args.ut]) throw new Error(`--ut inconnue : ${args.ut}. Connues : ${Object.keys(UNITES).join(', ')}`);
     o.ut = args.ut;
   }
-  if (args['decalage-heures'] !== undefined) o.decalageHeures = Number(args['decalage-heures']);
+  // parseArgs convertit --decalage-heures en decalageHeures : lire la forme
+  // en tirets rendrait undefined, sans le moindre avertissement.
+  if (args.decalageHeures !== undefined) o.decalageHeures = Number(args.decalageHeures);
   // Le proxy n'a d'importance que là où le scanner s'en sert : sur les grosses
   // bougies. Un seuil permet de juger le proxy là où il est utilisé.
-  if (args['seuil-volume'] !== undefined) o.seuilVolume = Number(args['seuil-volume']);
+  if (args.seuilVolume !== undefined) o.seuilVolume = Number(args.seuilVolume);
   return o;
 }
 
