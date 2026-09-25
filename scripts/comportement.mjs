@@ -82,7 +82,26 @@ export function validerOptions(args) {
 const q = (valeurs, part) => (valeurs.length ? quantile(valeurs, part).toFixed(2) : '—');
 
 /** Distribution d'une famille : ce qu'elle dit sur l'objectif et le stop. */
-function decrireFamille(nom, cas) {
+/** La part d'objectifs atteints avant le stop, par multiple. */
+export function partsAtteintes(cas) {
+  return MULTIPLES.map((m) => {
+    const verdicts = cas.map((c) => c.ordre[m]).filter((v) => v === 'atteint' || v === 'perdu');
+    return verdicts.length ? (verdicts.filter((v) => v === 'atteint').length / verdicts.length) * 100 : null;
+  });
+}
+
+/**
+ * Le témoin : les bougies de la MÊME famille que le détecteur n'a PAS
+ * signalées. C'est la seule comparaison qui répond à la question posée —
+ * « une bougie à volume anormal se comporte-t-elle autrement qu'une bougie
+ * ordinaire ? » Un taux de 59 % ne veut rien dire seul ; il ne veut dire
+ * quelque chose que si l'ordinaire donne 50.
+ *
+ * Sans ce témoin, on mesure la dérive du marché et on l'attribue au
+ * détecteur. Sur de l'or qui prend 35 % en deux ans, n'importe quelle règle
+ * acheteuse paraît bonne.
+ */
+function decrireFamille(nom, cas, temoin = null) {
   if (!cas.length) {
     console.log(`\n  ${nom.padEnd(14)} aucun cas`);
     return;
@@ -102,13 +121,27 @@ function decrireFamille(nom, cas) {
     + (retours.length ? `, après ${q(retours.map((c) => c.retourDansLaZone).sort((a, b) => a - b), 0.5)} bougies en médiane` : ''),
   );
 
-  const ligne = MULTIPLES.map((m) => {
-    const verdicts = cas.map((c) => c.ordre[m]).filter((v) => v === 'atteint' || v === 'perdu');
-    if (!verdicts.length) return `${m}R —`;
-    const part = (verdicts.filter((v) => v === 'atteint').length / verdicts.length) * 100;
-    return `${m}R ${part.toFixed(0)}%`;
+  const parts = partsAtteintes(cas);
+  const ligne = MULTIPLES.map((m, k) => `${m}R ${parts[k] === null ? '—' : parts[k].toFixed(0) + '%'}`).join('   ');
+  console.log(`    objectif atteint AVANT le stop :  ${ligne}`);
+
+  if (!temoin || !temoin.length) return;
+
+  const partsT = partsAtteintes(temoin);
+  const ligneT = MULTIPLES.map((m, k) => `${m}R ${partsT[k] === null ? '—' : partsT[k].toFixed(0) + '%'}`).join('   ');
+  console.log(`    TÉMOIN (${String(temoin.length).padStart(5)} non signalées)  :  ${ligneT}`);
+
+  // L'écart est le seul chiffre qui porte une information. Son incertitude
+  // aussi : deux points sur quatre cents cas, c'est du bruit.
+  const ecarts = MULTIPLES.map((m, k) => {
+    if (parts[k] === null || partsT[k] === null) return `${m}R —`;
+    const d = parts[k] - partsT[k];
+    // Erreur type de la différence de deux proportions, en points.
+    const se = Math.sqrt(2500 / cas.length + 2500 / temoin.length);
+    const sigma = se > 0 ? Math.abs(d) / se : 0;
+    return `${m}R ${d >= 0 ? '+' : ''}${d.toFixed(1)}${sigma >= 2 ? ' *' : ''}`;
   }).join('   ');
-  console.log(`    objectif atteint AVANT le stop symétrique :  ${ligne}`);
+  console.log(`    ÉCART (points)                   :  ${ecarts}`);
 }
 
 async function main() {
@@ -147,6 +180,9 @@ async function main() {
 
   // Un cas par anomalie, avec son comportement après.
   const parDetecteur = new Map(demandes.map((d) => [d, []]));
+  // Même traitement, mêmes exclusions, même horizon : seule l'appartenance
+  // au détecteur change. C'est ce qui rend la comparaison honnête.
+  const temoins = new Map(demandes.map((d) => [d, []]));
   let tronques = 0;
 
   for (const segment of segments) {
@@ -162,7 +198,8 @@ async function main() {
       const ordre = Object.fromEntries(MULTIPLES.map((m) => [m, atteintAvantDePerdre(serie, s.index, horizonBougies, m)]));
 
       for (const d of demandes) {
-        if (s.scores[d] > 0) parDetecteur.get(d).push({ ...apres, famille: s.mesures[champ], ordre });
+        const cas = { ...apres, famille: s.mesures[champ], ordre };
+        (s.scores[d] > 0 ? parDetecteur : temoins).get(d).push(cas);
       }
     }
   }
@@ -177,10 +214,13 @@ async function main() {
 
     if (!cas.length) continue;
 
-    decrireFamille('TOUTES', cas);
-    for (const f of FAMILLES) decrireFamille(f, cas.filter((c) => c.famille === f));
+    const temoin = temoins.get(detecteur);
+    decrireFamille('TOUTES', cas, temoin);
+    for (const f of FAMILLES) {
+      decrireFamille(f, cas.filter((c) => c.famille === f), temoin.filter((c) => c.famille === f));
+    }
     const sansFamille = cas.filter((c) => !c.famille);
-    if (sansFamille.length) decrireFamille('plat/inconnu', sansFamille);
+    if (sansFamille.length) decrireFamille('plat/inconnu', sansFamille, temoin.filter((c) => !c.famille));
   }
 
   console.log('\n\nLecture :');
@@ -191,6 +231,17 @@ async function main() {
   console.log('  répond vraiment à « où mettre le take profit » : comparer deux amplitudes');
   console.log('  maximales ne dit pas laquelle est arrivée en premier, et un objectif');
   console.log('  atteint après le stop ne rapporte rien.');
+  console.log();
+  console.log('  Le TÉMOIN est l’ensemble des bougies de la MÊME famille que le');
+  console.log('  détecteur n’a PAS signalées — mêmes exclusions, même horizon. Un taux');
+  console.log('  de 59 % ne dit rien seul ; il ne dit quelque chose que si l’ordinaire');
+  console.log('  donne 50. Sans ce témoin on mesure la dérive du marché et on');
+  console.log('  l’attribue au détecteur : sur de l’or qui prend 35 % en deux ans,');
+  console.log('  n’importe quelle règle acheteuse paraît bonne.');
+  console.log();
+  console.log('  L’ÉCART est le seul chiffre qui porte une information. « * » marque');
+  console.log('  deux erreurs types — le seuil au-dessous duquel c’est du bruit, et');
+  console.log('  au-dessus duquel c’est à éprouver sur une période jamais ouverte.');
   console.log();
   console.log('  CE N’EST PAS UNE MESURE DE STRATÉGIE. Aucune entrée n’est décidée, aucun');
   console.log('  coût n’est compté, et ces données ont déjà été regardées. Ce qui sort');
