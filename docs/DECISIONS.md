@@ -1759,3 +1759,131 @@ données OHLCV.
 Si l'effet s'y retrouve, il est réel et le système complet se justifie. S'il
 disparaît, HYP-001 rejoint les six autres, et le projet se clôt sur un
 résultat honnête plutôt que sur une conviction.
+
+---
+
+## HYP-002 — Réplication, gelée le 2026-09-25
+
+**Gelée AVANT d'avoir ouvert la moindre donnée d'un autre marché que l'or.**
+Ni l'argent, ni le platine, ni le cuivre, ni le pétrole, ni l'indice n'ont
+jamais été chargés dans ce dépôt. `comparer-marches.mjs` a été écrit pour eux
+et jamais exécuté sur eux.
+
+### Pourquoi répliquer plutôt que construire
+
+HYP-001 est CONFIRMÉE, et c'est un résultat fragile : p = 0,0486 pour un seuil
+à 0,05, une puissance réelle de 56 % là où 83 % étaient annoncés, et une
+hypothèse née de l'examen de vingt-quatre cellules. C'est le portrait-robot du
+résultat qui ne se reproduit pas.
+
+Construire un système dessus reviendrait à miser sur un tirage. Une seule
+chose peut le départager d'un hasard : **la même règle, sur des marchés jamais
+regardés.**
+
+### La règle : inchangée, et c'est le point
+
+`GEL.regle` **est** l'objet `GEL` de HYP-001, référencé et non recopié — un
+test vérifie l'identité des deux. Détecteur `picVolume`, seuil 4× la médiane,
+fenêtre 60 bougies, unité 15 minutes, famille `hausse-achat` lue sur la
+semaine, horizon 24 h, objectif 3R, stop 1R, fenêtres macro exclues, verdicts
+`ambigu` hors dénominateur.
+
+Si un seul paramètre différait, on ne répliquerait plus : on chercherait une
+variante qui marche, et on appellerait « confirmé » le premier réglage qui
+passe.
+
+### Les marchés, et pourquoi pas l'or
+
+| | | |
+|---|---|---|
+| **SI** | argent, COMEX | métal précieux, corrélé à l'or |
+| **PL** | platine, NYMEX | métal précieux, moins corrélé |
+| **HG** | cuivre, COMEX | métal industriel |
+| **CL** | pétrole WTI, NYMEX | énergie, hors métaux |
+| **ES** | E-mini S&P 500, CME | indice actions, microstructure différente |
+
+**L'or est exclu.** L'effet y a été trouvé ; l'y retrouver ne prouverait rien.
+
+Le panel est délibérément étagé. Si l'effet n'apparaît que sur l'argent, il
+est propre aux métaux précieux — peut-être même à la corrélation avec l'or.
+S'il apparaît aussi sur `ES`, c'est une propriété de microstructure, bien plus
+intéressante et bien plus surprenante.
+
+**Lecture secondaire, énoncée d'avance :** HYP-001 porte sur les semaines
+haussières, et l'or a pris 35 % sur la période. Si l'effet ne se manifeste que
+sur les marchés fortement haussiers du panel, c'est la dérive qu'on mesure,
+pas le détecteur. Cette lecture ne décide de rien — elle est notée maintenant
+pour ne pas être inventée après coup.
+
+### La période
+
+**2023-01-01 → 2026-09-01**, identique pour les cinq. Quarante-quatre mois.
+
+Aucun de ces marchés n'ayant jamais été ouvert, toute leur histoire est hors
+échantillon. Prendre la période la plus longue disponible maximise la
+puissance sans rien coûter en validité.
+
+### Le critère principal : un seul chiffre
+
+**Le regroupement en variance inverse des cinq écarts** — une méta-analyse à
+effets fixes. Un test, un p.
+
+Concaténer les cas de tous les marchés serait plus simple et faux : `ES`
+fournirait dix fois plus de bougies que `PL` et imposerait son résultat, et le
+mélange dépendrait de la liquidité de chacun plutôt que de l'effet cherché.
+
+**Les écarts par marché sont SECONDAIRES.** Cinq marchés regardés séparément,
+c'est cinq occasions de trouver par hasard — exactement l'erreur que les
+vingt-quatre cellules de HYP-001 ont failli faire commettre. Ils seront
+affichés parce qu'ils informent ; ils ne décident pas.
+
+### La règle de décision : quatre issues
+
+Test unilatéral, seuil 5 %, sur le regroupement seul.
+
+| Condition | Verdict |
+|---|---|
+| erreur type > **2,055** | **NON CONCLUANTE** |
+| écart ≤ 0 | **RÉFUTÉE** |
+| écart > 0 et p < 0,05 | **RÉPLIQUÉE** |
+| écart > 0 et p ≥ 0,05 | **NON RÉPLIQUÉE** |
+
+**L'insuffisance de puissance se constate en premier, avant de regarder le
+signe.** Sans cet ordre, on ne l'invoquerait que lorsque le résultat déplaît.
+
+Le seuil de 2,055 n'est pas arbitraire : c'est l'erreur type au-dessous de
+laquelle l'écart de référence de l'or (+5,11 points) est détectable à 80 % de
+puissance, soit 5,11 / (1,645 + 0,842).
+
+### Pourquoi un garde-fou de puissance plutôt qu'une puissance annoncée
+
+HYP-001 promettait 83 % sur une prévision de 601 cas ; il y en a eu 272. **Je
+me suis trompé d'un facteur 2,2 sur le seul chiffre qui justifiait le choix de
+la période.**
+
+Je ne sais pas prédire combien de bougies `hausse-achat` détectées chaque
+marché fournira — cela dépend de sa volatilité, de sa tendance sur la période
+et de la forme de sa distribution de volume, dont je ne sais rien puisque je
+ne les ai jamais ouverts. Annoncer une puissance serait répéter la même faute.
+
+À la place, le seuil est vérifié **sur les effectifs réellement obtenus**, et
+un test trop imprécis se déclare non concluant au lieu de trancher. Une
+réplication ratée faute de données n'est pas une réfutation.
+
+### Le coût, à valider avant exécution
+
+Environ **4,70 USD par marché** sur 44 mois en OHLCV-1m, extrapolé des 2,13
+USD payés pour 20 mois d'or — soit **~23 USD pour les cinq**. À confirmer par
+`get_cost` avant tout achat.
+
+### Ce que HYP-002 ne fera pas
+
+Ni décider d'une entrée, ni compter un spread, ni simuler un glissement, ni
+dimensionner une position. La question reste la même : *une bougie à volume
+anormal se comporte-t-elle autrement qu'une bougie quelconque ?*
+
+Si la réponse est oui sur cinq marchés de plus, alors seulement un système
+complet se justifie — pré-enregistré lui aussi, et avec ses coûts.
+
+Si elle est non, HYP-001 rejoint les six réfutations, et le projet se clôt sur
+un résultat honnête plutôt que sur une conviction.
