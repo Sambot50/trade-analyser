@@ -133,6 +133,6 @@ async function principal() {
   console.log('');
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === (await import('node:url')).pathToFileURL(process.argv[1] || '').href) {
   principal().catch((err) => { console.error(err.message); process.exitCode = 1; });
 }
