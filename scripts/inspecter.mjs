@@ -92,12 +92,16 @@ export function fenetreAutour(bougies, ms, { avant, apres }) {
 }
 
 /** Nom de fichier lisible et triable : détecteur, bande, score, date. */
+// La lettre « X » vaut pour tendance inconnue — jamais « ? », interdit dans
+// un nom de fichier sous Windows. Un nom illégal n'échoue qu'à l'écriture,
+// après le tracé : la moitié des planches sont produites, puis ENOENT.
 const LETTRE = { haussiere: 'H', baissiere: 'B', plate: 'P' };
+const INCONNUE = 'X';
 
 export function nomDePlanche({ detecteur, sensApparent: sens, bande, score, horodatage, tendanceSemaine }) {
   const date = horodatage.replace(/[:T]/g, '-').slice(0, 16);
   const rang = String(Math.round(Number(score) * 100)).padStart(6, '0');
-  const semaine = `sem${LETTRE[tendanceSemaine] ?? '?'}`;
+  const semaine = `sem${LETTRE[tendanceSemaine] ?? INCONNUE}`;
   // Le sens vient en second : un tri alphabétique regroupe alors tous les
   // achats d'un détecteur, puis toutes les ventes. C'est dans cet ordre
   // qu'on cherche une structure commune, pas en alternant.

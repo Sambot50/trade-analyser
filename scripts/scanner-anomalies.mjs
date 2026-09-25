@@ -308,7 +308,10 @@ async function main() {
   // Un marqueur qui ne marque jamais ressemble à « aucune annonce », alors
   // qu'il dit surtout « les horodatages ne sont pas en UTC ». Les exports
   // FirstRate sont en heure de New York ; ceux de Databento sont en UTC.
-  if (!totalMarques && lignes.length >= 10) {
+  // Ne le dire que si le marqueur n'a JAMAIS reconnu de fenêtre, pas quand
+  // --avec-macro est absent : dans ce cas les bougies macro ont été écartées
+  // en amont, et zéro candidat marqué est le comportement attendu.
+  if (!totalMarques && !macro && lignes.length >= 10) {
     console.log("⚠  Aucun candidat marqué « macro » sur l'ensemble.");
     console.log('   Les fenêtres d’annonce supposent des horodatages UTC. Si ton fichier');
     console.log('   est horodaté autrement, ramène-le avec --decalage-heures, sans quoi');

@@ -96,7 +96,7 @@ describe('la tendance hebdomadaire dans le nom', () => {
     expect(nomDePlanche({ ...base, tendanceSemaine: 'haussiere' })).toContain('-semH-');
     expect(nomDePlanche({ ...base, tendanceSemaine: 'baissiere' })).toContain('-semB-');
     expect(nomDePlanche({ ...base, tendanceSemaine: 'plate' })).toContain('-semP-');
-    expect(nomDePlanche({ ...base })).toContain('-sem?-');
+    expect(nomDePlanche({ ...base })).toContain('-semX-');
   });
 
   /**
@@ -113,5 +113,38 @@ describe('la tendance hebdomadaire dans le nom', () => {
     ].sort();
     expect(noms.map((n) => n.split('-').slice(1, 3).join('-')))
       .toEqual(['achat-semB', 'achat-semH', 'vente-semB', 'vente-semH']);
+  });
+});
+
+// Un nom de fichier illégal n'échoue qu'à l'ÉCRITURE, après que le graphique
+// a été tracé et rasterisé. Sur la machine de travail, treize planches ont été
+// produites puis le script est mort sur ENOENT, la quatorzième tendance
+// hebdomadaire étant inconnue et le nom portant « sem? ». Le point
+// d'interrogation est interdit sous Windows, licite sous Linux : la CI ne
+// pouvait pas le voir.
+describe('noms de planches utilisables sous Windows', () => {
+  // < > : " / \ | ? * et les caractères de contrôle.
+  const INTERDITS = /[<>:"/\\|?*\u0000-\u001f]/;
+
+  const champs = {
+    detecteur: 'picVolume', sensApparent: 'achat', bande: 'milieu',
+    score: 7.37, horodatage: '2023-01-05T14:00:00.000Z',
+  };
+
+  it('n’emploie aucun caractère interdit quand la tendance est inconnue', () => {
+    const n = nomDePlanche({ ...champs, tendanceSemaine: undefined });
+    expect(n).not.toMatch(INTERDITS);
+    expect(n).toContain('semX');
+  });
+
+  it.each(['haussiere', 'baissiere', 'plate', 'indetermine', undefined, null])(
+    'reste légal pour une tendance « %s »',
+    (tendanceSemaine) => {
+      expect(nomDePlanche({ ...champs, tendanceSemaine })).not.toMatch(INTERDITS);
+    },
+  );
+
+  it('garde l’horodatage sans deux-points', () => {
+    expect(nomDePlanche({ ...champs, tendanceSemaine: 'haussiere' })).not.toContain(':');
   });
 });
