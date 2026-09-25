@@ -20,7 +20,7 @@ export const SUGGESTED_MODELS = [
  *
  * Aucune clé, aucun compte : la requête ne quitte pas la machine.
  */
-export async function analyzeChart(dataUrl, { model, baseUrl, signal } = {}) {
+export async function analyzeChart(dataUrl, { model, baseUrl, signal, prompt } = {}) {
   const data = base64FromDataUrl(dataUrl);
   const mimeType = mimeFromDataUrl(dataUrl);
 
@@ -44,7 +44,9 @@ export async function analyzeChart(dataUrl, { model, baseUrl, signal } = {}) {
         messages: [
           {
             role: 'user',
-            content: ANALYSIS_PROMPT,
+            // L'invite par défaut fait relever l'axe au modèle. La mesure,
+            // elle, lui donne l'échelle : voir `promptAvecEchelle`.
+            content: prompt || ANALYSIS_PROMPT,
             // Ollama attend du base64 nu, sans le préfixe data:.
             images: [data],
           },
