@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validerOptions } from './scanner-anomalies.mjs';
+import { validerOptions, contreCourant } from './scanner-anomalies.mjs';
 
 describe('options du scanner', () => {
   it('exige un fichier', () => {
@@ -25,5 +25,27 @@ describe('options du scanner', () => {
     expect(validerOptions({ csv: 'x.csv' })).toMatchObject({
       ut: '15m', utCsv: '1m', fenetre: 60, nombre: 20, ecartMinutes: 120,
     });
+  });
+});
+
+
+describe('volume à contre-courant', () => {
+  /**
+   * La case qui intéresse : acheter dans une baisse, ou vendre dans une
+   * hausse. Suivre le flot ne demande ni raison ni moyens.
+   */
+  it('marque l’achat dans une baisse et la vente dans une hausse', () => {
+    expect(contreCourant({ sens: 'achat', tendanceSemaine: 'baissiere' })).toBe(true);
+    expect(contreCourant({ sens: 'vente', tendanceSemaine: 'haussiere' })).toBe(true);
+  });
+
+  it('ne marque pas la continuation', () => {
+    expect(contreCourant({ sens: 'achat', tendanceSemaine: 'haussiere' })).toBe(false);
+    expect(contreCourant({ sens: 'vente', tendanceSemaine: 'baissiere' })).toBe(false);
+  });
+
+  it('ne marque rien quand la tendance est plate ou inconnue', () => {
+    expect(contreCourant({ sens: 'achat', tendanceSemaine: 'plate' })).toBe(false);
+    expect(contreCourant({ sens: 'vente', tendanceSemaine: 'indetermine' })).toBe(false);
   });
 });

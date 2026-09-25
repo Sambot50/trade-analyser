@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   mediane, quantile, profilHoraire, scorerSegment, meilleurs,
-  echantillonStratifie, dansFenetreMacro, DETECTEURS,
+  echantillonStratifie, dansFenetreMacro, tendanceSur, SEUIL_TENDANCE, DETECTEURS,
 } from './anomalies.js';
 
 /** Bougie calme de référence : amplitude 10, volume 100. */
@@ -260,5 +260,55 @@ describe('sens dominant, par proxy', () => {
    */
   it('ne tranche pas une clôture égale à l’ouverture', () => {
     expect(sensDe({ ouverture: 2000, cloture: 2000, volume: 900 })).toBe('neutre');
+  });
+});
+
+
+describe('tendance à l’échelle du jour et de la semaine', () => {
+  const JOUR = 24 * 3_600_000;
+  const quartHeure = (i, cloture) => ({
+    ouvertureMs: i * 900_000, fermetureMs: i * 900_000 + 899_999,
+    ouverture: cloture, plusHaut: cloture, plusBas: cloture, cloture, volume: 100,
+  });
+  // 800 quarts d'heure : huit jours et demi.
+  const serieDe = (f) => Array.from({ length: 800 }, (_, i) => quartHeure(i, f(i)));
+
+  it('lit la hausse et la baisse à chaque échelle', () => {
+    const monte = serieDe((i) => 2000 + i * 0.5);
+    const descend = serieDe((i) => 2000 - i * 0.5);
+    expect(tendanceSur(monte, 799, JOUR)).toBe('haussiere');
+    expect(tendanceSur(monte, 799, 7 * JOUR)).toBe('haussiere');
+    expect(tendanceSur(descend, 799, 7 * JOUR)).toBe('baissiere');
+  });
+
+  /**
+   * Un marché qui a bougé d'un dixième de pour cent n'est ni haussier ni
+   * baissier. Lui coller une étiquette fabriquerait une moitié des cas au
+   * hasard.
+   */
+  it('rend « plate » sous le seuil plutôt que de trancher au hasard', () => {
+    const presquePlate = serieDe((i) => 2000 * (1 + (i / 799) * SEUIL_TENDANCE * 0.5));
+    expect(tendanceSur(presquePlate, 799, 7 * JOUR)).toBe('plate');
+  });
+
+  it('franchit le seuil juste au-dessus', () => {
+    const juste = serieDe((i) => 2000 * (1 + (i / 799) * SEUIL_TENDANCE * 2));
+    expect(tendanceSur(juste, 799, 7 * JOUR)).toBe('haussiere');
+  });
+
+  /**
+   * Sans historique suffisant, comparer à la première bougie disponible
+   * donnerait une tendance sur deux heures en la nommant « semaine ».
+   */
+  it('rend « indetermine » quand l’historique manque', () => {
+    const monte = serieDe((i) => 2000 + i * 0.5);
+    expect(tendanceSur(monte, 50, 7 * JOUR)).toBe('indetermine');
+    expect(tendanceSur(monte, 5, JOUR)).toBe('indetermine');
+  });
+
+  it('accompagne chaque bougie scorée', () => {
+    const r = scorerSegment(avecUneBougie({ volume: 900 }), { fenetre: 60 });
+    expect(['haussiere', 'baissiere', 'plate', 'indetermine']).toContain(r.at(-1).mesures.tendanceJour);
+    expect(['haussiere', 'baissiere', 'plate', 'indetermine']).toContain(r.at(-1).mesures.tendanceSemaine);
   });
 });

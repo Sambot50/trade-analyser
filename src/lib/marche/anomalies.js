@@ -34,6 +34,59 @@ export const mediane = (valeurs) => quantile(valeurs, 0.5);
 
 export const DETECTEURS = ['absorption', 'deplacement', 'rejet', 'horsSeance', 'gap', 'picVolume'];
 
+/**
+ * Variation minimale pour qu'on parle de tendance : 0,2 % du prix.
+ *
+ * En dessous, on rend « plate » plutôt que de trancher. Un marché qui a bougé
+ * d'un dixième de pour cent en une journée n'est ni haussier ni baissier, et
+ * lui coller une étiquette fabriquerait une moitié des cas au hasard.
+ *
+ * Le seuil couvre aussi l'écart de report entre deux contrats, de l'ordre de
+ * quelques dixièmes de pour cent sur l'or — mais la recherche reste confinée
+ * au segment, donc la question ne se pose pas.
+ */
+export const SEUIL_TENDANCE = 0.002;
+
+const HORIZONS = { tendanceJour: 24 * 3_600_000, tendanceSemaine: 7 * 24 * 3_600_000 };
+
+/**
+ * Sens du marché sur les `dureeMs` précédant une bougie.
+ *
+ * Défini par la VARIATION DU PRIX, et non par les cassures de structure
+ * qu'emploie le reste du projet. Deux raisons, toutes deux contraignantes :
+ *
+ * Une tendance hebdomadaire par cassures demanderait des bougies
+ * hebdomadaires, or un contrat GC ne vit que huit semaines. Il n'y a pas de
+ * quoi former un seul pivot.
+ *
+ * Et la recherche reste DANS le segment : jamais au travers d'un roulement,
+ * où le saut de prix se ferait passer pour un mouvement de marché.
+ *
+ * Rend `indetermine` quand l'historique manque, plutôt que de comparer à la
+ * première bougie disponible — ce qui donnerait une tendance sur deux heures
+ * en la nommant « semaine ».
+ */
+export function tendanceSur(bougies, index, dureeMs, seuil = SEUIL_TENDANCE) {
+  const cible = bougies[index].ouvertureMs - dureeMs;
+  if (!bougies.length || bougies[0].ouvertureMs > cible) return 'indetermine';
+
+  // Binaire : la dernière bougie ouvrant au plus tard à l'instant cible.
+  let bas = 0;
+  let haut = index;
+  while (bas < haut) {
+    const milieu = Math.ceil((bas + haut) / 2);
+    if (bougies[milieu].ouvertureMs <= cible) bas = milieu;
+    else haut = milieu - 1;
+  }
+
+  const depart = bougies[bas].cloture;
+  if (!depart) return 'indetermine';
+
+  const variation = (bougies[index].cloture - depart) / depart;
+  if (Math.abs(variation) < seuil) return 'plate';
+  return variation > 0 ? 'haussiere' : 'baissiere';
+}
+
 /** Volume exigé, en multiples de la médiane locale, avant de scorer quoi que ce soit. */
 const VOLUME_PLANCHER = 2;
 
@@ -190,6 +243,12 @@ export function scorerSegment(bougies, { fenetre = 60 } = {}) {
         // se trompe sur une bougie qui monte puis redescend en clôturant
         // plate. Elle vaut ce qu'elle vaut, et elle est nommée pour ça.
         sens: b.cloture > b.ouverture ? 'achat' : b.cloture < b.ouverture ? 'vente' : 'neutre',
+        // La tendance générale à deux échelles bien plus larges que la
+        // détection. Un volume à contre-courant n'est pas le même évènement
+        // qu'un volume qui suit le flot : le premier demande une raison et
+        // des moyens.
+        tendanceJour: tendanceSur(bougies, i, HORIZONS.tendanceJour),
+        tendanceSemaine: tendanceSur(bougies, i, HORIZONS.tendanceSemaine),
         // Marqué, jamais écarté : c'est à l'œil de trancher, mais il doit
         // savoir qu'une publication pouvait tomber à cet instant.
         macro: dansFenetreMacro(b.ouvertureMs),

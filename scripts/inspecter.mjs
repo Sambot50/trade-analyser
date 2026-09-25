@@ -92,13 +92,19 @@ export function fenetreAutour(bougies, ms, { avant, apres }) {
 }
 
 /** Nom de fichier lisible et triable : détecteur, bande, score, date. */
-export function nomDePlanche({ detecteur, sens, bande, score, horodatage }) {
+const LETTRE = { haussiere: 'H', baissiere: 'B', plate: 'P' };
+
+export function nomDePlanche({ detecteur, sens, bande, score, horodatage, tendanceSemaine }) {
   const date = horodatage.replace(/[:T]/g, '-').slice(0, 16);
   const rang = String(Math.round(Number(score) * 100)).padStart(6, '0');
+  const semaine = `sem${LETTRE[tendanceSemaine] ?? '?'}`;
   // Le sens vient en second : un tri alphabétique regroupe alors tous les
   // achats d'un détecteur, puis toutes les ventes. C'est dans cet ordre
   // qu'on cherche une structure commune, pas en alternant.
-  return `${detecteur}-${sens ?? 'nc'}-${bande}-${rang}-${date}.png`;
+  // La tendance hebdomadaire vient juste après le sens : un tri alphabétique
+  // range alors les quatre cases côte à côte — achat dans une baisse, achat
+  // dans une hausse, vente dans une baisse, vente dans une hausse.
+  return `${detecteur}-${sens ?? 'nc'}-${semaine}-${bande}-${rang}-${date}.png`;
 }
 
 const iso = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16);
@@ -172,7 +178,8 @@ async function main() {
     }
 
     const { svg } = tracerGraphique(fenetre.bougies, {
-      libelle: `${o.symbole} · ${a.detecteur} · ${a.sens ?? '?'} · ${a.bande} · score ${a.score}${a.macro ? ' · ⚠ annonce' : ''}`,
+      libelle: `${o.symbole} · ${a.detecteur} · ${a.sens ?? '?'} · jour ${a.tendanceJour ?? '?'}`
+        + ` · semaine ${a.tendanceSemaine ?? '?'} · ${a.bande} · score ${a.score}${a.macro ? ' · ⚠ annonce' : ''}`,
       unite: o.ut,
       marquerMs: fenetre.marquerMs,
     });

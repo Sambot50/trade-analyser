@@ -44,9 +44,9 @@ describe('nom de planche', () => {
     expect([fort, faible].sort().reverse()[0]).toBe(fort);
   });
 
-  it('porte le détecteur, le sens, la bande et la date', () => {
-    const n = nomDePlanche({ detecteur: 'gap', sens: 'achat', bande: 'milieu', score: 1.5, horodatage: '2023-06-15T14:30:00.000Z' });
-    expect(n).toMatch(/^gap-achat-milieu-/);
+  it('porte le détecteur, le sens, la tendance, la bande et la date', () => {
+    const n = nomDePlanche({ detecteur: 'gap', sens: 'achat', bande: 'milieu', score: 1.5, horodatage: '2023-06-15T14:30:00.000Z', tendanceSemaine: 'haussiere' });
+    expect(n).toMatch(/^gap-achat-semH-milieu-/);
     expect(n).toContain('2023-06-15-14-30');
     expect(n.endsWith('.png')).toBe(true);
   });
@@ -85,5 +85,33 @@ describe('filtre par sens', () => {
       nomDePlanche({ detecteur: 'absorption', sens: 'achat', bande: 'bas', score: 1, horodatage: '2023-01-01T00:00:00.000Z' }),
     ].sort();
     expect(noms[0]).toContain('-achat-');
+  });
+});
+
+
+describe('la tendance hebdomadaire dans le nom', () => {
+  const base = { detecteur: 'absorption', sens: 'achat', bande: 'sommet', score: 5, horodatage: '2023-06-15T14:00:00.000Z' };
+
+  it('code la tendance en une lettre', () => {
+    expect(nomDePlanche({ ...base, tendanceSemaine: 'haussiere' })).toContain('-semH-');
+    expect(nomDePlanche({ ...base, tendanceSemaine: 'baissiere' })).toContain('-semB-');
+    expect(nomDePlanche({ ...base, tendanceSemaine: 'plate' })).toContain('-semP-');
+    expect(nomDePlanche({ ...base })).toContain('-sem?-');
+  });
+
+  /**
+   * Quatre cases rangées côte à côte par un simple tri : achat dans une
+   * baisse, achat dans une hausse, vente dans une baisse, vente dans une
+   * hausse. C'est dans cet ordre qu'on cherche une structure commune.
+   */
+  it('range les quatre cases par un tri alphabétique', () => {
+    const noms = [
+      nomDePlanche({ ...base, sens: 'vente', tendanceSemaine: 'haussiere' }),
+      nomDePlanche({ ...base, sens: 'achat', tendanceSemaine: 'haussiere' }),
+      nomDePlanche({ ...base, sens: 'vente', tendanceSemaine: 'baissiere' }),
+      nomDePlanche({ ...base, sens: 'achat', tendanceSemaine: 'baissiere' }),
+    ].sort();
+    expect(noms.map((n) => n.split('-').slice(1, 3).join('-')))
+      .toEqual(['achat-semB', 'achat-semH', 'vente-semB', 'vente-semH']);
   });
 });

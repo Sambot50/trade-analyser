@@ -111,6 +111,20 @@ export function validerOptions(args) {
 
 const iso = (ms) => new Date(ms).toISOString().replace('T', ' ').slice(0, 16);
 
+const ABREGE = { haussiere: 'haus', baissiere: 'bais', plate: 'plat', indetermine: '—' };
+const abrege = (t) => ABREGE[t] ?? '—';
+
+/**
+ * Le volume va-t-il CONTRE la tendance de la semaine ?
+ *
+ * C'est la case qui intéresse : acheter dans une baisse ou vendre dans une
+ * hausse demande une raison et des moyens. Suivre le flot n'en demande
+ * aucun.
+ */
+export const contreCourant = (m) =>
+  (m.sens === 'achat' && m.tendanceSemaine === 'baissiere')
+  || (m.sens === 'vente' && m.tendanceSemaine === 'haussiere');
+
 async function main() {
   const o = validerOptions(parseArgs(process.argv.slice(2)));
 
@@ -151,6 +165,11 @@ async function main() {
 
   console.log(`${scores.length} bougies ${o.ut} scorées, référence sur ${o.fenetre} bougies glissantes\n`);
 
+  const sansSemaine = scores.filter((s) => s.mesures.tendanceSemaine === 'indetermine').length;
+  if (sansSemaine) {
+    console.log(`${sansSemaine} bougies sans tendance hebdomadaire : moins d'une semaine d'historique dans leur contrat`);
+  }
+
   const macro = scores.filter((s) => s.mesures.macro).length;
   if (!o.avecMacro) {
     console.log(`${macro} bougies écartées : fenêtre d'annonce américaine (--avec-macro pour les garder)\n`);
@@ -185,13 +204,14 @@ async function main() {
         continue;
       }
 
-      console.log('     bande    score  date (UTC)         vol×méd  ampl×méd  corps  mèche  macro');
+      console.log('     bande    score  date (UTC)         vol×méd  ampl×méd   jour   semaine   contre');
       for (const r of retenus) {
         const m = r.mesures;
         console.log(
           `     ${r.bande.padEnd(7)} ${String(r.scores[detecteur]).padStart(6)}  ${iso(r.ms)}  `
           + `${String(m.ratioVolume).padStart(7)}  ${String(m.ratioAmplitude).padStart(8)}  `
-          + `${String(m.partDuCorps).padStart(5)}  ${String(m.partDeLaMeche).padStart(5)}  ${m.macro ? '  ⚠' : ''}`,
+          + `${abrege(m.tendanceJour).padStart(5)}  ${abrege(m.tendanceSemaine).padStart(8)}   `
+          + `${contreCourant(m) ? '  ◀' : ''}${m.macro ? ' ⚠' : ''}`,
         );
         lignes.push(JSON.stringify({
           detecteur, bande: r.bande, horodatage: new Date(r.ms).toISOString(),
@@ -222,6 +242,11 @@ async function main() {
 
   console.log('Lecture :');
   console.log('  Ce classement ne prouve rien. Il fabrique des candidats à regarder.');
+  console.log();
+  console.log('  ◀ marque un volume à CONTRE-COURANT de la semaine : acheter dans une');
+  console.log('  baisse, ou vendre dans une hausse. C’est la case où quelqu’un paie pour');
+  console.log('  aller contre le marché — et celle que le filtre de biais jetait sans le');
+  console.log('  savoir, lui qui ne gagnait rien (ETAT.md : 50,0 % contre 46,6 %).');
   console.log();
   console.log('  La colonne « bande » dit d’où vient le candidat dans la distribution.');
   console.log('  Le sommet d’un marché, ce sont surtout ses annonces macro — d’où');
