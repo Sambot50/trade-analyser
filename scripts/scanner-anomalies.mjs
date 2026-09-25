@@ -19,7 +19,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { analyser as analyserCsv, agreger as agregerBougies } from '../src/lib/marche/csv.js';
 import { dureeUnite, UNITES } from '../src/lib/marche/bougies.js';
 import { decouperParContrat } from '../src/lib/marche/contrats.js';
-import { scorerSegment, meilleurs, echantillonStratifie, DETECTEURS } from '../src/lib/marche/anomalies.js';
+import { scorerSegment, meilleurs, echantillonStratifie, DETECTEURS, FAMILLES } from '../src/lib/marche/anomalies.js';
 import { parseArgs } from './backtest.mjs';
 
 /**
@@ -121,6 +121,29 @@ const abrege = (t) => ABREGE[t] ?? '—';
  * hausse demande une raison et des moyens. Suivre le flot n'en demande
  * aucun.
  */
+/**
+ * Le tableau des quatre familles, pour un horizon donné.
+ *
+ * C'est ce qu'on regarde avant les planches : une famille à trois cas ne
+ * permettra de reconnaître aucune structure commune, et il vaut mieux le
+ * savoir avant d'ouvrir trente images.
+ */
+function afficherFamilles(actifs, champ, titre) {
+  const compte = (f) => actifs.filter((s) => s.mesures[champ] === f).length;
+  const sans = actifs.filter((s) => !s.mesures[champ]).length;
+  const largeur = 8;
+
+  console.log(`\n  LES QUATRE FAMILLES — ${titre}`);
+  console.log(`  ${''.padEnd(22)}${'achat'.padStart(largeur)}${'vente'.padStart(largeur)}`);
+  for (const [nom, etiquette] of [['hausse', 'mouvement haussier'], ['baisse', 'mouvement baissier']]) {
+    console.log(
+      `  ${etiquette.padEnd(22)}`
+      + `${String(compte(`${nom}-achat`)).padStart(largeur)}${String(compte(`${nom}-vente`)).padStart(largeur)}`,
+    );
+  }
+  if (sans) console.log(`  ${'plat ou inconnu'.padEnd(22)}${String(sans).padStart(largeur * 2)}`);
+}
+
 export const contreCourant = (m) =>
   (m.sens === 'achat' && m.tendanceSemaine === 'baissiere')
   || (m.sens === 'vente' && m.tendanceSemaine === 'haussiere');
@@ -187,6 +210,10 @@ async function main() {
     console.log(`  ${TITRES[detecteur]}`);
     console.log(`  ${actifs} bougies sur ${retenusPourScan.length} (${((actifs / retenusPourScan.length) * 100).toFixed(1)} %)`);
     console.log('='.repeat(78));
+
+    const actifsDuDetecteur = retenusPourScan.filter((s) => s.scores[detecteur] > 0);
+    afficherFamilles(actifsDuDetecteur, 'familleJour', 'sur la journée');
+    afficherFamilles(actifsDuDetecteur, 'familleSemaine', 'sur la semaine');
 
     // Achat et vente séparés, et échantillonnés séparément : sans ça, un
     // marché qui monte remplirait les deux tableaux du même côté.

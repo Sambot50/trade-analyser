@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   mediane, quantile, profilHoraire, scorerSegment, meilleurs,
-  echantillonStratifie, dansFenetreMacro, tendanceSur, SEUIL_TENDANCE, DETECTEURS,
+  echantillonStratifie, dansFenetreMacro, tendanceSur, famille, SEUIL_TENDANCE, DETECTEURS, FAMILLES,
 } from './anomalies.js';
 
 /** Bougie calme de référence : amplitude 10, volume 100. */
@@ -310,5 +310,55 @@ describe('tendance à l’échelle du jour et de la semaine', () => {
     const r = scorerSegment(avecUneBougie({ volume: 900 }), { fenetre: 60 });
     expect(['haussiere', 'baissiere', 'plate', 'indetermine']).toContain(r.at(-1).mesures.tendanceJour);
     expect(['haussiere', 'baissiere', 'plate', 'indetermine']).toContain(r.at(-1).mesures.tendanceSemaine);
+  });
+});
+
+
+describe('les quatre familles', () => {
+  it('croise le mouvement général et le sens du volume', () => {
+    expect(famille('achat', 'haussiere')).toBe('hausse-achat');
+    expect(famille('vente', 'haussiere')).toBe('hausse-vente');
+    expect(famille('achat', 'baissiere')).toBe('baisse-achat');
+    expect(famille('vente', 'baissiere')).toBe('baisse-vente');
+  });
+
+  it('couvre exactement les quatre combinaisons annoncées', () => {
+    const produites = ['achat', 'vente'].flatMap((s) => ['haussiere', 'baissiere'].map((t) => famille(s, t)));
+    expect(new Set(produites)).toEqual(new Set(FAMILLES));
+  });
+
+  /**
+   * Une cinquième catégorie nommée « on ne sait pas » vaut mieux que quatre
+   * familles dont une est remplie au hasard.
+   */
+  it('ne range nulle part une tendance plate ou inconnue', () => {
+    expect(famille('achat', 'plate')).toBeNull();
+    expect(famille('vente', 'indetermine')).toBeNull();
+    expect(famille('neutre', 'haussiere')).toBeNull();
+  });
+
+  it('accompagne chaque bougie scorée, aux deux horizons', () => {
+    const m = scorerSegment(avecUneBougie({ volume: 900 }), { fenetre: 60 }).at(-1).mesures;
+    expect('familleJour' in m).toBe(true);
+    expect('familleSemaine' in m).toBe(true);
+  });
+
+  /**
+   * Le point sur lequel tout repose : les deux horizons se lisent sur la
+   * MÊME série que la détection. « Sur la semaine » veut dire 672 bougies en
+   * arrière, pas un changement d'unité.
+   */
+  it('lit les deux horizons sur la série reçue, sans changer d’unité', () => {
+    const quartDHeure = (i, prix) => ({
+      ouvertureMs: i * 900_000, fermetureMs: i * 900_000 + 899_999,
+      ouverture: prix, plusHaut: prix + 1, plusBas: prix - 1, cloture: prix, volume: 100,
+    });
+    // Huit jours de quarts d'heure, en hausse franche.
+    const s = Array.from({ length: 800 }, (_, i) => quartDHeure(i, 2000 + i));
+    expect(tendanceSur(s, 799, 24 * 3_600_000)).toBe('haussiere');
+    expect(tendanceSur(s, 799, 7 * 24 * 3_600_000)).toBe('haussiere');
+    // 96 quarts d'heure dans une journée, 672 dans une semaine.
+    expect(tendanceSur(s, 95, 24 * 3_600_000)).toBe('indetermine');
+    expect(tendanceSur(s, 96, 24 * 3_600_000)).toBe('haussiere');
   });
 });

@@ -50,6 +50,26 @@ export const SEUIL_TENDANCE = 0.002;
 const HORIZONS = { tendanceJour: 24 * 3_600_000, tendanceSemaine: 7 * 24 * 3_600_000 };
 
 /**
+ * Les quatre familles : mouvement général × sens du volume.
+ *
+ * Toujours lues sur la MÊME série que la détection — les bougies de quinze
+ * minutes. « Sur la journée » veut dire quatre-vingt-seize bougies en
+ * arrière, « sur la semaine » six cent soixante-douze, pas un changement
+ * d'unité.
+ *
+ * Rend `null` quand la tendance est plate ou inconnue : une cinquième famille
+ * nommée « on ne sait pas » vaut mieux que quatre familles dont une est
+ * remplie au hasard.
+ */
+export const FAMILLES = ['hausse-achat', 'hausse-vente', 'baisse-achat', 'baisse-vente'];
+
+export function famille(sens, tendance) {
+  if (tendance !== 'haussiere' && tendance !== 'baissiere') return null;
+  if (sens !== 'achat' && sens !== 'vente') return null;
+  return `${tendance === 'haussiere' ? 'hausse' : 'baisse'}-${sens}`;
+}
+
+/**
  * Sens du marché sur les `dureeMs` précédant une bougie.
  *
  * Défini par la VARIATION DU PRIX, et non par les cassures de structure
@@ -223,6 +243,10 @@ export function scorerSegment(bougies, { fenetre = 60 } = {}) {
 
     const ecartOuverture = i > 0 ? Math.abs(b.ouverture - bougies[i - 1].cloture) : 0;
 
+    const sens = b.cloture > b.ouverture ? 'achat' : b.cloture < b.ouverture ? 'vente' : 'neutre';
+    const tendanceJour = tendanceSur(bougies, i, HORIZONS.tendanceJour);
+    const tendanceSemaine = tendanceSur(bougies, i, HORIZONS.tendanceSemaine);
+
     resultats.push({
       index: i,
       ms: b.ouvertureMs,
@@ -242,13 +266,15 @@ export function scorerSegment(bougies, { fenetre = 60 } = {}) {
         // C'est l'approximation que colorent toutes les plateformes, et elle
         // se trompe sur une bougie qui monte puis redescend en clôturant
         // plate. Elle vaut ce qu'elle vaut, et elle est nommée pour ça.
-        sens: b.cloture > b.ouverture ? 'achat' : b.cloture < b.ouverture ? 'vente' : 'neutre',
+        sens,
         // La tendance générale à deux échelles bien plus larges que la
-        // détection. Un volume à contre-courant n'est pas le même évènement
-        // qu'un volume qui suit le flot : le premier demande une raison et
-        // des moyens.
-        tendanceJour: tendanceSur(bougies, i, HORIZONS.tendanceJour),
-        tendanceSemaine: tendanceSur(bougies, i, HORIZONS.tendanceSemaine),
+        // détection, mais lues sur les MÊMES bougies de quinze minutes. Un
+        // volume à contre-courant n'est pas le même évènement qu'un volume
+        // qui suit le flot : le premier demande une raison et des moyens.
+        tendanceJour,
+        tendanceSemaine,
+        familleJour: famille(sens, tendanceJour),
+        familleSemaine: famille(sens, tendanceSemaine),
         // Marqué, jamais écarté : c'est à l'œil de trancher, mais il doit
         // savoir qu'une publication pouvait tomber à cet instant.
         macro: dansFenetreMacro(b.ouvertureMs),
