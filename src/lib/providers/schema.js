@@ -89,6 +89,56 @@ généralité de marché.
 Réponds uniquement par un objet JSON conforme au schéma, sans texte autour.`;
 
 /**
+ * L'invite quand l'échelle est DONNÉE au lieu d'être lue.
+ *
+ * `ANALYSIS_PROMPT` fait relever l'axe au modèle : c'est le bon contrat quand
+ * l'image vient d'une capture d'écran dont on ignore tout. Mais pour mesurer,
+ * c'est une impasse — le banc d'essai chiffre la dérive de lecture d'axe à
+ * ~1,7 %, alors que le stop médian mesuré sur l'or vaut 0,188 % du prix.
+ * L'erreur d'OCR serait neuf fois plus grande que ce qu'on veut mesurer.
+ *
+ * Quand c'est nous qui traçons le graphique, nous connaissons l'échelle
+ * exacte. On la lui donne, et la mesure porte alors sur sa lecture de la
+ * STRUCTURE — la seule chose qu'on cherche à éprouver.
+ */
+export function promptAvecEchelle(echelle) {
+  const { priceTop, priceBottom, plotTopRatio, plotBottomRatio } = echelle;
+
+  return `Tu es un analyste technique (Price Action et Smart Money Concepts).
+
+L'ÉCHELLE DE PRIX T'EST DONNÉE. Ne la lis pas sur l'image, ne la devine pas :
+
+  prix en haut de la zone de tracé : ${priceTop}
+  prix en bas de la zone de tracé  : ${priceBottom}
+
+Cette zone occupe la fraction ${plotTopRatio} à ${plotBottomRatio} de la hauteur
+de l'image. En dessous, un panneau montre le volume échangé de chaque bougie.
+
+La dernière bougie à droite est la plus récente. Il n'y a rien après elle : tu
+ne vois que le passé, et c'est sur ce passé seul que ton plan doit reposer.
+
+Produis un plan de trade. Les niveaux entry, stopLoss, tp1 et tp2 sont des PRIX
+dans cette échelle, et doivent rester entre ${priceBottom} et ${priceTop}.
+
+Contraintes de cohérence, sans exception :
+- BUY  : stopLoss < entry < tp1 < tp2
+- SELL : stopLoss > entry > tp1 > tp2
+
+Recopie l'échelle ci-dessus dans le champ "scale". Ici ce n'est pas une mesure,
+seulement une formalité du schéma — il ne sera pas lu.
+
+confidence (0-100) : ta certitude sur ta LECTURE DE STRUCTURE, pas sur l'axe,
+qui t'est donné. Sois sévère : sous 40 si le graphique ne présente aucune
+configuration nette.
+
+reasoning : 2 à 4 phrases, chacune citant un élément réellement visible sur
+l'image — mèche de rejet, gap non comblé, cassure de structure, pic de volume.
+Jamais une généralité de marché.
+
+Réponds uniquement par un objet JSON conforme au schéma, sans texte autour.`;
+}
+
+/**
  * Extrait l'objet JSON d'une réponse texte.
  *
  * Les sorties structurées rendent ce nettoyage inutile chez Gemini, mais les
