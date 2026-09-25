@@ -242,8 +242,8 @@ describe('échantillonnage stratifié', () => {
 });
 
 
-describe('sens dominant, par proxy', () => {
-  const sensDe = (speciale) => scorerSegment(avecUneBougie(speciale), { fenetre: 60 }).at(-1).mesures.sens;
+describe('sens présumé (réfuté, DEC-030)', () => {
+  const sensDe = (speciale) => scorerSegment(avecUneBougie(speciale), { fenetre: 60 }).at(-1).mesures.sensApparent;
 
   it('lit l’achat sur une clôture au-dessus de l’ouverture', () => {
     expect(sensDe({ ouverture: 1990, cloture: 2010, volume: 900 })).toBe('achat');

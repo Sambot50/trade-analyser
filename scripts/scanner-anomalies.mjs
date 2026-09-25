@@ -183,8 +183,8 @@ function afficherFamilles(actifs, champ, titre) {
 }
 
 export const contreCourant = (m) =>
-  (m.sens === 'achat' && m.tendanceSemaine === 'baissiere')
-  || (m.sens === 'vente' && m.tendanceSemaine === 'haussiere');
+  (m.sensApparent === 'achat' && m.tendanceSemaine === 'baissiere')
+  || (m.sensApparent === 'vente' && m.tendanceSemaine === 'haussiere');
 
 async function main() {
   const o = validerOptions(parseArgs(process.argv.slice(2)));
@@ -260,8 +260,16 @@ async function main() {
 
     // Achat et vente séparés, et échantillonnés séparément : sans ça, un
     // marché qui monte remplirait les deux tableaux du même côté.
+    // DEC-030 : ce découpage repose sur un indice réfuté. Le dire ICI, à
+    // l'endroit exact où quelqu'un va lire « ACHAT » et y croire — un
+    // avertissement en tête de sortie se perd dans le défilement.
+    console.log('\n  ⚠  ACHAT / VENTE ci-dessous : PRÉSUMÉS d’après la clôture face à');
+    console.log('     l’ouverture. Mesuré faux une fois sur trois contre le vrai côté');
+    console.log('     de l’agresseur (DEC-030) : 62,6 % d’accord en 15 min, 47,8 % en');
+    console.log('     1 h. Un seuil de volume n’y change rien. À ne pas lire comme un fait.');
+
     for (const sens of ['achat', 'vente']) {
-      const duSens = retenusPourScan.filter((s) => s.mesures.sens === sens);
+      const duSens = retenusPourScan.filter((s) => s.mesures.sensApparent === sens);
       const options = { nombre: o.nombre, ecartMinimalMs: o.ecartMinutes * 60_000 };
       const retenus = o.sommet
         ? meilleurs(duSens, detecteur, options).map((r) => ({ ...r, bande: 'sommet' }))
