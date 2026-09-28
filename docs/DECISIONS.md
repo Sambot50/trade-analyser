@@ -2340,9 +2340,8 @@ ne regardait qu'un taux de réussite.
 
 **+0,198 R.** L'avantage ne disparaît pas, il rétrécit.
 
-Erreur type estimée à la main depuis les proportions : **≈ 0,101 R, soit
-z ≈ 2,0**. Le script la calcule désormais lui-même ; le chiffre mesuré reste à
-relever d'une exécution.
+Erreur type **mesurée : ± 0,102 R, soit z = 1,94.** L'estimation faite à la main
+depuis les proportions donnait 0,101 et 2,0 — elle était juste.
 
 D'après DEC-032, c'est bien une différence entre deux bras contemporains :
 son erreur type n'est pas gonflée par le chevauchement. En revanche les 58,8 %
@@ -2379,6 +2378,40 @@ l'écart mesuré trop bas.
 
 Corrigé : chaque bras paie les siens. Le défaut jouait en défaveur du
 détecteur — bonne direction pour une erreur, mais une erreur quand même.
+
+### Ce que la correction a révélé, et ce qu'il ne faut PAS y lire
+
+Les deux bras ne paient pas du tout la même chose :
+
+| | Frais | Espérance nette |
+|---|---|---|
+| Détectées | **8,87 % de R** | +0,304 R |
+| Témoin | **24,03 % de R** | **−0,045 R** |
+
+Quatre ticks valent 0,40 $/oz dans les deux cas. Mais R est la hauteur de la
+bougie d'ancrage : ~4,5 $ pour une bougie détectée, ~1,7 $ pour une bougie du
+témoin. Le même coût absolu pèse trois fois plus lourd rapporté à un R trois
+fois plus petit. **Le témoin passe négatif.**
+
+L'apport net monte donc de +0,198 à **+0,350 R**, ce qui donnerait z = 3,4.
+**Ce chiffre ne doit pas être lu comme un avantage qui se renforce.**
+
+| Composante | Valeur | Contenu prédictif |
+|---|---|---|
+| Écart brut détectées − témoin | **+0,198 R** | oui — z = 1,94 |
+| Écart de structure de coût | **+0,152 R** | **aucun** |
+| Total net | +0,350 R | |
+
+**43 % de l'avantage net ne vient pas du détecteur**, mais de ce que ses bougies
+sont plus grandes. C'est un effet d'unité — mesurer en R, où R change à chaque
+trade — et non un effet de prédiction. La part prédictive reste à +0,198 R et
+z = 1,94, inchangée.
+
+Reste un résultat utile, et il n'est pas là où on le cherchait : **une bougie de
+1,7 $ de hauteur ne se trade pas à quatre ticks de frais.** Son espérance brute
+de +0,195 R est intégralement mangée. Cela rejoint DEC-031 — le volume annonce
+l'amplitude, et l'amplitude décide si le trade paie ses frais avant même de
+décider s'il gagne.
 
 ### Ce qui reste sans réponse, et qui pèse plus que le chiffre
 
