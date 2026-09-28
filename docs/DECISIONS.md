@@ -2183,3 +2183,108 @@ La question neuve — **quel rapport gain/risque cet avantage supporte-t-il ?**
 2020-2022 ne l'est plus : ses chiffres sont désormais connus, et y chercher le
 bon ratio reviendrait à l'ajuster sur ce qu'on a déjà vu. 2017-2019 reste
 disponible.
+
+---
+
+## DEC-032 — L'erreur type d'un taux isolé est fausse d'un facteur 3,7. Celle d'une différence ne l'est pas.
+
+**2026-09-28.** `diag/resolution` a été écrite pour savoir si le dénominateur de
+HYP-001 était creux. Lancée d'abord sur une marche aléatoire — un contrôle de
+routine, la réponse étant connue d'avance — elle a rendu autre chose.
+
+### L'alerte
+
+Sur du bruit pur, sans aucun avantage possible, le témoin rend **53,7 % de
+réussite et +0,215 R**. Attendu : 50 % et 0.
+
+Premier réflexe, distinguer une dérive d'échantillon d'un biais de code :
+**le reflet de la série** — chaque hausse devenue baisse — rend **+0,262 R**,
+positif lui aussi. Une dérive aurait changé de signe. Pas un biais.
+
+### Ce que ce n'était pas
+
+`sortDeLaPosition` isolée, **219 800 ancres**, aucune sélection :
+
+```
+taux sur barrières   49,89 %   attendu 50,00 %   écart −1,0 écart-type
+espérance complète   −0,0067 R  attendu 0
+```
+
+La fonction est propre. `scorerSegment` seul aussi : −0,4 écart-type.
+
+Ce sont les **familles** qui séparaient. Suivre la tendance rendait positif
+(hausse-achat +2,7 SE, baisse-vente +3,0 SE), la contrer rendait négatif
+(hausse-vente −2,8 SE, baisse-achat −1,7 SE) — un motif cohérent, tentant, et
+**faux** : rejoué sur quatorze graines, les signes basculent et la moyenne
+retombe à rien.
+
+### Ce que c'était
+
+Les écarts s'étalaient de **−9,4 à +11,5 écarts-types**. Sur des observations
+indépendantes, c'est impossible. Elles ne le sont pas.
+
+Avec un horizon de 24 heures sur des bougies de 15 minutes, **deux signaux
+consécutifs partagent 95 de leurs 96 bougies de résolution**. Un mouvement de
+marché pousse toutes les positions de la fenêtre dans le même sens. La formule
+usuelle les croit séparées.
+
+Mesuré en rejouant la règle gelée sur douze à quatorze marches indépendantes :
+
+| Grandeur | Dispersion réelle | Erreur type annoncée | Facteur |
+|---|---|---|---|
+| Taux d'**un seul bras** | 5,12 | 1,45 | **× 3,52** |
+| **Différence** détectées − témoin | 5,29 pt | 6,69 pt | **× 0,79** |
+
+### La correction que je me suis appliquée
+
+Ayant mesuré ×3,78 sur un bras, j'ai multiplié l'erreur type de HYP-002 —
+0,518 — et conclu que z tombait de 2,43 à 0,64, donc que le résultat
+s'effondrait.
+
+**C'était faux.** J'avais appliqué à une différence un facteur mesuré sur un
+bras. La mesure directe de la différence donne un facteur de **0,79 à 0,95** :
+aucune inflation. `z = 2,43` et `p = 0,0076` tiennent.
+
+### Pourquoi la différence est protégée
+
+Détectées et témoin sont tirés de la **même période** et subissent le **même**
+marché. La composante commune — celle, précisément, qui gonfle la variance de
+chaque bras — s'annule dans la soustraction. Il ne reste que ce qui distingue
+réellement les deux groupes.
+
+Ce n'est donc pas une prudence de méthode : **un témoin tiré de la même période
+est ce qui rend l'erreur type utilisable.** Sans lui, il aurait fallu multiplier
+par 3,7 et rien n'aurait survécu. La conception du protocole, décidée bien avant
+qu'on sache pourquoi, était la bonne pour une raison qu'on ignorait.
+
+### Ce que ça condamne quand même
+
+**Tout taux de réussite d'un bras isolé, assorti d'un intervalle calculé comme
+si les positions étaient indépendantes, est faux d'un facteur ~3,7.** Cela vise
+les colonnes « détectées » et « témoin » prises séparément dans les tableaux de
+HYP-001 et HYP-002 — pas leur écart, qui est la grandeur sur laquelle les deux
+hypothèses ont été jugées. Les verdicts tiennent ; les chiffres de colonne ne
+doivent pas être cités seuls.
+
+### La question d'origine, toujours ouverte
+
+Sur données synthétiques, la part « sans résolution » est de **1,5 % à 2,8 %**
+— et 1,8 % sur les 219 800 ancres isolées. La crainte qui a motivé la branche,
+*« il se peut que la majorité des positions n'atteigne rien »*, ne s'y vérifie
+pas : avec 96 bougies d'horizon, des barrières à ±3 fois la hauteur d'une
+bougie sont presque toujours touchées.
+
+Mais la volatilité de la marche est **constante**, et celle de l'or ne l'est
+pas : il a des régimes calmes où rien ne bouge pendant des heures. **Le chiffre
+sur GC reste à mesurer**, et lui seul répond.
+
+### Portée
+
+Le facteur est un ordre de grandeur, pas une constante. Il dépend du rapport
+entre l'horizon et l'espacement des signaux, et il a été mesuré sur une
+volatilité constante. Retenir : **3,7 environ pour un bras, 1 pour une
+différence contemporaine** — et remesurer avec `scripts/inflation.mjs` si
+l'horizon ou l'unité changent.
+
+Rien ici n'est pré-enregistré. C'est un étalonnage d'instrument, pas une
+hypothèse : il dit ce que vaut une erreur type, jamais si une règle est vraie.
