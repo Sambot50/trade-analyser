@@ -2288,3 +2288,115 @@ l'horizon ou l'unité changent.
 
 Rien ici n'est pré-enregistré. C'est un étalonnage d'instrument, pas une
 hypothèse : il dit ce que vaut une erreur type, jamais si une règle est vraie.
+
+---
+
+## DEC-033 — Le dénominateur était creux, et il l'était d'un seul côté
+
+**2026-09-28.** `resolution.mjs` lancé sur `GC_2023_2024` — **721 détectées,
+8 585 témoin**. La crainte qui a motivé la branche est confirmée, mais pas sous
+la forme redoutée.
+
+### La mesure
+
+| | atteint | perdu | **sans résolution** | ambigu |
+|---|---|---|---|---|
+| Détectées | 42,6 % | 29,8 % | **27,2 %** | 0,4 % |
+| Témoin | 51,9 % | 45,4 % | **2,2 %** | 0,5 % |
+
+**Un facteur douze.** Plus d'une position détectée sur quatre n'atteint aucune
+barrière en 24 heures, contre une sur cinquante au témoin.
+
+### La mécanique, évidente une fois vue
+
+Le détecteur retient les **grosses** bougies. Les barrières sont posées à
+±3 fois la hauteur de la bougie d'ancrage. Trois fois une grosse bougie, c'est
+loin — et vingt-quatre heures n'y suffisent pas.
+
+La règle gelée écartait ces cas du dénominateur. Elle jetait donc, **du seul
+côté détecté**, le quart des positions — et ce quart ne vaut rien :
+
+| | Barrières seules | Sorties au marché | Espérance complète |
+|---|---|---|---|
+| Détectées | +0,529 R | **+0,032 R** | +0,393 R |
+| Témoin | +0,198 R | +0,054 R | +0,195 R |
+
+### Ce que ça fait au chiffre publié
+
+| | Écart détectées − témoin |
+|---|---|
+| Comme le mesurait la règle gelée | **+0,331 R** |
+| En comptant tout, comme un compte le subit | **+0,198 R** |
+
+**La règle gelée surestimait l'avantage de 67 %.** Non par malveillance de
+mesure : elle appliquait le même traitement à deux bras que ce traitement
+n'affecte pas de la même façon. Le témoin n'était gonflé que de 2 % ; les
+détectées de 35 %.
+
+C'est la définition d'un biais de sélection, et il était invisible tant qu'on
+ne regardait qu'un taux de réussite.
+
+### Ce qui survit
+
+**+0,198 R.** L'avantage ne disparaît pas, il rétrécit.
+
+Erreur type estimée à la main depuis les proportions : **≈ 0,101 R, soit
+z ≈ 2,0**. Le script la calcule désormais lui-même ; le chiffre mesuré reste à
+relever d'une exécution.
+
+D'après DEC-032, c'est bien une différence entre deux bras contemporains :
+son erreur type n'est pas gonflée par le chevauchement. En revanche les 58,8 %
+et 53,3 %, taux d'un bras isolé, ne doivent jamais être cités seuls.
+
+**Rien de tout cela n'est pré-enregistré.** Ces données ont déjà été regardées.
+Un z de 2,0 y vaut beaucoup moins qu'un p de 0,0076 sur une épreuve gelée.
+
+### Le contrôle synthétique était aveugle à ce défaut, par construction
+
+Lancé la veille sur une marche aléatoire, le même script rendait 1,5 % à 2,8 %
+de non-résolution, et j'en avais conclu que **la crainte ne se vérifiait pas**.
+C'était faux, et la raison est instructive.
+
+`aleatoire.js` tire le volume **indépendamment du prix** — c'est précisément ce
+qui garantit l'absence d'avantage, et donc ce qui rend le contrôle valable. Mais
+cela détruit du même coup la corrélation volume ↔ amplitude de **+0,479**
+mesurée par DEC-031. Sur cette marche, une bougie à gros volume n'est pas une
+grosse bougie ; ses barrières ne sont pas plus lointaines ; l'asymétrie ne peut
+pas apparaître.
+
+**Un contrôle sans avantage ne détecte pas les biais qui naissent d'une
+corrélation réelle.** Il prouve qu'une mesure rend zéro sur du bruit. Il ne
+prouve pas qu'elle rend le bon chiffre sur un marché. Les deux contrôles sont
+nécessaires, et aucun ne remplace l'autre.
+
+### Un défaut corrigé au passage
+
+Les frais n'étaient relevés que sur les bougies détectées, puis appliqués aux
+deux bras. Or le coût en R vaut `ticks ÷ hauteur` : les bougies détectées étant
+les plus grandes, leur coût en R est le plus faible. Le témoin se voyait donc
+offrir des frais qu'il ne paie pas, son espérance nette était trop haute, et
+l'écart mesuré trop bas.
+
+Corrigé : chaque bras paie les siens. Le défaut jouait en défaveur du
+détecteur — bonne direction pour une erreur, mais une erreur quand même.
+
+### Ce qui reste sans réponse, et qui pèse plus que le chiffre
+
+**Il n'y a pas de mécanisme.**
+
+DEC-031 a établi que le volume est corrélé à **+0,430** avec l'amplitude à une
+heure, et à **+0,013** avec la direction — zéro. À 24 heures, l'horizon de
+HYP-001, la corrélation avec l'amplitude tombe elle-même à **−0,003**.
+
+HYP-001 est une règle **directionnelle**, sur un horizon **mort**, fondée sur un
+indicateur **sans contenu directionnel**. Qu'elle produise un effet de deux
+sigma n'a aucune explication connue.
+
+Et l'effet rétrécit à chaque examen : +5,11 points sur l'or, +3,02 sur les
+métaux, +1,26 au regroupement, et aujourd'hui l'avantage en R perd 40 % de plus.
+**Un effet qui diminue chaque fois qu'on mesure mieux tend en général vers
+zéro.**
+
+Conclure exigerait une épreuve pré-enregistrée sur une période jamais ouverte,
+avec l'**espérance complète** pour critère et non le taux sur barrières.
+2017-2019 reste la seule disponible.

@@ -76,6 +76,17 @@ export function resumer(sorts, coutMoyenEnR) {
   const horizon = par('horizon');
   const tous = [...barrieres, ...horizon].map((s) => s.R);
 
+  // Erreur type de l'espérance complète, sur les R eux-mêmes.
+  //
+  // DEC-032 : ce chiffre est utilisable pour une DIFFÉRENCE entre deux bras
+  // contemporains, où le mouvement commun s'annule. Il ne l'est PAS pour un
+  // bras pris seul — les positions s'y chevauchent et sa vraie dispersion
+  // vaut environ 3,7 fois celle-ci.
+  const m = moyenne(tous);
+  const ecartType = tous.length > 1
+    ? Math.sqrt(tous.reduce((s, x) => s + (x - m) ** 2, 0) / (tous.length - 1))
+    : null;
+
   return {
     n,
     atteint: par('atteint').length,
@@ -89,6 +100,9 @@ export function resumer(sorts, coutMoyenEnR) {
     evComplete: moyenne(tous),
     evNette: tous.length ? moyenne(tous) - coutMoyenEnR : null,
     evHorizon: moyenne(horizon.map((s) => s.R)),
+    cout: coutMoyenEnR,
+    ecartType,
+    erreurType: ecartType === null ? null : ecartType / Math.sqrt(tous.length),
   };
 }
 
@@ -102,17 +116,19 @@ function afficher(nom, r) {
   console.log(`    espérance, barrières seules ${r.evBarrieresSeules === null ? '—' : (r.evBarrieresSeules >= 0 ? '+' : '') + r.evBarrieresSeules.toFixed(3)} R`);
   console.log(`    espérance des sorties au marché ${r.evHorizon === null ? '—' : (r.evHorizon >= 0 ? '+' : '') + r.evHorizon.toFixed(3)} R`);
   console.log(`    ESPÉRANCE COMPLÈTE          ${r.evComplete === null ? '—' : (r.evComplete >= 0 ? '+' : '') + r.evComplete.toFixed(3)} R`);
-  console.log(`    ESPÉRANCE NETTE (frais)     ${r.evNette === null ? '—' : (r.evNette >= 0 ? '+' : '') + r.evNette.toFixed(3)} R`);
+  console.log(`    ESPÉRANCE NETTE (frais)     ${r.evNette === null ? '—' : (r.evNette >= 0 ? '+' : '') + r.evNette.toFixed(3)} R   (frais propres à ce bras : ${(r.cout * 100).toFixed(2)} % de R)`);
+  console.log(`    erreur type de ce bras      ± ${r.erreurType === null ? '—' : r.erreurType.toFixed(3)} R   — à multiplier par ~3,7, voir DEC-032`);
 }
 
-async function mesurer(chemin) {
+export async function mesurer(chemin) {
   const { bougies: fines, volumeExploitable } = analyserCsv(await readFile(chemin, 'utf8'), { unite: GEL.utCsv });
   if (!volumeExploitable) return null;
   const pas = pasDeCotation(fines.slice(0, 200000).map((b) => b.cloture));
   const horizon = Math.round((GEL.horizonHeures * 3_600_000) / dureeUnite(GEL.ut));
   const { segments } = decouperParContrat(fines);
 
-  const detectees = []; const temoin = []; const couts = [];
+  const detectees = []; const temoin = [];
+  const coutsDetectees = []; const coutsTemoin = [];
   for (const segment of segments) {
     const serie = agregerBougies(segment.bougies, GEL.ut);
     for (const s of scorerSegment(serie, { fenetre: GEL.fenetre })) {
@@ -121,13 +137,21 @@ async function mesurer(chemin) {
       const sort = sortDeLaPosition(serie, s.index, horizon, GEL.multiple);
       if (!sort) continue;
       const b = serie[s.index];
+      // Le coût en R vaut `ticks ÷ hauteur`. Les bougies détectées sont les
+      // GROSSES : leur coût en R est mécaniquement plus faible. Emprunter
+      // leur chiffre au témoin lui offrait des frais qu'il ne paie pas, et
+      // gonflait son espérance nette — donc rétrécissait l'écart mesuré.
+      const cout = pas ? (TICKS * pas) / (b.plusHaut - b.plusBas) : null;
       if (s.scores[GEL.detecteur]) {
         detectees.push(sort);
-        if (pas) couts.push((TICKS * pas) / (b.plusHaut - b.plusBas));
-      } else temoin.push(sort);
+        if (cout !== null) coutsDetectees.push(cout);
+      } else {
+        temoin.push(sort);
+        if (cout !== null) coutsTemoin.push(cout);
+      }
     }
   }
-  return { detectees, temoin, coutMoyen: moyenne(couts) ?? 0, pas };
+  return { detectees, temoin, coutsDetectees, coutsTemoin, pas };
 }
 
 async function principal() {
@@ -145,28 +169,41 @@ async function principal() {
   console.log(`\nrègle de HYP-001 : ${GEL.ut} · ±${GEL.multiple}R · ${GEL.famille} · horizon ${GEL.horizonHeures} h`);
   console.log(`frais : ${TICKS} ticks aller-retour, pas lu dans les données\n`);
 
-  const toutesDetectees = []; const toutTemoin = []; let coutTotal = 0; let nFichiers = 0;
+  const toutesDetectees = []; const toutTemoin = [];
+  const toutCoutD = []; const toutCoutT = [];
 
   for (const f of fichiers) {
     process.stdout.write(`  ${f} … `);
     const m = await mesurer(f);
     if (!m) { console.log('pas de volume réel'); continue; }
-    console.log(`${m.detectees.length} détectées · ${m.temoin.length} témoin · pas ${m.pas} · frais moyens ${(m.coutMoyen * 100).toFixed(2)} % de R`);
+    console.log(`${m.detectees.length} détectées · ${m.temoin.length} témoin · pas ${m.pas}`);
     toutesDetectees.push(...m.detectees); toutTemoin.push(...m.temoin);
-    coutTotal += m.coutMoyen; nFichiers++;
+    toutCoutD.push(...m.coutsDetectees); toutCoutT.push(...m.coutsTemoin);
   }
 
-  const coutMoyen = nFichiers ? coutTotal / nFichiers : 0;
+  const d = resumer(toutesDetectees, moyenne(toutCoutD) ?? 0);
+  const t = resumer(toutTemoin, moyenne(toutCoutT) ?? 0);
+
   console.log('\n' + '='.repeat(76));
   console.log('  CE QUE LA RÈGLE GELÉE ÉCARTAIT');
   console.log('='.repeat(76));
-  afficher('DÉTECTÉES', resumer(toutesDetectees, coutMoyen));
-  afficher('TÉMOIN   ', resumer(toutTemoin, coutMoyen));
+  afficher('DÉTECTÉES', d);
+  afficher('TÉMOIN   ', t);
 
-  const d = resumer(toutesDetectees, coutMoyen);
-  const t = resumer(toutTemoin, coutMoyen);
   if (d && t && d.evComplete !== null && t.evComplete !== null) {
-    console.log(`\n  APPORT DU DÉTECTEUR, espérance complète : ${(d.evComplete - t.evComplete >= 0 ? '+' : '')}${(d.evComplete - t.evComplete).toFixed(3)} R`);
+    const ecart = d.evComplete - t.evComplete;
+    console.log(`\n  APPORT DU DÉTECTEUR, espérance complète : ${ecart >= 0 ? '+' : ''}${ecart.toFixed(3)} R`);
+    if (d.erreurType !== null && t.erreurType !== null) {
+      const se = Math.sqrt(d.erreurType ** 2 + t.erreurType ** 2);
+      console.log(`    erreur type de l'écart                  ± ${se.toFixed(3)} R`);
+      console.log(`    z                                         ${(ecart / se).toFixed(2)}`);
+      console.log(`\n    Cet écart est une DIFFÉRENCE entre deux bras contemporains :`);
+      console.log(`    son erreur type n'est pas gonflée par le chevauchement (DEC-032).`);
+      console.log(`    Mais ces données ont déjà été regardées. Un z n'y vaut pas un p.`);
+    }
+    if (d.evNette !== null && t.evNette !== null) {
+      console.log(`\n  APPORT NET DES FRAIS, chacun payant les siens : ${(d.evNette - t.evNette >= 0 ? '+' : '')}${(d.evNette - t.evNette).toFixed(3)} R`);
+    }
   }
 
   console.log('\n  Lecture :');

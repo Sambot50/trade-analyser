@@ -1,5 +1,11 @@
+import { writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
-import { resumer, sortDeLaPosition } from './resolution.mjs';
+
+import { mesurer, resumer, sortDeLaPosition } from './resolution.mjs';
+import { serieAleatoire, enCsv } from '../src/lib/marche/aleatoire.js';
 
 const bg = (ouverture, plusHaut, plusBas, cloture) => ({ ouverture, plusHaut, plusBas, cloture, volume: 1 });
 const plat = (prix) => bg(prix, prix, prix, prix);
@@ -69,4 +75,44 @@ describe('résumé', () => {
   });
 
   it('rend null sur un ensemble vide', () => expect(resumer([], 0)).toBeNull());
+
+  it('reporte les frais qu’on lui a passés, pour qu’on voie lesquels', () => {
+    expect(resumer([s('atteint', 3), s('perdu', -3)], 0.0887).cout).toBeCloseTo(0.0887, 9);
+  });
+
+  it('rend l’erreur type de l’espérance complète', () => {
+    // Quatre R : 3, −3, 3, −3. Écart-type d'échantillon = 2√3 ≈ 3,4641.
+    const r = resumer([s('atteint', 3), s('perdu', -3), s('atteint', 3), s('perdu', -3)], 0);
+    expect(r.ecartType).toBeCloseTo(2 * Math.sqrt(3), 9);
+    expect(r.erreurType).toBeCloseTo((2 * Math.sqrt(3)) / 2, 9);
+  });
+
+  it('ne prétend pas à une erreur type sur une seule position', () => {
+    const r = resumer([s('atteint', 3)], 0);
+    expect(r.ecartType).toBeNull();
+    expect(r.erreurType).toBeNull();
+  });
+});
+
+describe('frais mesurés bras par bras', () => {
+  // Le défaut corrigé : les frais n'étaient relevés que sur les bougies
+  // DÉTECTÉES, puis appliqués aux deux bras. Or le coût en R vaut
+  // `ticks ÷ hauteur`, et les deux bras n'ont pas la même hauteur de bougie.
+  // Le témoin se voyait donc attribuer des frais qui n'étaient pas les siens.
+  const fichier = join(tmpdir(), 'resolution-frais.csv');
+  writeFileSync(fichier, enCsv(serieAleatoire({ graine: 5, minutes: 25 * 1440, contrats: 1 })));
+
+  it('relève un coût par position, dans chaque bras séparément', async () => {
+    const m = await mesurer(fichier);
+    expect(m.pas).toBeGreaterThan(0);
+    expect(m.coutsDetectees.length).toBe(m.detectees.length);
+    expect(m.coutsTemoin.length).toBe(m.temoin.length);
+    expect(m.coutsDetectees.length).toBeGreaterThan(0);
+    expect(m.coutsTemoin.length).toBeGreaterThan(0);
+    for (const c of [...m.coutsDetectees, ...m.coutsTemoin]) expect(c).toBeGreaterThan(0);
+  });
+
+  it('n’expose plus de coût unique partagé', async () => {
+    expect(await mesurer(fichier)).not.toHaveProperty('coutMoyen');
+  });
 });
