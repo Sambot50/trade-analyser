@@ -2183,3 +2183,100 @@ La question neuve — **quel rapport gain/risque cet avantage supporte-t-il ?**
 2020-2022 ne l'est plus : ses chiffres sont désormais connus, et y chercher le
 bon ratio reviendrait à l'ajuster sur ce qu'on a déjà vu. 2017-2019 reste
 disponible.
+
+---
+
+## DEC-034 — La fiche de dimensionnement, jouée comme règle, ne gagne pas
+
+**2026-09-30.** `plan.mjs` sur `GC_2023_2024` — **47 185 bougies de 15 minutes,
+11 contrats**, les deux sens sur chaque bougie, quantiles recalculés à chaque
+pas sur les seules ancres dont l'horizon s'est refermé.
+
+C'est la première fois que les trois distances de la fiche — stop au q90 à 1 h,
+objectif au q75 à 4 h, seuil nul à la médiane 1 h — sont jouées **ensemble**.
+
+### Le résultat
+
+**Douze cases. Onze sont négatives nettes.** La douzième, vente 6–10× à
++0,042 R, a n = 203 pour une erreur type de 0,052 : 0,8 écart-type.
+
+| Tranche | Brut achat | Net achat | Frais |
+|---|---|---|---|
+| 1–1,5× | +0,003 R | **−0,078 R** | 0,081 R |
+| 1,5–2× | +0,030 R | **−0,045 R** | 0,075 R |
+| 2–3× | +0,010 R | **−0,052 R** | 0,062 R |
+| 3–4× | +0,021 R | **−0,026 R** | 0,047 R |
+| 4–6× | −0,012 R | **−0,057 R** | 0,045 R |
+| 6–10× | −0,073 R | **−0,120 R** | 0,047 R |
+
+**L'espérance brute est indiscernable de zéro.** Les z valent 0,3 · 2,1 · 0,8 ·
+0,95 · −0,5 · −1,5 à l'achat, et 0,1 · −2,3 · −0,6 · −0,8 · 0,3 · 1,8 à la
+vente. Sur douze cases, un 2,1 est attendu par hasard — et ce sont là des
+chiffres d'une case **prise seule**, donc soumis au gonflement de DEC-032. Le
+chevauchement y est plus faible qu'à 24 heures (16 bougies au lieu de 96), mais
+il n'est pas nul : ces z sont des majorants.
+
+La seule case au-dessus de 2 écarts-types a d'ailleurs son miroir exact :
+**+0,030 à l'achat, −0,032 à la vente, même tranche**. Ce n'est pas la règle qui
+parle, c'est la hausse de l'or sur 2023-2024.
+
+### Trois mécanismes, tous mesurés
+
+**Les frais valent trois fois l'avantage.** 0,045 à 0,081 R contre 0,003 à
+0,030 R d'espérance brute.
+
+**Le seuil nul transforme 37 à 47 % des positions en zéros**, quand l'objectif
+n'est touché que 13 à 24 % du temps. Il se déclenche à la **médiane** de
+l'excursion à 1 h — donc sur la moitié des bougies par construction — et il
+suffit ensuite que le prix revienne à l'entrée. Près d'un trade sur deux paie
+les frais complets pour un résultat nul.
+
+**Les frais décroissent quand la tranche monte** — 0,081 → 0,047 R. C'est la
+mécanique de DEC-033, confirmée sur un second jeu de mesures indépendant.
+
+### Ce que ça n'invalide pas
+
+**La fiche n'a jamais prétendu donner la direction, et ce test suppose
+précisément la direction absente** : il prend les deux sens sur chaque bougie.
+Direction aléatoire, espérance nulle — c'est la bonne réponse, pas une
+réfutation.
+
+Deux choses en sortent renforcées :
+
+- **DEC-031 tient.** Le volume ne dit rien de la direction ; la démonstration
+  est maintenant double, par la corrélation et par le rendement.
+- **Le tableau vente est mesuré, non supposé.** Achat et vente sont quasi
+  identiques à chaque tranche. La crainte d'une asymétrie due à la hausse de
+  l'or est levée.
+
+### Ce que ça établit, et qui vaut plus que le verdict
+
+**La friction vaut 0,08 R par trade.**
+
+C'est le seuil qu'une lecture de direction doit franchir pour que la fiche
+cesse de perdre. En ordre de grandeur, faire basculer une position du stop vers
+l'objectif vaut environ 2,5 R ; franchir 0,08 R demande donc d'en retourner
+environ 3 %, soit **avoir raison près de 51,5 % du temps au lieu de 50 %**.
+
+Cette conversion est une approximation, pas une mesure. Le chiffre mesuré est
+**0,08 R**, et c'est le seul qui décide si un trading discrétionnaire peut
+payer ses frais sur ce plan.
+
+### Requalification
+
+La fiche cesse d'être présentée comme un plan qui gagne. Elle est **un outil de
+dimensionnement assorti d'un coût connu** : elle dit de combien de place le
+prix a besoin, et ce que cette place coûte. Elle ne dit rien de la direction,
+et ne produit aucun rendement par elle-même.
+
+### Le piège immédiat
+
+Retirer le seuil nul, ou l'éloigner, et relancer sur les mêmes données. **Ce
+serait de l'ajustement sur ce qu'on vient de regarder.** 2023-2024 est
+désormais ouvert pour cette question.
+
+Une variante se gèle d'abord, puis s'éprouve sur `GC_2025_2026`, encore vierge
+de toute mesure de ce type.
+
+Rien ici n'est pré-enregistré. Ce diagnostic dit ce que la fiche **aurait**
+rendu, jamais ce qu'elle rendra.
