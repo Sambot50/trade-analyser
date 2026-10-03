@@ -298,6 +298,8 @@ export function echelleDepuisReperes(reperes, { ecartMaximal = 0.01, minimum = 3
     retenus: meilleur,
     rejetes: points.filter((p) => !meilleur.includes(p)),
     prixDeY: (y) => a * y + b,
+    // L'inverse, pour reporter une zone mesurée SUR l'image.
+    yDePrix: (prix) => (prix - b) / a,
   };
 }
 

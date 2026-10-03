@@ -3,7 +3,7 @@ import {
   Upload, Sparkles, TrendingUp, TrendingDown,
   Target, RefreshCw, Key, CheckCircle2,
   Copy, Zap, ShieldAlert, AlertCircle, Layers,
-  BarChart2, ArrowUpRight, Eye, EyeOff, Cpu, Settings, Ruler, NotebookPen, LineChart,
+  BarChart2, ArrowUpRight, Eye, EyeOff, Cpu, Settings, Ruler, NotebookPen, LineChart, GitCompare,
 } from 'lucide-react';
 
 import { SAMPLES } from './samples.js';
@@ -15,6 +15,8 @@ import { enregistrerAnalyse, dossierMemorise, resoudreEnAttente } from './lib/jo
 import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines, rrVerdict, breakEvenRate, FRICTION_PAR_DEFAUT } from './lib/analysis.js';
 import { lireGraphique } from './lib/vision/lecture.js';
 import { pixelsDepuisDataUrl, enCanvas } from './lib/vision/navigateur.js';
+import { rectanglesDesOrderBlocks, etiquetteDuRectangle } from './lib/vision/trace.js';
+import { confronter, ECART_PREOCCUPANT } from './lib/vision/confrontation.js';
 
 const LEVEL_LABELS = { entry: 'ENTRÉE', sl: 'STOP LOSS', tp1: 'TP 1', tp2: 'TP 2' };
 
@@ -35,6 +37,7 @@ export default function App() {
   const [visibleLevels, setVisibleLevels] = useState({ entry: true, sl: true, tp1: true, tp2: true });
 
   const [lecture, setLecture] = useState(null);
+  const [hauteurImage, setHauteurImage] = useState(0);
   const [lectureEnCours, setLectureEnCours] = useState(false);
   const [prixHaut, setPrixHaut] = useState('');
   const [prixBas, setPrixBas] = useState('');
@@ -128,10 +131,17 @@ export default function App() {
 
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
+      setHauteurImage(img.naturalHeight);
 
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
+
+      // Les zones mesurées se tracent même sans analyse du modèle : elles ne
+      // lui doivent rien, et c'est tout l'intérêt de les voir côte à côte.
+      for (const rect of rectanglesDesOrderBlocks(lecture, canvas.width)) {
+        dessinerZone(ctx, rect);
+      }
 
       if (!analysis) {
         setOverlayWarning('');
@@ -186,7 +196,7 @@ export default function App() {
 
     img.src = imageSrc;
     return () => { cancelled = true; };
-  }, [imageSrc, analysis, visibleLevels, engine.provider, engine.model, dossierJournal]);
+  }, [imageSrc, analysis, lecture, visibleLevels, engine.provider, engine.model, dossierJournal]);
 
   const loadSample = async (sample) => {
     setErrorMsg('');
@@ -469,6 +479,10 @@ export default function App() {
           </p>
 
           {lecture && <LectureCard lecture={lecture} />}
+
+          {lecture?.ok && analysis?.scale && (
+            <ConfrontationCard analysis={analysis} lecture={lecture} hauteurImage={hauteurImage} />
+          )}
 
           {lecture && !lecture.ok && lecture.etape === 'echelle' && (
             <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-2.5">
@@ -812,6 +826,83 @@ function ScaleCard({ scale }) {
  * lu » et « aucune bougie trouvée » demandent deux gestes opposés de la part
  * de l'utilisateur.
  */
+// Le modèle et la géométrie, côte à côte. Rien de tout cela n'est visible sans
+// les deux lectures : c'est pour ça que la carte n'apparaît qu'alors.
+function ConfrontationCard({ analysis, lecture, hauteurImage }) {
+  const c = confronter(analysis, lecture, hauteurImage);
+  if (!c) return null;
+  const { axes, niveaux } = c;
+
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+      <p className="text-[11px] uppercase tracking-wider text-cyan-400 font-semibold flex items-center gap-1.5">
+        <GitCompare className="w-3.5 h-3.5" /> Modèle contre mesure
+      </p>
+
+      {axes ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[12px] text-slate-400">Écart d’axe</span>
+            <span
+              className={`text-[13px] font-semibold tabular-nums ${
+                c.axeDouteux ? 'text-amber-400' : 'text-emerald-400'
+              }`}
+            >
+              {(axes.moyen * 100).toFixed(2)} % en moyenne · {(axes.pire * 100).toFixed(2)} % au pire
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-slate-500">
+            <span>haut mesuré {axes.hautMesure.toFixed(2)}</span>
+            <span>haut modèle {axes.hautModele.toFixed(2)}</span>
+            <span>bas mesuré {axes.basMesure.toFixed(2)}</span>
+            <span>bas modèle {axes.basModele.toFixed(2)}</span>
+          </div>
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            {c.axeDouteux
+              ? `Au-delà de ${(ECART_PREOCCUPANT * 100).toFixed(0)} % de l’étendue, le décalage dépasse de loin un stop : les niveaux du modèle visent à côté, même s’ils ont l’air justes.`
+              : 'Les deux axes concordent — les niveaux du modèle portent bien sur les prix qu’il annonce.'}
+          </p>
+        </div>
+      ) : (
+        <p className="text-[11px] text-slate-500">
+          Le modèle n’a pas fourni de repère d’axe exploitable : rien à confronter.
+        </p>
+      )}
+
+      {niveaux.length > 0 && (
+        <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[12px] text-slate-400">Niveaux sur une zone mesurée</span>
+            <span className="text-[13px] text-slate-200 font-semibold tabular-nums">
+              {c.appuyes} / {c.total}
+            </span>
+          </div>
+          {niveaux.map((n) => (
+            <div key={n.cle} className="flex items-baseline justify-between gap-2 text-[11px]">
+              <span className="text-slate-400">
+                {n.libelle} <span className="font-mono text-slate-600">{n.prix.toFixed(2)}</span>
+              </span>
+              {n.dansUneZone ? (
+                <span className="text-emerald-400">dans l’OB #{n.index}</span>
+              ) : n.distance !== null ? (
+                <span className="text-slate-500">
+                  à {(n.distance * 100).toFixed(1)} % de l’OB #{n.index}
+                </span>
+              ) : (
+                <span className="text-slate-600">aucune zone mesurée</span>
+              )}
+            </div>
+          ))}
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            Un niveau hors de toute zone n’est pas faux pour autant — il ne s’appuie
+            simplement sur rien que l’image montre.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function LectureCard({ lecture }) {
   if (!lecture.ok) {
     const geste = {
@@ -1011,6 +1102,45 @@ function LevelCard({ icon: Icon, label, value, tone }) {
 }
 
 /** Trace une ligne de niveau et son étiquette de prix sur le canvas. */
+/**
+ * Une zone d'order block, telle qu'elle a été MESURÉE sur l'image.
+ *
+ * Volontairement discrète : un fond très transparent et un liseré. Ces zones
+ * courent jusqu'au bord droit et se chevauchent souvent ; peintes en opaque,
+ * elles masqueraient les bougies qu'elles servent à expliquer.
+ */
+function dessinerZone(ctx, rect) {
+  const couleur = rect.sens === 'baissier' ? '239, 83, 80' : '38, 166, 154';
+  ctx.save();
+
+  ctx.fillStyle = `rgba(${couleur}, 0.13)`;
+  ctx.fillRect(rect.x, rect.y, rect.largeur, rect.hauteur);
+
+  ctx.strokeStyle = `rgba(${couleur}, 0.85)`;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(rect.x, rect.y, rect.largeur, rect.hauteur);
+
+  // Le bord gauche marque la bougie d'ancrage : c'est elle, l'order block.
+  ctx.beginPath();
+  ctx.lineWidth = 3;
+  ctx.moveTo(rect.x, rect.y);
+  ctx.lineTo(rect.x, rect.y + rect.hauteur);
+  ctx.stroke();
+
+  const texte = etiquetteDuRectangle(rect);
+  ctx.font = 'bold 12px Inter, system-ui, sans-serif';
+  ctx.textBaseline = 'bottom';
+  const largeurTexte = ctx.measureText(texte).width + 12;
+  const yTexte = rect.y > 18 ? rect.y - 3 : rect.y + rect.hauteur + 15;
+
+  ctx.fillStyle = `rgba(${couleur}, 0.92)`;
+  ctx.fillRect(rect.x, yTexte - 14, largeurTexte, 16);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(texte, rect.x + 6, yTexte);
+
+  ctx.restore();
+}
+
 function drawLevel(ctx, width, { y, color, label, price }) {
   ctx.save();
 

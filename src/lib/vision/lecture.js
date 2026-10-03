@@ -90,7 +90,7 @@ export async function lireGraphique(données, largeur, hauteur, options = {}) {
     const a = (prixBas - prixHaut) / (zone.y1 - zone.y0);
     const b = prixHaut - a * zone.y0;
     lu = { convention: 'manuelle', reperes: [{ prix: prixHaut, y: zone.y0 }, { prix: prixBas, y: zone.y1 }],
-      echelle: { a, b, n: 2, pireEcart: 0, prixDeY: (y) => a * y + b } };
+      echelle: { a, b, n: 2, pireEcart: 0, prixDeY: (y) => a * y + b, yDePrix: (prix) => (prix - b) / a } };
   } else {
     let lues = null;
     try {
