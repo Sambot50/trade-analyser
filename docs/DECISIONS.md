@@ -2186,6 +2186,375 @@ disponible.
 
 ---
 
+## DEC-031 — Le volume prédit l'amplitude, jamais la direction
+
+**2026-09-25.** Trois hypothèses gelées, trois verdicts, et la question du
+projet toujours sans réponse : *un gros volume apparaît, que fait le graphique
+ensuite ?* HYP-001 à HYP-003 mesuraient un taux de réussite à 24 heures. Elles
+ne demandaient pas si le volume était corrélé à quoi que ce soit. Cette mesure
+le demande.
+
+### La mesure
+
+**424 821 bougies de 15 minutes**, cinq marchés — SI, PL, HG, CL, ES —
+corrélation de rang de Spearman entre le volume d'une bougie et ce que le prix
+fait après elle, à quatre horizons.
+
+Spearman plutôt que Pearson : la distribution des volumes a une queue épaisse,
+et une poignée de bougies écraserait un coefficient linéaire. Les rangs
+neutralisent cela ; les ex æquo partagent leur rang.
+
+Deux grandeurs mesurées séparément, et c'est tout l'intérêt :
+
+| Le volume est-il corrélé à… | 15 min | 1 h | 4 h | 24 h |
+|---|---|---|---|---|
+| …la **distance parcourue** (amplitude) | **+0,479** | **+0,430** | **+0,285** | −0,003 |
+| …la **variation signée** (direction) | +0,009 | +0,013 | +0,009 | +0,001 |
+
+### Deux faits, et ils ne sont pas du même ordre
+
+**Le volume prédit l'amplitude.** +0,479 à 15 minutes n'est pas un effet
+marginal arraché à la statistique : c'est la relation la plus forte que ce
+projet ait mesurée, sur n'importe quoi, depuis son début.
+
+**Le volume ne dit rien de la direction.** +0,013 est indiscernable de zéro à
+tous les horizons. Cela vaut confirmation indépendante de DEC-030, par une voie
+entièrement différente — non plus le côté de l'agresseur transaction par
+transaction, mais le mouvement qui suit, sur cinq marchés et deux ans.
+
+**Entrer à l'achat parce que le volume est élevé reste un pile ou face.** Le
+volume dit *combien*, jamais *où*.
+
+### Ce que cela explique rétrospectivement
+
+Le signal est **mort à 24 heures** — l'horizon exact des trois hypothèses
+gelées. Elles mesuraient à l'endroit où il ne reste rien.
+
+Ce n'est pas un reproche au protocole : le pré-enregistrement a fait son
+travail, et l'avantage de +3,02 points sur les métaux tient toujours. C'est que
+l'horizon avait été choisi **avant** qu'on sache où vivait le signal, et que
+personne n'avait posé la question du bon horizon. HYP-001 et HYP-002 ont
+trouvé une lueur à l'endroit le plus défavorable qui soit.
+
+### L'or ne se déduit pas des cinq autres, et je l'ai appris à mes dépens
+
+Les chiffres ci-dessus ont d'abord été **transposés à l'or**. C'était une
+erreur, et elle portait sur deux points.
+
+Mesure refaite sur GC seul — `GC_2023_2024`, **46 421 bougies**, excursion
+maximale en 1 heure depuis la **clôture**, par tranche de volume rapportée à la
+médiane des 60 bougies précédentes :
+
+| Volume | n | médiane | q75 | q90 |
+|---|---|---|---|---|
+| 1–1,5× | 7 333 | 0,09 % | 0,16 % | 0,25 % |
+| 1,5–2× | 4 641 | 0,10 % | 0,18 % | 0,28 % |
+| 2–3× | 4 970 | 0,11 % | 0,19 % | 0,34 % |
+| 3–4× | 2 458 | 0,13 % | 0,24 % | 0,41 % |
+| 4–6× | 2 281 | 0,14 % | 0,28 % | 0,46 % |
+| 6–10× | 1 414 | 0,16 % | 0,31 % | 0,51 % |
+| ≥ 10× | 669 | **0,20 %** | 0,35 % | 0,65 % |
+
+**Premier point : les distances étaient deux fois trop grandes.** L'or bouge
+moins que l'argent, le platine, le cuivre, le pétrole et l'indice. Un
+pourcentage transposé d'un marché à l'autre n'est pas un pourcentage, c'est une
+supposition.
+
+**Second point, plus grave : le sens de la relation n'est pas le même.** Sur
+les cinq autres marchés, l'amplitude **retombe** à la tranche ≥ 10×. Sur l'or
+elle **continue de monter** — 0,20 % est la médiane la plus haute de la table.
+La relation y est monotone. La conclusion « le plus gros volume bouge le moins »
+est vraie ailleurs et fausse ici.
+
+### Ce que l'or condamne quand même, et pour une autre raison
+
+La conclusion pratique — éviter les plus gros volumes — tient, mais la raison
+n'est pas celle qu'on croyait. Ce n'est pas le mouvement qui rétrécit, c'est le
+**risque qui enfle plus vite que le gain** :
+
+| Volume | stop (q90, 1 h) | objectif (q75, 4 h) | gain/risque |
+|---|---|---|---|
+| 1–1,5× | 0,25 % | 0,36 % | **1,44** |
+| 2–3× | 0,34 % | 0,39 % | 1,15 |
+| 4–6× | 0,46 % | 0,46 % | 1,00 |
+| ≥ 10× | 0,65 % | 0,52 % | **0,80** |
+
+Le stop nécessaire est multiplié par 2,6 d'un bout à l'autre, l'objectif
+atteignable par 1,4 seulement. Les deux courbes se croisent vers **4–6×**.
+Au-delà, il faut viser juste plus d'une fois sur deux pour rentrer dans ses
+frais.
+
+### Ce que cela ne fait pas
+
+`correlations.mjs` et `dimensionner.mjs` ne produisent **aucun signal
+d'entrée**, et ne doivent jamais être relus comme s'ils en produisaient. Ils
+décrivent des distributions passées. Ils dimensionnent une position dont la
+direction a été décidée ailleurs, par autre chose qu'eux.
+
+Ces mesures ne sont pas pré-enregistrées. Elles ne réfutent ni ne confirment
+rien : elles cartographient. Toute règle qu'on en tirerait devrait être gelée
+puis éprouvée sur une période encore fermée — 2017-2019 reste disponible.
+
+### La leçon
+
+Une grandeur mesurée sur un marché n'est transposable à un autre que si on l'a
+vérifié. Pas en ordre de grandeur, et pas même en **sens** : ici, c'est le sens
+de la relation qui a changé d'un marché à l'autre. Le coût de la vérification
+était d'une commande et de quatre minutes. Le coût de l'avoir sautée a été une
+fiche publiée avec un graphique qui disait l'inverse de la vérité.
+
+---
+
+## DEC-032 — L'erreur type d'un taux isolé est fausse d'un facteur 3,7. Celle d'une différence ne l'est pas.
+
+**2026-09-28.** `diag/resolution` a été écrite pour savoir si le dénominateur de
+HYP-001 était creux. Lancée d'abord sur une marche aléatoire — un contrôle de
+routine, la réponse étant connue d'avance — elle a rendu autre chose.
+
+### L'alerte
+
+Sur du bruit pur, sans aucun avantage possible, le témoin rend **53,7 % de
+réussite et +0,215 R**. Attendu : 50 % et 0.
+
+Premier réflexe, distinguer une dérive d'échantillon d'un biais de code :
+**le reflet de la série** — chaque hausse devenue baisse — rend **+0,262 R**,
+positif lui aussi. Une dérive aurait changé de signe. Pas un biais.
+
+### Ce que ce n'était pas
+
+`sortDeLaPosition` isolée, **219 800 ancres**, aucune sélection :
+
+```
+taux sur barrières   49,89 %   attendu 50,00 %   écart −1,0 écart-type
+espérance complète   −0,0067 R  attendu 0
+```
+
+La fonction est propre. `scorerSegment` seul aussi : −0,4 écart-type.
+
+Ce sont les **familles** qui séparaient. Suivre la tendance rendait positif
+(hausse-achat +2,7 SE, baisse-vente +3,0 SE), la contrer rendait négatif
+(hausse-vente −2,8 SE, baisse-achat −1,7 SE) — un motif cohérent, tentant, et
+**faux** : rejoué sur quatorze graines, les signes basculent et la moyenne
+retombe à rien.
+
+### Ce que c'était
+
+Les écarts s'étalaient de **−9,4 à +11,5 écarts-types**. Sur des observations
+indépendantes, c'est impossible. Elles ne le sont pas.
+
+Avec un horizon de 24 heures sur des bougies de 15 minutes, **deux signaux
+consécutifs partagent 95 de leurs 96 bougies de résolution**. Un mouvement de
+marché pousse toutes les positions de la fenêtre dans le même sens. La formule
+usuelle les croit séparées.
+
+Mesuré en rejouant la règle gelée sur douze à quatorze marches indépendantes :
+
+| Grandeur | Dispersion réelle | Erreur type annoncée | Facteur |
+|---|---|---|---|
+| Taux d'**un seul bras** | 5,12 | 1,45 | **× 3,52** |
+| **Différence** détectées − témoin | 5,29 pt | 6,69 pt | **× 0,79** |
+
+### La correction que je me suis appliquée
+
+Ayant mesuré ×3,78 sur un bras, j'ai multiplié l'erreur type de HYP-002 —
+0,518 — et conclu que z tombait de 2,43 à 0,64, donc que le résultat
+s'effondrait.
+
+**C'était faux.** J'avais appliqué à une différence un facteur mesuré sur un
+bras. La mesure directe de la différence donne un facteur de **0,79 à 0,95** :
+aucune inflation. `z = 2,43` et `p = 0,0076` tiennent.
+
+### Pourquoi la différence est protégée
+
+Détectées et témoin sont tirés de la **même période** et subissent le **même**
+marché. La composante commune — celle, précisément, qui gonfle la variance de
+chaque bras — s'annule dans la soustraction. Il ne reste que ce qui distingue
+réellement les deux groupes.
+
+Ce n'est donc pas une prudence de méthode : **un témoin tiré de la même période
+est ce qui rend l'erreur type utilisable.** Sans lui, il aurait fallu multiplier
+par 3,7 et rien n'aurait survécu. La conception du protocole, décidée bien avant
+qu'on sache pourquoi, était la bonne pour une raison qu'on ignorait.
+
+### Ce que ça condamne quand même
+
+**Tout taux de réussite d'un bras isolé, assorti d'un intervalle calculé comme
+si les positions étaient indépendantes, est faux d'un facteur ~3,7.** Cela vise
+les colonnes « détectées » et « témoin » prises séparément dans les tableaux de
+HYP-001 et HYP-002 — pas leur écart, qui est la grandeur sur laquelle les deux
+hypothèses ont été jugées. Les verdicts tiennent ; les chiffres de colonne ne
+doivent pas être cités seuls.
+
+### La question d'origine, toujours ouverte
+
+Sur données synthétiques, la part « sans résolution » est de **1,5 % à 2,8 %**
+— et 1,8 % sur les 219 800 ancres isolées. La crainte qui a motivé la branche,
+*« il se peut que la majorité des positions n'atteigne rien »*, ne s'y vérifie
+pas : avec 96 bougies d'horizon, des barrières à ±3 fois la hauteur d'une
+bougie sont presque toujours touchées.
+
+Mais la volatilité de la marche est **constante**, et celle de l'or ne l'est
+pas : il a des régimes calmes où rien ne bouge pendant des heures. **Le chiffre
+sur GC reste à mesurer**, et lui seul répond.
+
+### Portée
+
+Le facteur est un ordre de grandeur, pas une constante. Il dépend du rapport
+entre l'horizon et l'espacement des signaux, et il a été mesuré sur une
+volatilité constante. Retenir : **3,7 environ pour un bras, 1 pour une
+différence contemporaine** — et remesurer avec `scripts/inflation.mjs` si
+l'horizon ou l'unité changent.
+
+Rien ici n'est pré-enregistré. C'est un étalonnage d'instrument, pas une
+hypothèse : il dit ce que vaut une erreur type, jamais si une règle est vraie.
+
+---
+
+## DEC-033 — Le dénominateur était creux, et il l'était d'un seul côté
+
+**2026-09-28.** `resolution.mjs` lancé sur `GC_2023_2024` — **721 détectées,
+8 585 témoin**. La crainte qui a motivé la branche est confirmée, mais pas sous
+la forme redoutée.
+
+### La mesure
+
+| | atteint | perdu | **sans résolution** | ambigu |
+|---|---|---|---|---|
+| Détectées | 42,6 % | 29,8 % | **27,2 %** | 0,4 % |
+| Témoin | 51,9 % | 45,4 % | **2,2 %** | 0,5 % |
+
+**Un facteur douze.** Plus d'une position détectée sur quatre n'atteint aucune
+barrière en 24 heures, contre une sur cinquante au témoin.
+
+### La mécanique, évidente une fois vue
+
+Le détecteur retient les **grosses** bougies. Les barrières sont posées à
+±3 fois la hauteur de la bougie d'ancrage. Trois fois une grosse bougie, c'est
+loin — et vingt-quatre heures n'y suffisent pas.
+
+La règle gelée écartait ces cas du dénominateur. Elle jetait donc, **du seul
+côté détecté**, le quart des positions — et ce quart ne vaut rien :
+
+| | Barrières seules | Sorties au marché | Espérance complète |
+|---|---|---|---|
+| Détectées | +0,529 R | **+0,032 R** | +0,393 R |
+| Témoin | +0,198 R | +0,054 R | +0,195 R |
+
+### Ce que ça fait au chiffre publié
+
+| | Écart détectées − témoin |
+|---|---|
+| Comme le mesurait la règle gelée | **+0,331 R** |
+| En comptant tout, comme un compte le subit | **+0,198 R** |
+
+**La règle gelée surestimait l'avantage de 67 %.** Non par malveillance de
+mesure : elle appliquait le même traitement à deux bras que ce traitement
+n'affecte pas de la même façon. Le témoin n'était gonflé que de 2 % ; les
+détectées de 35 %.
+
+C'est la définition d'un biais de sélection, et il était invisible tant qu'on
+ne regardait qu'un taux de réussite.
+
+### Ce qui survit
+
+**+0,198 R.** L'avantage ne disparaît pas, il rétrécit.
+
+Erreur type **mesurée : ± 0,102 R, soit z = 1,94.** L'estimation faite à la main
+depuis les proportions donnait 0,101 et 2,0 — elle était juste.
+
+D'après DEC-032, c'est bien une différence entre deux bras contemporains :
+son erreur type n'est pas gonflée par le chevauchement. En revanche les 58,8 %
+et 53,3 %, taux d'un bras isolé, ne doivent jamais être cités seuls.
+
+**Rien de tout cela n'est pré-enregistré.** Ces données ont déjà été regardées.
+Un z de 2,0 y vaut beaucoup moins qu'un p de 0,0076 sur une épreuve gelée.
+
+### Le contrôle synthétique était aveugle à ce défaut, par construction
+
+Lancé la veille sur une marche aléatoire, le même script rendait 1,5 % à 2,8 %
+de non-résolution, et j'en avais conclu que **la crainte ne se vérifiait pas**.
+C'était faux, et la raison est instructive.
+
+`aleatoire.js` tire le volume **indépendamment du prix** — c'est précisément ce
+qui garantit l'absence d'avantage, et donc ce qui rend le contrôle valable. Mais
+cela détruit du même coup la corrélation volume ↔ amplitude de **+0,479**
+mesurée par DEC-031. Sur cette marche, une bougie à gros volume n'est pas une
+grosse bougie ; ses barrières ne sont pas plus lointaines ; l'asymétrie ne peut
+pas apparaître.
+
+**Un contrôle sans avantage ne détecte pas les biais qui naissent d'une
+corrélation réelle.** Il prouve qu'une mesure rend zéro sur du bruit. Il ne
+prouve pas qu'elle rend le bon chiffre sur un marché. Les deux contrôles sont
+nécessaires, et aucun ne remplace l'autre.
+
+### Un défaut corrigé au passage
+
+Les frais n'étaient relevés que sur les bougies détectées, puis appliqués aux
+deux bras. Or le coût en R vaut `ticks ÷ hauteur` : les bougies détectées étant
+les plus grandes, leur coût en R est le plus faible. Le témoin se voyait donc
+offrir des frais qu'il ne paie pas, son espérance nette était trop haute, et
+l'écart mesuré trop bas.
+
+Corrigé : chaque bras paie les siens. Le défaut jouait en défaveur du
+détecteur — bonne direction pour une erreur, mais une erreur quand même.
+
+### Ce que la correction a révélé, et ce qu'il ne faut PAS y lire
+
+Les deux bras ne paient pas du tout la même chose :
+
+| | Frais | Espérance nette |
+|---|---|---|
+| Détectées | **8,87 % de R** | +0,304 R |
+| Témoin | **24,03 % de R** | **−0,045 R** |
+
+Quatre ticks valent 0,40 $/oz dans les deux cas. Mais R est la hauteur de la
+bougie d'ancrage : ~4,5 $ pour une bougie détectée, ~1,7 $ pour une bougie du
+témoin. Le même coût absolu pèse trois fois plus lourd rapporté à un R trois
+fois plus petit. **Le témoin passe négatif.**
+
+L'apport net monte donc de +0,198 à **+0,350 R**, ce qui donnerait z = 3,4.
+**Ce chiffre ne doit pas être lu comme un avantage qui se renforce.**
+
+| Composante | Valeur | Contenu prédictif |
+|---|---|---|
+| Écart brut détectées − témoin | **+0,198 R** | oui — z = 1,94 |
+| Écart de structure de coût | **+0,152 R** | **aucun** |
+| Total net | +0,350 R | |
+
+**43 % de l'avantage net ne vient pas du détecteur**, mais de ce que ses bougies
+sont plus grandes. C'est un effet d'unité — mesurer en R, où R change à chaque
+trade — et non un effet de prédiction. La part prédictive reste à +0,198 R et
+z = 1,94, inchangée.
+
+Reste un résultat utile, et il n'est pas là où on le cherchait : **une bougie de
+1,7 $ de hauteur ne se trade pas à quatre ticks de frais.** Son espérance brute
+de +0,195 R est intégralement mangée. Cela rejoint DEC-031 — le volume annonce
+l'amplitude, et l'amplitude décide si le trade paie ses frais avant même de
+décider s'il gagne.
+
+### Ce qui reste sans réponse, et qui pèse plus que le chiffre
+
+**Il n'y a pas de mécanisme.**
+
+DEC-031 a établi que le volume est corrélé à **+0,430** avec l'amplitude à une
+heure, et à **+0,013** avec la direction — zéro. À 24 heures, l'horizon de
+HYP-001, la corrélation avec l'amplitude tombe elle-même à **−0,003**.
+
+HYP-001 est une règle **directionnelle**, sur un horizon **mort**, fondée sur un
+indicateur **sans contenu directionnel**. Qu'elle produise un effet de deux
+sigma n'a aucune explication connue.
+
+Et l'effet rétrécit à chaque examen : +5,11 points sur l'or, +3,02 sur les
+métaux, +1,26 au regroupement, et aujourd'hui l'avantage en R perd 40 % de plus.
+**Un effet qui diminue chaque fois qu'on mesure mieux tend en général vers
+zéro.**
+
+Conclure exigerait une épreuve pré-enregistrée sur une période jamais ouverte,
+avec l'**espérance complète** pour critère et non le taux sur barrières.
+2017-2019 reste la seule disponible.
+
+---
+
 ## DEC-034 — La fiche de dimensionnement, jouée comme règle, ne gagne pas
 
 **2026-09-30.** `plan.mjs` sur `GC_2023_2024` — **47 185 bougies de 15 minutes,
