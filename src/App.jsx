@@ -816,8 +816,8 @@ function LectureCard({ lecture }) {
   if (!lecture.ok) {
     const geste = {
       palette: 'Vérifie que la capture montre bien des chandeliers, pas une courbe.',
-      zone: 'Recadre sur le graphique seul, sans la barre d\u2019outils.',
-      echelle: 'Agrandis la capture, ou dézoome l\u2019axe pour afficher plus de graduations.',
+      zone: 'Recadre sur le graphique seul, sans la barre d’outils.',
+      echelle: 'Agrandis la capture, ou dézoome l’axe pour afficher plus de graduations.',
       bougies: 'Le tracé a été trouvé mais reste vide : vérifie le recadrage.',
     }[lecture.etape];
 
@@ -830,7 +830,7 @@ function LectureCard({ lecture }) {
         {geste && <p className="text-[12px] text-slate-500 leading-relaxed">{geste}</p>}
         {lecture.etiquettes?.length > 0 && (
           <p className="text-[11px] text-slate-600 font-mono">
-            lu sur l\u2019axe : {lecture.etiquettes.map((e) => e.texte).join(' · ')}
+            lu sur l’axe : {lecture.etiquettes.map((e) => e.texte).join(' · ')}
           </p>
         )}
       </div>
@@ -843,7 +843,7 @@ function LectureCard({ lecture }) {
   return (
     <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
       <p className="text-[11px] uppercase tracking-wider text-indigo-400 font-semibold flex items-center gap-1.5">
-        <Ruler className="w-3.5 h-3.5" /> Mesuré sur l\u2019image
+        <Ruler className="w-3.5 h-3.5" /> Mesuré sur l’image
       </p>
 
       {(lecture.titre?.symbole || lecture.titre?.unite) && (
@@ -855,7 +855,7 @@ function LectureCard({ lecture }) {
       )}
       {lecture.titre && !lecture.titre.symbole && (
         <p className="text-[11px] text-amber-400">
-          Symbole non reconnu sur le bandeau — l\u2019issue devra être saisie à la main.
+          Symbole non reconnu sur le bandeau — l’issue devra être saisie à la main.
           {lecture.titre.texte && (
             <span className="text-slate-600 font-mono"> lu : « {lecture.titre.texte.slice(0, 60)} »</span>
           )}
@@ -916,8 +916,8 @@ function LectureCard({ lecture }) {
       )}
 
       <p className="text-[10px] text-slate-600 leading-relaxed border-t border-slate-800 pt-2.5">
-        Mesuré, pas interprété : aucun modèle n\u2019intervient ici. Les prix sont justes à
-        deux pixels près, soit la précision que porte l\u2019image.
+        Mesuré, pas interprété : aucun modèle n’intervient ici. Les prix sont justes à
+        deux pixels près, soit la précision que porte l’image.
       </p>
     </div>
   );
