@@ -208,3 +208,62 @@ describe('chaîne complète, sans rien donner d’autre que l’image', () => {
     }
   });
 });
+
+describe('zoneTrace — ce qui est coloré à droite du tracé', () => {
+  // Le cas qui bloquait sur une vraie capture : TradingView pose l'étiquette
+  // du prix courant SUR l'axe, et elle a la teinte exacte d'une bougie
+  // baissière. Borner le tracé sur la dernière colonne colorée faisait sauter
+  // la bordure droite jusqu'à elle, et la bande d'axe devenait large de
+  // quelques pixels — plus rien à lire dedans.
+  const PALETTE = { hausse: [16, 185, 129], baisse: [239, 68, 68] };
+
+  function scene({ etiquette = null, panneau = null } = {}) {
+    const L = 900; const H = 400;
+    const d = new Uint8ClampedArray(L * H * 4);
+    const pose = (x, y, c) => {
+      const i = (y * L + x) * 4;
+      d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255;
+    };
+    // Des bougies : hautes, espacées comme à l'écran.
+    for (let c = 0; c < 24; c++) {
+      const cx = 20 + c * 24;
+      for (let x = cx; x < cx + 14; x++) for (let y = 120 + (c % 5) * 8; y < 260; y++) pose(x, y, PALETTE.hausse);
+      for (let y = 80; y < 300; y++) pose(cx + 7, y, PALETTE.hausse);
+    }
+    // Une étiquette de prix : une ligne de texte, vingt pixels de haut.
+    if (etiquette) for (let x = etiquette[0]; x < etiquette[1]; x++) for (let y = 180; y < 200; y++) pose(x, y, PALETTE.baisse);
+    // Un panneau latéral : des lignes de texte, mais sur toute la hauteur.
+    if (panneau) for (let x = panneau[0]; x < panneau[1]; x++) for (let y = 40; y < 340; y++) pose(x, y, PALETTE.baisse);
+    return { d, L, H };
+  }
+
+  it('borne le tracé sur le BLOC dense, pas sur la dernière colonne colorée', () => {
+    const { d, L, H } = scene({ etiquette: [700, 760] });
+    const z = zoneTrace(d, L, H, PALETTE);
+    expect(z.x1).toBeLessThanOrEqual(600);
+    expect(z.x1).toBeGreaterThan(560);
+  });
+
+  it('laisse la bande d’axe couvrir l’étiquette du prix courant', () => {
+    // Elle est posée SUR les graduations : s'arrêter avant elle viderait la
+    // bande, et c'est exactement ce qu'on cherche à éviter.
+    const { d, L, H } = scene({ etiquette: [700, 760] });
+    const z = zoneTrace(d, L, H, PALETTE);
+    expect(z.axeX1).toBe(L);
+    expect(z.axeX1 - z.axeX0).toBeGreaterThan(200);
+  });
+
+  it('s’arrête en revanche avant un vrai panneau latéral', () => {
+    const { d, L, H } = scene({ panneau: [650, 880] });
+    const z = zoneTrace(d, L, H, PALETTE);
+    expect(z.x1).toBeLessThanOrEqual(600);
+    expect(z.axeX1).toBe(650);
+  });
+
+  it('garde une bande utilisable même avec étiquette ET panneau', () => {
+    const { d, L, H } = scene({ etiquette: [610, 670], panneau: [700, 880] });
+    const z = zoneTrace(d, L, H, PALETTE);
+    expect(z.axeX1).toBe(700);
+    expect(z.axeX1 - z.axeX0).toBeGreaterThan(80);
+  });
+});

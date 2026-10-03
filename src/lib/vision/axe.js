@@ -104,14 +104,14 @@ export function reperesDepuisEtiquettes(etiquettes, options = {}) {
  * Sans cette frontière, chaque bougie avale sa propre barre de volume et son
  * plus bas plonge de cent cinquante pixels.
  */
-export function zoneTrace(données, largeur, hauteur, palette, { seuilChroma = 25, ecartTeinteMax = 25 } = {}) {
+export function zoneTrace(données, largeur, hauteur, palette, { seuilChroma = 25, ecartTeinteMax = 25, ecartTolere = 60, largeurPanneau = 110 } = {}) {
   if (!palette) return null;
   const tH = teinte(palette.hausse);
   const tB = teinte(palette.baisse);
 
-  const colonneOccupee = new Uint8Array(largeur);
-  const ligneOccupee = new Uint8Array(hauteur);
-  let trouve = false;
+  // Première passe : la hauteur couverte par chaque colonne.
+  const hautCol = new Int32Array(largeur).fill(-1);
+  const basCol = new Int32Array(largeur).fill(-1);
 
   for (let y = 0; y < hauteur; y++) {
     for (let x = 0; x < largeur; x++) {
@@ -121,15 +121,107 @@ export function zoneTrace(données, largeur, hauteur, palette, { seuilChroma = 2
       if (chroma(p) < seuilChroma) continue;
       const t = teinte(p);
       if (ecartTeinte(t, tH) >= ecartTeinteMax && ecartTeinte(t, tB) >= ecartTeinteMax) continue;
-      colonneOccupee[x] = 1; ligneOccupee[y] = 1; trouve = true;
+      if (hautCol[x] === -1) hautCol[x] = y;
+      basCol[x] = y;
     }
+  }
+
+  // C'EST LA HAUTEUR QUI SÉPARE UNE BOUGIE DU DÉCOR, pas l'écart horizontal.
+  //
+  // Une étiquette de prix, une variation de watchlist, un bouton coloré : tout
+  // cela tient sur une ligne de texte, une vingtaine de pixels. Une colonne de
+  // bougie, mèche comprise, en couvre des centaines. Le rapport est franc, et
+  // il ne dépend ni du zoom ni du nombre de bougies affichées — contrairement
+  // à l'écart entre deux bougies, qui m'avait fait prendre chaque bougie pour
+  // un bloc séparé.
+  const hauteurs = [];
+  for (let x = 0; x < largeur; x++) if (hautCol[x] !== -1) hauteurs.push(basCol[x] - hautCol[x]);
+  if (!hauteurs.length) return null;
+  hauteurs.sort((a, b) => a - b);
+  const medianeHauteur = hauteurs[hauteurs.length >> 1];
+  const seuilHauteur = Math.max(6, medianeHauteur * 0.2);
+
+  const colonneOccupee = new Uint8Array(largeur);
+  let trouve = false;
+  for (let x = 0; x < largeur; x++) {
+    if (hautCol[x] === -1 || basCol[x] - hautCol[x] < seuilHauteur) continue;
+    colonneOccupee[x] = 1;
+    trouve = true;
   }
   if (!trouve) return null;
 
+  // Seconde passe pour les LIGNES, sur les pixels réellement colorés.
+  //
+  // Les marquer sur toute l'étendue d'une colonne boucherait le vide entre le
+  // panneau des prix et celui du volume : une même colonne porte la bougie ET
+  // sa barre, donc son étendue couvre la coupure qu'on cherche justement à
+  // trouver.
+  const ligneOccupee = new Uint8Array(hauteur);
+  for (let y = 0; y < hauteur; y++) {
+    for (let x = 0; x < largeur; x++) {
+      if (!colonneOccupee[x]) continue;
+      const i = (y * largeur + x) * 4;
+      if (données[i + 3] < 128) continue;
+      const p = [données[i], données[i + 1], données[i + 2]];
+      if (chroma(p) < seuilChroma) continue;
+      const t = teinte(p);
+      if (ecartTeinte(t, tH) >= ecartTeinteMax && ecartTeinte(t, tB) >= ecartTeinteMax) continue;
+      ligneOccupee[y] = 1;
+      break;
+    }
+  }
+
+  // Le tracé est le BLOC de colonnes le plus fourni, pas l'étendue totale.
+  //
+  // TradingView pose l'étiquette du prix courant sur l'axe, et elle a la teinte
+  // exacte d'une bougie — rouge quand le prix baisse. Prendre la dernière
+  // colonne colorée ferait donc sauter la bordure droite jusqu'à cette
+  // étiquette : la bande d'axe deviendrait large de quelques pixels, et il n'y
+  // aurait plus rien à lire dedans. Une watchlist, dont les variations sont
+  // écrites en vert et en rouge, produit le même effet en pire.
+  //
+  // Après le filtre de hauteur, on regroupe encore en blocs : un panneau
+  // latéral peut porter des barres assez hautes pour passer. La tolérance est
+  // large, car l'écart entre deux bougies grandit quand on dézoome.
+  const blocs = [];
+  let debutBloc = -1; let vide = 0; let occupees = 0;
+  for (let x = 0; x <= largeur; x++) {
+    if (x < largeur && colonneOccupee[x]) {
+      if (debutBloc === -1) debutBloc = x;
+      vide = 0; occupees++;
+      continue;
+    }
+    if (debutBloc === -1) continue;
+    vide++;
+    if (vide > ecartTolere || x === largeur) {
+      blocs.push({ x0: debutBloc, x1: x - vide + 1, occupees });
+      debutBloc = -1; vide = 0; occupees = 0;
+    }
+  }
+  if (!blocs.length) return null;
+  blocs.sort((a, b) => b.occupees - a.occupees);
+  const trace = blocs[0];
+
+  // À droite du tracé il y a deux choses très différentes.
+  //
+  // L'étiquette du prix courant est DANS la bande d'axe, posée par-dessus les
+  // graduations. S'arrêter avant elle reviendrait à vider la bande — c'est
+  // justement ce qu'on cherche à éviter.
+  //
+  // Un panneau latéral — watchlist, liste de valeurs — est une autre affaire :
+  // ses variations en vert et en rouge n'ont rien à voir avec l'axe, et la
+  // bande doit s'arrêter avant.
+  //
+  // La largeur les sépare : une étiquette fait quelques dizaines de pixels, un
+  // panneau plusieurs centaines. Le seuil est un réglage, pas une vérité.
+  const suivant = blocs
+    .filter((b) => b.x0 >= trace.x1 && b.x1 - b.x0 >= largeurPanneau)
+    .sort((a, b) => a.x0 - b.x0)[0];
+
   const premier = (tab) => tab.indexOf(1);
   const dernier = (tab) => tab.lastIndexOf(1);
-  const x0 = premier(colonneOccupee);
-  const x1 = dernier(colonneOccupee) + 1;
+  const x0 = trace.x0;
+  const x1 = trace.x1;
   const yDebut = premier(ligneOccupee);
   const yFin = dernier(ligneOccupee) + 1;
 
@@ -155,6 +247,7 @@ export function zoneTrace(données, largeur, hauteur, palette, { seuilChroma = 2
     volumeY1: frontiere ? yFin : null,
     // La bande à droite des bougies : c'est là que l'OCR doit chercher l'axe.
     axeX0: x1,
-    axeX1: largeur,
+    axeX1: suivant ? suivant.x0 : largeur,
+    blocs: blocs.length,
   };
 }
