@@ -174,3 +174,35 @@ describe('prixParPixel', () => {
     expect(prixParPixel(100, 0)).toBeNull();
   });
 });
+
+describe('une référence ÉPARSE, relevée à la main', () => {
+  // Le cas réel quand l'export CSV est payant : on survole une dizaine de
+  // bougies dans la fenêtre de données et on recopie leurs quatre prix. Un
+  // biais est un décalage constant — dix points suffisent à le voir.
+  it('conclut sur une poignée de bougies prises dans la série', () => {
+    const { reelles, mesurees } = serie(210, { biais: 9 });
+    const echantillon = reelles.filter((_, i) => i % 21 === 0);   // 10 bougies
+    expect(echantillon.length).toBe(10);
+
+    const r = rapprocher({ mesurees, reelles: echantillon, finMs: FIN, uniteMinutes: 15 });
+    expect(r.ok).toBe(true);
+    expect(r.nombreApparie).toBe(10);
+    expect(r.decalage).toBe(0);
+    expect(r.parChamp.cloture.biaisMedian).toBeCloseTo(9, 6);
+  });
+
+  it('refuse de conclure en dessous du plancher, et dit combien il en faut', () => {
+    const { reelles, mesurees } = serie(210);
+    const r = rapprocher({ mesurees, reelles: reelles.slice(0, 4), finMs: FIN, uniteMinutes: 15 });
+    expect(r.ok).toBe(false);
+    expect(r.probleme).toMatch(/au moins 8/);
+  });
+
+  it('ne se laisse pas tromper par une référence éparse MAL alignée', () => {
+    const { reelles, mesurees } = serie(210);
+    const echantillon = reelles.filter((_, i) => i % 21 === 0);
+    const r = rapprocher({ mesurees, reelles: echantillon, finMs: FIN + 3 * PAS, uniteMinutes: 15 });
+    expect(r.decalage).toBe(-3);
+    expect(r.parChamp.cloture.ecartMedian).toBeCloseTo(0, 6);
+  });
+});

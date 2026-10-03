@@ -11,6 +11,15 @@
 // biais, décide de ce qu'on peut faire des mesures — placer un stop à deux
 // points près n'a aucun sens si la lecture en coûte dix.
 
+/**
+ * En deçà, un alignement ne vaut rien.
+ *
+ * Huit bougies dont on connaît la forme suffisent à lever l'ambiguïté sur un
+ * décalage de quelques rangs — c'est la forme qui tranche, pas le nombre. En
+ * dessous, n'importe quel décalage trouve de quoi se justifier.
+ */
+export const MINIMUM_APPARIEMENTS = 8;
+
 /** Les quatre prix d'une bougie, et ce qu'ils valent à la lecture. */
 export const CHAMPS = ['ouverture', 'cloture', 'plusHaut', 'plusBas'];
 
@@ -83,9 +92,13 @@ export function meilleurDecalage(mesurees, reellesParRang, { fenetre = 5 } = {})
   let meilleur = null;
   for (let d = -fenetre; d <= fenetre; d++) {
     const e = ecartRecentre(mesurees, (i) => reellesParRang(i + d));
-    // Un alignement qui ne recouvre qu'une poignée de bougies n'est pas un
-    // alignement : il gagnerait par manque de contre-exemples.
-    if (!e || e.n < mesurees.length / 2) continue;
+    // Un alignement qui ne recouvre presque rien n'est pas un alignement : il
+    // gagnerait par manque de contre-exemples. Mais le seuil ne peut pas être
+    // la moitié des bougies MESURÉES — une référence éparse est le cas normal
+    // quand on relève une dizaine de bougies à la main dans la fenêtre de
+    // données, faute d'export. Le plancher est donc le plus petit des deux :
+    // la moitié du mesuré, ou ce minimum absolu.
+    if (!e || e.n < Math.min(mesurees.length / 2, MINIMUM_APPARIEMENTS)) continue;
     if (!meilleur || e.valeur < meilleur.ecart) meilleur = { decalage: d, ecart: e.valeur, n: e.n };
   }
   return meilleur;
@@ -112,6 +125,16 @@ export function rapprocher({ mesurees, reelles, finMs, uniteMinutes, fenetre = 5
   }
   if (!(uniteMinutes > 0)) {
     return { ok: false, probleme: 'Sans unité de temps, aucun rang mesuré ne correspond à un instant.' };
+  }
+  // Vérifié AVANT de chercher un décalage : sinon la recherche échoue faute de
+  // matière et rend « aucun décalage ne coïncide », ce qui enverrait chercher
+  // une erreur d'unité de temps là où il manque simplement des références.
+  if (reelles.length < Math.min(mesurees.length, MINIMUM_APPARIEMENTS)) {
+    return {
+      ok: false,
+      probleme: `Seulement ${reelles.length} bougie(s) de référence, il en faut au moins `
+        + `${MINIMUM_APPARIEMENTS}. Relève-en davantage dans la fenêtre de données.`,
+    };
   }
 
   const pas = uniteMinutes * 60_000;
@@ -162,6 +185,14 @@ export function rapprocher({ mesurees, reelles, finMs, uniteMinutes, fenetre = 5
       // systématique — une échelle légèrement fausse déplace TOUT dans le même
       // sens, et seule la médiane signée le révèle.
       biaisMedian: mediane(signes),
+    };
+  }
+
+  if (paires.length < Math.min(mesurees.length, MINIMUM_APPARIEMENTS)) {
+    return {
+      ok: false,
+      probleme: `Seulement ${paires.length} bougie(s) en correspondance, il en faut au moins `
+        + `${MINIMUM_APPARIEMENTS}. Relève davantage de bougies, ou vérifie l'unité de temps.`,
     };
   }
 
