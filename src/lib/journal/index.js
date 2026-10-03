@@ -1,16 +1,18 @@
 // Orchestration du journal : produire, écrire, résoudre.
 
+import { construireMesure, ligneIndexMesure, TYPE_MESURE } from './mesure.js';
 import { construireEnregistrement, cheminDossier, ligneIndex, ligneMiseAJour, construireResume,
          reduireIndex, HORIZON_RESOLUTION_MINUTES, OBJECTIF_JOURNAL } from './schema.js';
 import { genererRapport } from './report.js';
 import { genererSchemaDoc } from './schema-doc.js';
 import { resoudreIssue } from './resolve.js';
-import { recupererBougiesPaginees, symboleResolvable, MINUTES_PAR_BOUGIE } from './market.js';
+import { recupererBougiesPaginees, versPaireBinance, MINUTES_PAR_BOUGIE } from './market.js';
 import { deposerDansTampon, listerTampon, majEntree, ecrireFichier, ajouterLigne,
          sousDossier, lireLignesIndex } from './store.js';
 
 export * from './store.js';
 export { reduireIndex } from './schema.js';
+export * from './mesure.js';
 
 const HORIZON_BOUGIES = HORIZON_RESOLUTION_MINUTES / MINUTES_PAR_BOUGIE;
 
@@ -73,6 +75,48 @@ export async function enregistrerAnalyse({ analyse, moteur, captureDataUrl, over
   return { record, erreurDisque: null };
 }
 
+/**
+ * Enregistre une lecture géométrique, sans modèle et sans plan.
+ *
+ * Même tampon, même dossier, même index que les analyses : c'est le point.
+ * Une mesure prise aujourd'hui doit se retrouver à côté de l'analyse de la
+ * même capture, pas dans un second journal qu'on oublierait de relire.
+ */
+export async function enregistrerMesure({ lecture, marche, captureDataUrl, apercuDataUrl, dimensions, dureeMs, dossierRacine }) {
+  const horodatage = maintenantIso();
+  const capture = dataUrlVersBlob(captureDataUrl);
+  const apercu = apercuDataUrl ? dataUrlVersBlob(apercuDataUrl) : null;
+
+  const record = construireMesure({
+    lecture, marche, horodatage, dimensions, dureeMs,
+    fichiers: {
+      capture: {
+        nom: 'capture.png',
+        largeur: dimensions?.largeur ?? null,
+        hauteur: dimensions?.hauteur ?? null,
+        typeMime: capture.type,
+        octets: capture.size,
+        sha256: await empreinte(capture),
+      },
+      // L'aperçu porte les zones tracées : c'est ce qu'on regarde d'abord en
+      // rouvrant un dossier, et il ne se reconstruit pas sans relancer le code.
+      overlay: apercu ? { nom: 'overlay.png', typeMime: apercu.type, octets: apercu.size } : null,
+    },
+  });
+  if (!record) throw new Error('Lecture incomplète : rien à enregistrer.');
+
+  await deposerDansTampon({ record, capture, overlay: apercu, ecritSurDisque: false });
+
+  if (dossierRacine) {
+    try {
+      await deverserSurDisque(dossierRacine);
+    } catch (err) {
+      return { record, erreurDisque: err.message };
+    }
+  }
+  return { record, erreurDisque: null };
+}
+
 /** Écrit sur disque toutes les entrées du tampon qui n'y sont pas encore. */
 export async function deverserSurDisque(racine) {
   const entrees = await listerTampon();
@@ -85,8 +129,14 @@ export async function deverserSurDisque(racine) {
     // référence ainsi que des dossiers complets.
     if (entree.capture) await ecrireFichier(dossier, 'capture.png', entree.capture);
     if (entree.overlay) await ecrireFichier(dossier, 'overlay.png', entree.overlay);
-    await ecrireFichier(dossier, 'analyse.json', JSON.stringify(entree.record, null, 2));
-    await ajouterLigne(racine, 'index.jsonl', ligneIndex(entree.record));
+
+    // Une mesure et une analyse ne portent pas les mêmes champs : leur donner
+    // le même nom de fichier et la même ligne d'index obligerait tout lecteur
+    // à deviner lequel il tient.
+    const mesure = entree.record.type === TYPE_MESURE;
+    await ecrireFichier(dossier, mesure ? 'mesure.json' : 'analyse.json', JSON.stringify(entree.record, null, 2));
+    await ajouterLigne(racine, 'index.jsonl',
+      mesure ? ligneIndexMesure(entree.record, cheminDossier(entree.record)) : ligneIndex(entree.record));
 
     await majEntree(entree.record.id, (e) => ({ ...e, ecritSurDisque: true }));
   }
@@ -134,11 +184,14 @@ export async function resoudreEnAttente({ racine, signal } = {}) {
   const rapport = [];
 
   for (const { record } of aResoudre) {
-    const symbole = record.marche.symbole;
+    const affiche = record.marche.symbole;
+    // Le symbole lu sur l'image est celui de la plateforme, pas celui de la
+    // source de bougies : `BTCUSD` à l'écran, `BTCUSDT` chez Binance.
+    const symbole = versPaireBinance(affiche);
 
-    if (!symboleResolvable(symbole)) {
+    if (!symbole) {
       rapport.push({ id: record.id, issue: 'non_resolvable',
-        message: `${symbole ?? 'symbole inconnu'} : pas de source publique, saisie manuelle requise.` });
+        message: `${affiche ?? 'symbole inconnu'} : pas de source publique, saisie manuelle requise.` });
       continue;
     }
 

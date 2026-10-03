@@ -6,7 +6,7 @@
 // résumé en langue naturelle. Le surcoût en octets est sans commune mesure
 // avec le coût d'une mauvaise interprétation six mois plus tard.
 
-import { breakEvenRate, computeRR, rrVerdict } from '../analysis.js';
+import { breakEvenRate, computeRR, rrVerdict, FRICTION_PAR_DEFAUT } from '../analysis.js';
 
 // v2 (2026-09-23) : la règle de sortie devient explicite. En v1, un trade
 // passé par TP1 puis stoppé était compté comme un gain de +1 R tout en
@@ -56,13 +56,20 @@ export function construireId(horodatage, symbole, uniteTemps) {
   return `${horodatage}-${symboleNettoye}-${tf}`;
 }
 
-/** Chemin du dossier de l'analyse, relatif à la racine du journal. */
+/**
+ * Chemin du dossier de l'enregistrement, relatif à la racine du journal.
+ *
+ * Une mesure prend le suffixe `-mesure` : analysée et mesurée dans la même
+ * seconde, les deux se retrouveraient sinon dans le même dossier, et la
+ * seconde écrasserait le `capture.png` de la première.
+ */
 export function cheminDossier(record) {
   const jour = record.horodatage.slice(0, 10);
   const heure = record.horodatage.slice(11, 19).replace(/:/g, '');
   const symbole = (record.marche.symbole || 'INCONNU').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const tf = (record.marche.uniteTemps || '?').replace(/[^A-Za-z0-9]/g, '');
-  return `${jour}/${heure}-${symbole}-${tf}`;
+  const suffixe = record.type === 'mesure' ? '-mesure' : '';
+  return `${jour}/${heure}-${symbole}-${tf}${suffixe}`;
 }
 
 /**
@@ -154,6 +161,10 @@ export function construireEnregistrement({ analyse, moteur, fichiers, horodatage
       ratioRisqueRendementTp1: rr1,
       ratioRisqueRendementTp2: rr2,
       tauxReussiteEquilibre: arrondir(breakEvenRate(rr1), 4),
+      // Le même seuil, frais compris. Le premier dit ce qu'il faudrait dans un
+      // monde sans courtier ; celui-ci, ce qu'il faut vraiment.
+      tauxReussiteEquilibreAvecFrais: arrondir(breakEvenRate(rr1, FRICTION_PAR_DEFAUT), 4),
+      frictionSupposee: FRICTION_PAR_DEFAUT,
       commentaireTauxEquilibre:
         'Proportion de trades gagnants nécessaire pour ne rien perdre avec ce ratio.',
       verdictRatio: verdict.tone === 'bad' ? 'defavorable'

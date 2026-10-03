@@ -3,16 +3,21 @@ import {
   Upload, Sparkles, TrendingUp, TrendingDown,
   Target, RefreshCw, Key, CheckCircle2,
   Copy, Zap, ShieldAlert, AlertCircle, Layers,
-  BarChart2, ArrowUpRight, Eye, EyeOff, Cpu, Settings, Ruler, NotebookPen, LineChart,
+  BarChart2, ArrowUpRight, Eye, EyeOff, Cpu, Settings, Ruler, NotebookPen, LineChart, GitCompare,
 } from 'lucide-react';
 
 import { SAMPLES } from './samples.js';
 import { PROVIDERS, analyzeChart, blockingReason, getProvider, listInstalledModels } from './lib/providers/index.js';
 import { loadSettings, saveSettings } from './lib/settings.js';
+import { chargerInstrument, enregistrerInstrument, resoudreInstrument } from './lib/instrument.js';
 import { toPngDataUrl } from './lib/image.js';
 import JournalView from './JournalView.jsx';
-import { enregistrerAnalyse, dossierMemorise, resoudreEnAttente } from './lib/journal/index.js';
-import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines, rrVerdict, breakEvenRate } from './lib/analysis.js';
+import { enregistrerAnalyse, enregistrerMesure, dossierMemorise, resoudreEnAttente } from './lib/journal/index.js';
+import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines, rrVerdict, breakEvenRate, FRICTION_PAR_DEFAUT } from './lib/analysis.js';
+import { lireGraphique } from './lib/vision/lecture.js';
+import { pixelsDepuisDataUrl, enCanvas } from './lib/vision/navigateur.js';
+import { rectanglesDesOrderBlocks, etiquetteDuRectangle } from './lib/vision/trace.js';
+import { confronter, ECART_PREOCCUPANT } from './lib/vision/confrontation.js';
 
 const LEVEL_LABELS = { entry: 'ENTRÉE', sl: 'STOP LOSS', tp1: 'TP 1', tp2: 'TP 2' };
 
@@ -31,6 +36,14 @@ export default function App() {
   const [showKeyValue, setShowKeyValue] = useState(false);
 
   const [visibleLevels, setVisibleLevels] = useState({ entry: true, sl: true, tp1: true, tp2: true });
+
+  const [lecture, setLecture] = useState(null);
+  const [hauteurImage, setHauteurImage] = useState(0);
+  const [instrument, setInstrument] = useState(chargerInstrument);
+  const [mesureEnCours, setMesureEnCours] = useState(false);
+  const [lectureEnCours, setLectureEnCours] = useState(false);
+  const [prixHaut, setPrixHaut] = useState('');
+  const [prixBas, setPrixBas] = useState('');
 
   const [onglet, setOnglet] = useState('analyse');
   const [dossierJournal, setDossierJournal] = useState(null);
@@ -121,10 +134,17 @@ export default function App() {
 
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
+      setHauteurImage(img.naturalHeight);
 
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
+
+      // Les zones mesurées se tracent même sans analyse du modèle : elles ne
+      // lui doivent rien, et c'est tout l'intérêt de les voir côte à côte.
+      for (const rect of rectanglesDesOrderBlocks(lecture, canvas.width)) {
+        dessinerZone(ctx, rect);
+      }
 
       if (!analysis) {
         setOverlayWarning('');
@@ -179,7 +199,7 @@ export default function App() {
 
     img.src = imageSrc;
     return () => { cancelled = true; };
-  }, [imageSrc, analysis, visibleLevels, engine.provider, engine.model, dossierJournal]);
+  }, [imageSrc, analysis, lecture, visibleLevels, engine.provider, engine.model, dossierJournal]);
 
   const loadSample = async (sample) => {
     setErrorMsg('');
@@ -198,7 +218,22 @@ export default function App() {
   };
 
   const journaliser = (analyseNormalisee, dureeMs) => {
-    enAttenteJournal.current = { analyse: analyseNormalisee, dureeMs };
+    // Le modèle rend parfois `UNKNOWN` et `intraday` devant un graphique qui
+    // affiche son symbole en toutes lettres. Sans symbole reconnaissable, le
+    // journal ne peut aller chercher aucune bougie, l'issue n'est jamais
+    // constatée, et le plan reste « en cours » pour toujours. Deux secours :
+    // le bandeau lu par OCR, puis la saisie retenue d'une session à l'autre.
+    const { symbole, unite } = resoudreInstrument({
+      analyse: analyseNormalisee,
+      titre: lecture?.ok ? lecture.titre : null,
+      saisi: instrument,
+    });
+    const analyse = {
+      ...analyseNormalisee,
+      symbol: symbole.valeur ?? analyseNormalisee.symbol,
+      timeframe: unite.valeur ?? analyseNormalisee.timeframe,
+    };
+    enAttenteJournal.current = { analyse, dureeMs };
   };
 
   const runAnalysis = async () => {
@@ -234,6 +269,79 @@ export default function App() {
       setErrorMsg(err.message || "Échec de l'analyse.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * Lit le graphique par la géométrie : aucun modèle, aucun appel réseau.
+   *
+   * Les couleurs, les bornes du tracé, la frontière du panneau de volume et
+   * l'échelle sont déduites de l'image elle-même ; les bougies en sont
+   * extraites, puis les figures que le dépôt sait déjà reconnaître.
+   */
+  /**
+   * La mesure au journal, avec l'aperçu tel qu'il est tracé à l'écran.
+   *
+   * L'aperçu est pris sur le canevas plutôt que reconstruit : c'est ce qu'on
+   * regarde d'abord en rouvrant un dossier, et il porte les zones aux pixels
+   * près. Le reconstruire ailleurs serait une seconde implémentation à tenir
+   * en accord avec la première.
+   */
+  const enregistrerLaMesure = async () => {
+    if (!lecture?.ok || mesureEnCours) return;
+    setMesureEnCours(true);
+    try {
+      const canvas = canvasRef.current;
+      const resolu = resoudreInstrument({ analyse: analysis, titre: lecture.titre, saisi: instrument });
+      const { erreurDisque } = await enregistrerMesure({
+        lecture,
+        marche: {
+          symbole: resolu.symbole.valeur,
+          unite: resolu.unite.valeur,
+          provenanceSymbole: resolu.symbole.source,
+        },
+        captureDataUrl: imageSrc,
+        apercuDataUrl: canvas ? canvas.toDataURL('image/png') : null,
+        dimensions: canvas ? { largeur: canvas.width, hauteur: canvas.height } : null,
+        dossierRacine: dossierJournal,
+      });
+      setNoteJournal(
+        erreurDisque
+          ? `Mesure enregistrée en mémoire, mais pas sur disque : ${erreurDisque}`
+          : dossierJournal
+            ? 'Mesure enregistrée dans le journal.'
+            : 'Mesure enregistrée en mémoire du navigateur — connecte un dossier pour la garder.'
+      );
+    } catch (err) {
+      setNoteJournal(`Échec de l’enregistrement de la mesure : ${err.message}`);
+    } finally {
+      setMesureEnCours(false);
+    }
+  };
+
+  const runLecture = async (echelleManuelle = null) => {
+    if (!imageSrc || lectureEnCours) return;
+    setLectureEnCours(true);
+    setLecture(null);
+    setErrorMsg('');
+    try {
+      const { données, largeur, hauteur } = await pixelsDepuisDataUrl(imageSrc);
+      // `cheminLangue` évite d'aller chercher le dictionnaire sur un CDN au
+      // moment où l'on s'en sert : il est servi avec l'application.
+      const r = await lireGraphique(données, largeur, hauteur, {
+        facteur: 4,
+        cheminLangue: '/tesseract',
+        enImage: enCanvas,
+        echelleManuelle,
+      });
+      setLecture(r);
+      if (!r.ok) setErrorMsg(r.probleme);
+    } catch (err) {
+      console.error(err);
+      setLecture(null);
+      setErrorMsg(err.message || 'La lecture du graphique a échoué.');
+    } finally {
+      setLectureEnCours(false);
     }
   };
 
@@ -400,6 +508,80 @@ export default function App() {
             {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             {loading ? `Analyse en cours via ${provider.label}…` : "Lancer l'analyse AI"}
           </button>
+
+          <button
+            onClick={() => runLecture()}
+            disabled={!imageSrc || lectureEnCours}
+            className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 disabled:text-slate-700 text-slate-100 text-sm font-semibold py-3 rounded-xl transition border border-slate-700"
+          >
+            {lectureEnCours ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Ruler className="w-4 h-4" />}
+            {lectureEnCours ? 'Lecture de la géométrie…' : 'Lire les bougies (sans modèle)'}
+          </button>
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            Mesure l'image au lieu de l'interpréter : couleurs, bornes du tracé et échelle
+            déduites des pixels, puis structure, order blocks et prises de liquidité.
+          </p>
+
+          {lecture && <LectureCard lecture={lecture} />}
+
+          {lecture?.ok && analysis?.scale && (
+            <ConfrontationCard analysis={analysis} lecture={lecture} hauteurImage={hauteurImage} />
+          )}
+
+          {lecture?.ok && (
+            <button
+              onClick={enregistrerLaMesure}
+              disabled={mesureEnCours}
+              className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700
+                         disabled:opacity-50 text-slate-200 text-[13px] font-semibold rounded-xl py-2.5 transition"
+            >
+              {mesureEnCours ? <RefreshCw className="w-4 h-4 animate-spin" /> : <NotebookPen className="w-4 h-4" />}
+              {mesureEnCours ? 'Enregistrement…' : 'Enregistrer la mesure au journal'}
+            </button>
+          )}
+
+          <InstrumentCard
+            instrument={instrument}
+            onChange={(suivant) => { setInstrument(suivant); enregistrerInstrument(suivant); }}
+            resolu={resoudreInstrument({
+              analyse: analysis, titre: lecture?.ok ? lecture.titre : null, saisi: instrument,
+            })}
+          />
+
+          {lecture && !lecture.ok && lecture.etape === 'echelle' && (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-2.5">
+              <p className="text-[12px] text-slate-300 font-semibold">
+                Saisis les deux prix extrêmes de l’axe
+              </p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Le prix tout en haut du graphique et celui tout en bas, lus sur l’axe de
+                ta capture. Deux nombres suffisent : l’OCR devient inutile.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  value={prixHaut} onChange={(e) => setPrixHaut(e.target.value)}
+                  placeholder="prix en haut" inputMode="decimal"
+                  className="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-[13px] text-slate-100 font-mono"
+                />
+                <input
+                  value={prixBas} onChange={(e) => setPrixBas(e.target.value)}
+                  placeholder="prix en bas" inputMode="decimal"
+                  className="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-[13px] text-slate-100 font-mono"
+                />
+              </div>
+              <button
+                onClick={() => runLecture({
+                  prixHaut: Number(String(prixHaut).replace(',', '.')),
+                  prixBas: Number(String(prixBas).replace(',', '.')),
+                })}
+                disabled={lectureEnCours || !prixHaut || !prixBas}
+                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-sm font-semibold py-2.5 rounded-lg transition"
+              >
+                <Ruler className="w-4 h-4" />
+                Relire avec cette échelle
+              </button>
+            </div>
+          )}
         </section>
 
         <aside className="lg:sticky lg:top-24">
@@ -701,9 +883,274 @@ function ScaleCard({ scale }) {
  * Un ratio seul est abstrait ; voir « risque 256,73 pour viser 223,27 » dit
  * immédiatement si la proposition tient debout.
  */
+/**
+ * Ce que la lecture géométrique a trouvé — ou l'étape où elle a buté.
+ *
+ * Nommer l'étape n'est pas un détail d'affichage : « l'axe n'a pas pu être
+ * lu » et « aucune bougie trouvée » demandent deux gestes opposés de la part
+ * de l'utilisateur.
+ */
+// Le modèle et la géométrie, côte à côte. Rien de tout cela n'est visible sans
+// les deux lectures : c'est pour ça que la carte n'apparaît qu'alors.
+function ConfrontationCard({ analysis, lecture, hauteurImage }) {
+  const c = confronter(analysis, lecture, hauteurImage);
+  if (!c) return null;
+  const { axes, niveaux } = c;
+
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+      <p className="text-[11px] uppercase tracking-wider text-cyan-400 font-semibold flex items-center gap-1.5">
+        <GitCompare className="w-3.5 h-3.5" /> Modèle contre mesure
+      </p>
+
+      {axes ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[12px] text-slate-400">Écart d’axe</span>
+            <span
+              className={`text-[13px] font-semibold tabular-nums ${
+                c.axeDouteux ? 'text-amber-400' : 'text-emerald-400'
+              }`}
+            >
+              {(axes.moyen * 100).toFixed(2)} % en moyenne · {(axes.pire * 100).toFixed(2)} % au pire
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] font-mono text-slate-500">
+            <span>haut mesuré {axes.hautMesure.toFixed(2)}</span>
+            <span>haut modèle {axes.hautModele.toFixed(2)}</span>
+            <span>bas mesuré {axes.basMesure.toFixed(2)}</span>
+            <span>bas modèle {axes.basModele.toFixed(2)}</span>
+          </div>
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            {c.axeDouteux
+              ? `Au-delà de ${(ECART_PREOCCUPANT * 100).toFixed(0)} % de l’étendue, le décalage dépasse de loin un stop : les niveaux du modèle visent à côté, même s’ils ont l’air justes.`
+              : 'Les deux axes concordent — les niveaux du modèle portent bien sur les prix qu’il annonce.'}
+          </p>
+        </div>
+      ) : (
+        <p className="text-[11px] text-slate-500">
+          Le modèle n’a pas fourni de repère d’axe exploitable : rien à confronter.
+        </p>
+      )}
+
+      {niveaux.length > 0 && (
+        <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-[12px] text-slate-400">Niveaux sur une zone mesurée</span>
+            <span className="text-[13px] text-slate-200 font-semibold tabular-nums">
+              {c.appuyes} / {c.total}
+            </span>
+          </div>
+          {niveaux.map((n) => (
+            <div key={n.cle} className="flex items-baseline justify-between gap-2 text-[11px]">
+              <span className="text-slate-400">
+                {n.libelle} <span className="font-mono text-slate-600">{n.prix.toFixed(2)}</span>
+              </span>
+              {n.dansUneZone ? (
+                <span className="text-emerald-400">dans l’OB #{n.index}</span>
+              ) : n.distance !== null ? (
+                <span className="text-slate-500">
+                  à {(n.distance * 100).toFixed(1)} % de l’OB #{n.index}
+                </span>
+              ) : (
+                <span className="text-slate-600">aucune zone mesurée</span>
+              )}
+            </div>
+          ))}
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            Un niveau hors de toute zone n’est pas faux pour autant — il ne s’appuie
+            simplement sur rien que l’image montre.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// L'instrument retenu, et d'où il vient.
+//
+// La provenance est affichée, pas seulement la valeur. Un symbole « saisi »
+// est le dernier recours : il décrit ce qu'on regardait la fois d'avant, pas
+// forcément la capture en cours. Le montrer est la seule protection contre
+// un journal qui range une analyse de l'or sous BTCUSD, erreur qui ne se voit
+// qu'au moment où l'on croit relire ses propres résultats.
+function InstrumentCard({ instrument, onChange, resolu }) {
+  const couleurs = { modèle: 'text-emerald-400', bandeau: 'text-indigo-400', saisi: 'text-amber-400' };
+  const ligne = (libelle, champ) => (
+    <div className="flex items-baseline justify-between gap-2 text-[11px]">
+      <span className="text-slate-500">{libelle}</span>
+      {champ.valeur ? (
+        <span className="text-slate-200 font-mono">
+          {champ.valeur} <span className={couleurs[champ.source] ?? 'text-slate-600'}>· {champ.source}</span>
+        </span>
+      ) : (
+        <span className="text-slate-600">non résolu</span>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+      <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1.5">
+        <LineChart className="w-3.5 h-3.5" /> Instrument
+      </p>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] text-slate-500 uppercase tracking-wider">Symbole</span>
+          <input
+            value={instrument.symbole ?? ''}
+            onChange={(e) => onChange({ ...instrument, symbole: e.target.value })}
+            placeholder="BTCUSD"
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[12px] text-slate-200 font-mono
+                       focus:outline-none focus:border-indigo-600"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] text-slate-500 uppercase tracking-wider">Unité de temps</span>
+          <input
+            value={instrument.unite ?? ''}
+            onChange={(e) => onChange({ ...instrument, unite: e.target.value })}
+            placeholder="15m"
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[12px] text-slate-200 font-mono
+                       focus:outline-none focus:border-indigo-600"
+          />
+        </label>
+      </div>
+
+      <div className="flex flex-col gap-1 border-t border-slate-800 pt-2.5">
+        {ligne('Retenu pour le journal', resolu.symbole)}
+        {ligne('Horizon', resolu.unite)}
+      </div>
+
+      <p className="text-[11px] text-slate-600 leading-relaxed">
+        Sans symbole, le journal ne sait pas quelles bougies aller chercher : l’issue
+        n’est jamais constatée et le plan reste « en cours » indéfiniment. La saisie ne
+        sert qu’en dernier recours, quand ni le modèle ni le bandeau n’ont su lire.
+      </p>
+    </div>
+  );
+}
+
+function LectureCard({ lecture }) {
+  if (!lecture.ok) {
+    const geste = {
+      palette: 'Vérifie que la capture montre bien des chandeliers, pas une courbe.',
+      zone: 'Recadre sur le graphique seul, sans la barre d’outils.',
+      // Rien lu : le geste est de recadrer, pas d'agrandir. Agrandir une
+      // capture qui ne contient pas l'axe ne fera jamais apparaître l'axe.
+      echelle: (lecture.etiquettes?.length ?? 0) === 0
+        ? 'Reprends la capture en incluant la colonne de prix, à droite du graphique.'
+        : 'Agrandis la capture, ou dézoome l’axe pour afficher plus de graduations.',
+      bougies: 'Le tracé a été trouvé mais reste vide : vérifie le recadrage.',
+    }[lecture.etape];
+
+    return (
+      <div className="bg-slate-900/60 border border-rose-900/50 rounded-xl p-4 flex flex-col gap-2">
+        <p className="text-[11px] uppercase tracking-wider text-rose-400 font-semibold">
+          Lecture interrompue — étape « {lecture.etape} »
+        </p>
+        <p className="text-[13px] text-slate-300 leading-relaxed">{lecture.probleme}</p>
+        {geste && <p className="text-[12px] text-slate-500 leading-relaxed">{geste}</p>}
+        {lecture.etiquettes?.length > 0 && (
+          <p className="text-[11px] text-slate-600 font-mono">
+            lu sur l’axe : {lecture.etiquettes.map((e) => e.texte).join(' · ')}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const { bougies, zone, convention, analyses } = lecture;
+  const obs = analyses.orderBlocks;
+
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+      <p className="text-[11px] uppercase tracking-wider text-indigo-400 font-semibold flex items-center gap-1.5">
+        <Ruler className="w-3.5 h-3.5" /> Mesuré sur l’image
+      </p>
+
+      {(lecture.titre?.symbole || lecture.titre?.unite) && (
+        <div className="flex items-center gap-2 text-[12px]">
+          <span className="text-slate-200 font-semibold">{lecture.titre.symbole ?? '—'}</span>
+          <span className="text-slate-500">{lecture.titre.unite ?? 'unité non lue'}</span>
+          <span className="text-[10px] text-slate-600">lu sur le bandeau</span>
+        </div>
+      )}
+      {lecture.titre && !lecture.titre.symbole && (
+        <p className="text-[11px] text-amber-400">
+          Symbole non reconnu sur le bandeau — l’issue devra être saisie à la main.
+          {lecture.titre.texte && (
+            <span className="text-slate-600 font-mono"> lu : « {lecture.titre.texte.slice(0, 60)} »</span>
+          )}
+        </p>
+      )}
+
+      <div className="grid grid-cols-3 gap-2 text-[11px]">
+        <div>
+          <span className="text-slate-500">Bougies</span>
+          <p className="text-slate-200 font-semibold tabular-nums">{bougies.length}</p>
+        </div>
+        <div>
+          <span className="text-slate-500">Cassures</span>
+          <p className="text-slate-200 font-semibold tabular-nums">{analyses.cassures.length}</p>
+        </div>
+        <div>
+          <span className="text-slate-500">Order blocks</span>
+          <p className="text-slate-200 font-semibold tabular-nums">{obs.length}</p>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-slate-600">
+        axe lu en convention « {convention} » · panneau de volume {zone.avecVolume ? 'détecté' : 'absent'}
+        {analyses.rejetes > 0 && ` · ${analyses.rejetes} candidat(s) écarté(s)`}
+      </p>
+
+      {!analyses.assezDeBougies && (
+        <p className="text-[12px] text-amber-400">
+          Trop peu de bougies pour chercher une structure. Dézoome la capture.
+        </p>
+      )}
+
+      {obs.length > 0 && (
+        <div className="flex flex-col gap-2 border-t border-slate-800 pt-3">
+          {obs.slice(0, 4).map((ob, i) => {
+            const q = ob.qualificatifs;
+            const marques = [
+              q.priseDeLiquidite && 'prise de liquidité',
+              q.fvg && 'FVG',
+              q.premiumDiscount?.enZoneFavorable && 'zone favorable',
+              q.premiumDiscount?.ote && 'OTE',
+            ].filter(Boolean);
+            return (
+              <div key={i} className="flex flex-col gap-1">
+                <p className="text-[12px] text-slate-200 font-semibold">
+                  OB {ob.sens ?? ''} — bougie {ob.index}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {marques.length ? marques.join(' · ') : 'aucun qualificatif'}
+                </p>
+              </div>
+            );
+          })}
+          {obs.length > 4 && (
+            <p className="text-[11px] text-slate-600">et {obs.length - 4} autre(s)</p>
+          )}
+        </div>
+      )}
+
+      <p className="text-[10px] text-slate-600 leading-relaxed border-t border-slate-800 pt-2.5">
+        Mesuré, pas interprété : aucun modèle n’intervient ici. Les prix sont justes à
+        deux pixels près, soit la précision que porte l’image.
+      </p>
+    </div>
+  );
+}
+
 function RiskCard({ analysis }) {
   const verdict = rrVerdict(analysis.rr);
   const breakEven = breakEvenRate(analysis.rr);
+  const avecFrais = breakEvenRate(analysis.rr, FRICTION_PAR_DEFAUT);
 
   const risk = Math.abs(analysis.entry - analysis.stopLoss);
   const reward = Math.abs(analysis.tp1 - analysis.entry);
@@ -742,6 +1189,23 @@ function RiskCard({ analysis }) {
           Il te faut {(breakEven * 100).toFixed(0)} % de trades gagnants rien que pour être à l'équilibre.
         </p>
       )}
+
+      {avecFrais !== null && (
+        avecFrais > 1 ? (
+          <p className="text-[11px] mt-1 text-rose-300 font-semibold">
+            Frais compris, aucun taux de réussite ne rend ce plan rentable : le ratio ne
+            couvre même pas l'aller-retour.
+          </p>
+        ) : (
+          <p className="text-[11px] mt-1 text-amber-400">
+            Frais compris, il en faut {(avecFrais * 100).toFixed(0)} %.{' '}
+            <span className="text-slate-600">
+              friction supposée {FRICTION_PAR_DEFAUT} R — mesurée sur l'or en 15 min (DEC-034),
+              à remesurer sur ton marché.
+            </span>
+          </p>
+        )
+      )}
     </div>
   );
 }
@@ -771,6 +1235,45 @@ function LevelCard({ icon: Icon, label, value, tone }) {
 }
 
 /** Trace une ligne de niveau et son étiquette de prix sur le canvas. */
+/**
+ * Une zone d'order block, telle qu'elle a été MESURÉE sur l'image.
+ *
+ * Volontairement discrète : un fond très transparent et un liseré. Ces zones
+ * courent jusqu'au bord droit et se chevauchent souvent ; peintes en opaque,
+ * elles masqueraient les bougies qu'elles servent à expliquer.
+ */
+function dessinerZone(ctx, rect) {
+  const couleur = rect.sens === 'baissier' ? '239, 83, 80' : '38, 166, 154';
+  ctx.save();
+
+  ctx.fillStyle = `rgba(${couleur}, 0.13)`;
+  ctx.fillRect(rect.x, rect.y, rect.largeur, rect.hauteur);
+
+  ctx.strokeStyle = `rgba(${couleur}, 0.85)`;
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(rect.x, rect.y, rect.largeur, rect.hauteur);
+
+  // Le bord gauche marque la bougie d'ancrage : c'est elle, l'order block.
+  ctx.beginPath();
+  ctx.lineWidth = 3;
+  ctx.moveTo(rect.x, rect.y);
+  ctx.lineTo(rect.x, rect.y + rect.hauteur);
+  ctx.stroke();
+
+  const texte = etiquetteDuRectangle(rect);
+  ctx.font = 'bold 12px Inter, system-ui, sans-serif';
+  ctx.textBaseline = 'bottom';
+  const largeurTexte = ctx.measureText(texte).width + 12;
+  const yTexte = rect.y > 18 ? rect.y - 3 : rect.y + rect.hauteur + 15;
+
+  ctx.fillStyle = `rgba(${couleur}, 0.92)`;
+  ctx.fillRect(rect.x, yTexte - 14, largeurTexte, 16);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(texte, rect.x + 6, yTexte);
+
+  ctx.restore();
+}
+
 function drawLevel(ctx, width, { y, color, label, price }) {
   ctx.save();
 

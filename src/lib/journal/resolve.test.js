@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resoudreIssue, compteDansLesStats, estGagnant, gainEnR, reglageObjectif, TRAITEMENTS_AMBIGU } from './resolve.js';
-import { symboleResolvable, normaliserBougie } from './market.js';
+import { symboleResolvable, normaliserBougie, versPaireBinance } from './market.js';
 
 // Plan repris du premier essai réel sur capture TradingView.
 const SHORT = { direction: 'SELL', prixEntree: 86523, prixStopLoss: 86780, prixTp1: 86300, prixTp2: 86100 };
@@ -331,5 +331,39 @@ describe('gainEnR — traitement des issues ambiguës', () => {
 
   it('refuse un traitement inconnu', () => {
     expect(() => gainEnR('ambigu', '2r', 'moitie')).toThrow(/ambiguës inconnu/);
+  });
+});
+
+describe('versPaireBinance — rapprocher l’affiché de la source', () => {
+  it('passe une paire Binance telle quelle', () => {
+    expect(versPaireBinance('BTCUSDT')).toBe('BTCUSDT');
+    expect(versPaireBinance('ETH/USDT')).toBe('ETHUSDT');
+  });
+
+  it('écarte le préfixe de place, qui ne nous apprend rien', () => {
+    expect(versPaireBinance('BINANCE:BTCUSDT')).toBe('BTCUSDT');
+    expect(versPaireBinance('COMEX:GC1!')).toBeNull();
+  });
+
+  it('rapproche BTCUSD de BTCUSDT — c’est le cas qui bloquait le journal', () => {
+    expect(versPaireBinance('BTCUSD')).toBe('BTCUSDT');
+    expect(versPaireBinance('ETHUSD')).toBe('ETHUSDT');
+    expect(versPaireBinance('SOLUSD')).toBe('SOLUSDT');
+  });
+
+  it('REFUSE de prendre du forex pour de la crypto', () => {
+    // EURUSDT existe chez Binance et n'a rien à voir avec EURUSD. Résoudre un
+    // plan forex contre ces bougies-là donnerait un résultat faux en silence.
+    expect(versPaireBinance('EURUSD')).toBeNull();
+    expect(versPaireBinance('GBPUSD')).toBeNull();
+    expect(versPaireBinance('XAUUSD')).toBeNull();
+    expect(versPaireBinance('USDJPY')).toBeNull();
+  });
+
+  it('refuse ce qu’il ne reconnaît pas plutôt que de deviner', () => {
+    expect(versPaireBinance('UNKNOWN')).toBeNull();
+    expect(versPaireBinance('')).toBeNull();
+    expect(versPaireBinance(null)).toBeNull();
+    expect(versPaireBinance('GC1!')).toBeNull();
   });
 });

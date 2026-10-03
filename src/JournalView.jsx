@@ -50,6 +50,29 @@ export default function JournalView({ racine, setRacine }) {
     }
   };
 
+  /**
+   * Écrit le tampon sur disque SANS rouvrir le sélecteur.
+   *
+   * Le bouton du dossier rouvre toujours la boîte de dialogue : on y voit un
+   * sélecteur, pas ses fichiers, d'où l'impression que le dossier est vide
+   * alors qu'il est plein. Et rien ne permettait de déverser sans repasser
+   * par cette boîte.
+   */
+  const ecrire = async () => {
+    if (!racine) return;
+    setOccupe(true);
+    setMessage(null);
+    try {
+      const n = await deverserSurDisque(racine);
+      setMessage({ ton: 'ok', texte: n ? `${n} analyse(s) écrite(s) dans ${racine.name}.` : 'Tout était déjà sur disque.' });
+      await recharger();
+    } catch (err) {
+      setMessage({ ton: 'erreur', texte: `Écriture refusée : ${err.message}. Reconnecte le dossier — le navigateur redemande l'autorisation à chaque session.` });
+    } finally {
+      setOccupe(false);
+    }
+  };
+
   const resoudre = async () => {
     setOccupe(true);
     setMessage(null);
@@ -93,8 +116,19 @@ export default function JournalView({ racine, setRacine }) {
           className="flex items-center gap-2 text-xs bg-slate-900 hover:bg-slate-800 disabled:opacity-40 border border-slate-700/80 px-3.5 py-2 rounded-lg transition"
         >
           <FolderOpen className="w-3.5 h-3.5" />
-          {racine ? `Dossier : ${racine.name}` : 'Connecter un dossier'}
+          {racine ? `Changer de dossier (${racine.name})` : 'Connecter un dossier'}
         </button>
+
+        {racine && nonEcrites > 0 && (
+          <button
+            onClick={ecrire}
+            disabled={occupe}
+            className="flex items-center gap-2 text-xs bg-amber-600 hover:bg-amber-500 disabled:bg-slate-800 disabled:text-slate-600 text-white px-3.5 py-2 rounded-lg transition"
+          >
+            {occupe ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <HardDrive className="w-3.5 h-3.5" />}
+            Écrire {nonEcrites} analyse(s) sur disque
+          </button>
+        )}
 
         <button
           onClick={resoudre}
@@ -118,7 +152,10 @@ export default function JournalView({ racine, setRacine }) {
           <span>
             <strong>{nonEcrites} analyse(s) uniquement en mémoire du navigateur.</strong>{' '}
             Le stockage du navigateur n'est pas une sauvegarde : il s'efface avec les données de
-            site. Connecte un dossier pour les écrire sur disque.
+            site.{' '}
+            {racine
+              ? `Le dossier ${racine.name} est connecté — clique sur « Écrire sur disque ». Si ça échoue, c'est que l'autorisation a expiré : le navigateur la redemande à chaque session, il faut repasser par « Changer de dossier ».`
+              : 'Connecte un dossier pour les écrire sur disque.'}
           </span>
         </div>
       )}

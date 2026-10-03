@@ -15,7 +15,18 @@ const LIBELLE_STATUT = {
   horizon_depasse: 'Horizon dépassé', en_cours: 'En cours',
 };
 
+/**
+ * Les mesures géométriques ne sont pas des trades.
+ *
+ * Elles n'ont ni direction, ni ratio, ni issue à constater. Comptées avec les
+ * analyses, elles gonfleraient le total et s'empileraient dans « en cours »
+ * comme autant de plans qu'on aurait oublié de résoudre — soit exactement la
+ * conclusion fausse que ce rapport doit empêcher.
+ */
+export const estMesure = (ligne) => ligne?.type === 'mesure';
+
 export function calculerStatistiques(lignes) {
+  lignes = lignes.filter((l) => !estMesure(l));
   const total = lignes.length;
   const tranchees = lignes.filter((l) => compteDansLesStats(l.statut));
   const gagnantes = tranchees.filter((l) => estGagnant(l.statut));
@@ -52,6 +63,7 @@ export function calculerStatistiques(lignes) {
 }
 
 export function genererRapport(lignes, { genereLe }) {
+  const mesures = lignes.filter(estMesure);
   const s = calculerStatistiques(lignes);
   const out = [];
 
@@ -62,6 +74,15 @@ export function genererRapport(lignes, { genereLe }) {
   out.push('Ce fichier est régénéré à chaque écriture. Il résume `index.jsonl` ;');
   out.push('le détail d\'une analyse se trouve dans son dossier, décrit par `SCHEMA.md`.');
   out.push('');
+
+  if (mesures.length) {
+    const bougies = mesures.reduce((n, m) => n + (m.nombreDeBougies || 0), 0);
+    out.push(`S'y ajoutent **${mesures.length} mesure${mesures.length > 1 ? 's' : ''} géométrique${mesures.length > 1 ? 's' : ''}**`);
+    out.push(`(${bougies} bougies reconstruites depuis les images), comptées à part : une mesure`);
+    out.push('n\'a ni entrée ni stop, donc aucune issue à constater. Elles vivent dans un');
+    out.push('dossier suffixé `-mesure`, et portent `mesure.json` plutôt que `analyse.json`.');
+    out.push('');
+  }
 
   out.push('## Ce que disent les chiffres');
   out.push('');
