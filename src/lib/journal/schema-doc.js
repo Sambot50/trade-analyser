@@ -180,6 +180,75 @@ plus de précision que le quadrillage de l'image — compter deux pixels
 d'incertitude. Ne pas les comparer à des cours de référence sans tenir compte
 de ça.
 
+## Les order blocks, et leur jugement
+
+Chaque order block détecté reçoit **sa propre ligne** dans \`index.jsonl\`,
+\`type: "order_block"\`, en plus de la ligne de la mesure. C'est ce qui permet à
+l'index de rester le seul fichier à lire : la file d'attente, les vues et un
+backtest s'en servent sans ouvrir un seul \`mesure.json\`.
+
+\`\`\`
+id                 <id de la mesure>#ob<rang de la bougie>
+idEnregistrement   la mesure dont il vient
+indexBougie        son rang dans la série mesurée
+sens               haussier ou baissier
+prixHautDeZone     bornes de la zone, en prix
+prixBasDeZone
+qualificatifs      ce que l'analyse a relevé : prise de liquidité, FVG, OTE...
+etat               en_attente | valide | invalide
+\`\`\`
+
+### Trois états, et le troisième n'est pas un oubli
+
+Une zone détectée aujourd'hui ne se juge pas aujourd'hui : il faut que le prix
+revienne, ce qui prend des heures sur une unité courte et des semaines sur une
+grande.
+
+| état | sens |
+|---|---|
+| \`en_attente\` | détectée, le prix n'y est pas encore revenu |
+| \`valide\` | le prix est revenu et la zone a tenu |
+| \`invalide\` | traversée, elle n'a rien retenu |
+
+\`en_attente\` est l'état NORMAL d'une zone récente, pas une saisie manquante.
+
+### Le jugement est un évènement, pas une correction
+
+Il s'ajoute à l'index sous la forme d'une ligne ne portant que ce qui change :
+
+\`\`\`json
+{"type":"order_block","id":"...#ob71","maj":"2026-10-05T08:00:00Z","etat":"valide","note":"rejet net"}
+\`\`\`
+
+L'enregistrement d'origine **ne bouge pas**. Il dit ce qui a été détecté ce
+jour-là ; le réécrire effacerait la seule trace de ce qu'on savait au moment de
+la détection. La réduction de l'index fusionne les deux lignes par identifiant.
+
+### Le taux de validation exclut l'attente
+
+Une zone que le prix n'a pas encore atteinte n'a rien échoué. La compter
+perdante ferait baisser le taux à mesure qu'on détecte, ce qui n'aurait aucun
+sens. Le dénominateur est donc \`valide + invalide\`, et vaut \`null\` tant que
+rien n'est tranché — \`null\` dit « on ne sait pas », zéro dirait « ça ne marche
+pas ».
+
+## vues/ — le catalogue
+
+Un arbre de dossiers ne donne qu'UNE hiérarchie : ranger par symbole interdit de
+parcourir par mois. Les dossiers datés restent donc le rangement, et \`vues/\`
+est le catalogue.
+
+| | |
+|---|---|
+| \`vues/par-validite/<etat>/<date>.md\` | ton jugement d'abord, la date ensuite |
+| \`vues/par-validite/<etat>/TOUT.md\` | l'ensemble d'un état, sans ouvrir chaque jour |
+| \`vues/par-symbole/<SYMBOLE>.md\` | tout ce qui concerne un instrument |
+| \`vues/par-mois/<AAAA-MM>.md\` | la vue chronologique |
+
+**Rien d'unique n'y vit.** Chaque fiche se recalcule depuis \`index.jsonl\` à
+chaque écriture ; supprimer \`vues/\` ne perd rien. Pour traiter le journal par
+programme, lire \`index.jsonl\` — les vues sont pour l'œil.
+
 ## Ce que ce journal ne dit pas
 
 - **Aucun de ces trades n'a été exécuté.** Ce sont des plans produits par un

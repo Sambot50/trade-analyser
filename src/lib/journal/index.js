@@ -1,6 +1,8 @@
 // Orchestration du journal : produire, écrire, résoudre.
 
 import { construireMesure, ligneIndexMesure, TYPE_MESURE } from './mesure.js';
+import { ligneOrderBlock, ligneJugement, idOrderBlock } from './jugement.js';
+import { genererVues } from './vues.js';
 import { construireEnregistrement, cheminDossier, ligneIndex, ligneMiseAJour, construireResume,
          reduireIndex, HORIZON_RESOLUTION_MINUTES, OBJECTIF_JOURNAL } from './schema.js';
 import { genererRapport } from './report.js';
@@ -13,6 +15,8 @@ import { deposerDansTampon, listerTampon, majEntree, ecrireFichier, ajouterLigne
 export * from './store.js';
 export { reduireIndex } from './schema.js';
 export * from './mesure.js';
+export * from './jugement.js';
+export { genererVues } from './vues.js';
 
 const HORIZON_BOUGIES = HORIZON_RESOLUTION_MINUTES / MINUTES_PAR_BOUGIE;
 
@@ -135,8 +139,22 @@ export async function deverserSurDisque(racine) {
     // à deviner lequel il tient.
     const mesure = entree.record.type === TYPE_MESURE;
     await ecrireFichier(dossier, mesure ? 'mesure.json' : 'analyse.json', JSON.stringify(entree.record, null, 2));
+
+    const chemin = cheminDossier(entree.record);
     await ajouterLigne(racine, 'index.jsonl',
-      mesure ? ligneIndexMesure(entree.record, cheminDossier(entree.record)) : ligneIndex(entree.record));
+      mesure ? ligneIndexMesure(entree.record, chemin) : ligneIndex(entree.record));
+
+    // Une ligne d'index PAR order block, en plus de celle de la mesure.
+    //
+    // C'est ce qui permet à `index.jsonl` de rester le seul fichier à lire :
+    // la file d'attente, les vues et un futur backtest s'en servent sans
+    // ouvrir un seul `mesure.json`. Chaque zone naît « en attente » — elle
+    // n'a rien prouvé tant que le prix n'y est pas revenu.
+    if (mesure) {
+      for (const ob of entree.record.mesure?.structure?.orderBlocks ?? []) {
+        await ajouterLigne(racine, 'index.jsonl', ligneOrderBlock(entree.record, ob, chemin));
+      }
+    }
 
     await majEntree(entree.record.id, (e) => ({ ...e, ecritSurDisque: true }));
   }
@@ -147,9 +165,41 @@ export async function deverserSurDisque(racine) {
 
 export async function regenererFichiersRacine(racine) {
   const lignes = reduireIndex(await lireLignesIndex(racine));
-  await ecrireFichier(racine, 'RAPPORT.md', genererRapport(lignes, { genereLe: maintenantIso() }));
+  const genereLe = maintenantIso();
+  await ecrireFichier(racine, 'RAPPORT.md', genererRapport(lignes, { genereLe }));
   await ecrireFichier(racine, 'SCHEMA.md', genererSchemaDoc());
+
+  // Les vues ne contiennent rien d'unique : elles se recalculent toutes, à
+  // chaque écriture, depuis l'index. On ne cherche donc pas à savoir
+  // lesquelles ont changé — une fiche périmée serait pire qu'une réécriture.
+  for (const [chemin, contenu] of genererVues(lignes, { genereLe })) {
+    const parts = chemin.split('/');
+    const dossier = await sousDossier(racine, parts.slice(0, -1).join('/'));
+    await ecrireFichier(dossier, parts.at(-1), contenu);
+  }
   return lignes;
+}
+
+/**
+ * Le jugement différé d'une zone : elle a tenu, ou elle n'a pas tenu.
+ *
+ * Écrit comme un ÉVÈNEMENT, pas comme une correction. L'enregistrement
+ * d'origine ne bouge pas : il dit ce qui a été détecté ce jour-là, et le
+ * réécrire effacerait la seule trace de ce qu'on savait au moment de la
+ * détection. Le jugement s'ajoute, daté, et la réduction de l'index les
+ * fusionne par identifiant.
+ */
+export async function jugerOrderBlock({ racine, idEnregistrement, indexBougie, etat, note }) {
+  if (!racine) throw new Error('Aucun dossier de journal connecté : le jugement ne pourrait aller nulle part.');
+  const ligne = ligneJugement({
+    id: idOrderBlock(idEnregistrement, indexBougie),
+    etat,
+    note,
+    horodatage: maintenantIso(),
+  });
+  await ajouterLigne(racine, 'index.jsonl', ligne);
+  await regenererFichiersRacine(racine);
+  return ligne;
 }
 
 /** Applique un résultat : réécrit analyse.json, ajoute une ligne d'index, régénère le rapport. */

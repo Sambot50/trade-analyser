@@ -3,7 +3,7 @@ import {
   Upload, Sparkles, TrendingUp, TrendingDown,
   Target, RefreshCw, Key, CheckCircle2,
   Copy, Zap, ShieldAlert, AlertCircle, Layers,
-  BarChart2, ArrowUpRight, Eye, EyeOff, Cpu, Settings, Ruler, NotebookPen, LineChart, GitCompare,
+  BarChart2, ArrowUpRight, Eye, EyeOff, Cpu, Settings, Ruler, NotebookPen, LineChart, GitCompare, Hourglass,
 } from 'lucide-react';
 
 import { SAMPLES } from './samples.js';
@@ -13,6 +13,7 @@ import { chargerInstrument, enregistrerInstrument, resoudreInstrument } from './
 import { toPngDataUrl } from './lib/image.js';
 import JournalView from './JournalView.jsx';
 import { enregistrerAnalyse, enregistrerMesure, dossierMemorise, resoudreEnAttente } from './lib/journal/index.js';
+import FileDAttente from './FileDAttente.jsx';
 import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines, rrVerdict, breakEvenRate, FRICTION_PAR_DEFAUT } from './lib/analysis.js';
 import { lireGraphique } from './lib/vision/lecture.js';
 import { pixelsDepuisDataUrl, enCanvas } from './lib/vision/navigateur.js';
@@ -395,6 +396,7 @@ export default function App() {
             {[
               { id: 'analyse', label: 'Analyse', Icone: LineChart },
               { id: 'journal', label: 'Journal', Icone: NotebookPen },
+              { id: 'file', label: 'À juger', Icone: Hourglass },
             ].map(({ id, label, Icone }) => (
               <button
                 key={id}
@@ -432,6 +434,10 @@ export default function App() {
       {onglet === 'journal' ? (
         <main className="max-w-7xl mx-auto px-5 py-6">
           <JournalView racine={dossierJournal} setRacine={setDossierJournal} />
+        </main>
+      ) : onglet === 'file' ? (
+        <main className="max-w-3xl mx-auto px-5 py-6">
+          <FileDAttente racine={dossierJournal} />
         </main>
       ) : (
       <main className="max-w-7xl mx-auto px-5 py-6 grid lg:grid-cols-[1.35fr_1fr] gap-6 items-start">
