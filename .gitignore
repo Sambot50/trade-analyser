@@ -15,3 +15,12 @@ sortie-*.txt
 # Scripts jetables de téléchargement et de vérification, écrits au fil des
 # sessions. Ce qui mérite d'être gardé vit dans `scripts/`, versionné et testé.
 *.py
+
+# Fichiers du moteur de lecture, rapatriés par « npm run assets:ocr ».
+# Une trentaine de mégaoctets de binaire : reconstituables, donc non versionnés.
+/public/tesseract/*
+!/public/tesseract/LISEZMOI.md
+
+# tesseract.js décompresse son dictionnaire dans le répertoire courant
+# quand il tourne sous Node (les tests du moteur réel).
+*.traineddata

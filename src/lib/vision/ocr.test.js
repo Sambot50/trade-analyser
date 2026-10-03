@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   recadrer, agrandir, luminance, binariser, preparerBande,
   etiquettesDepuisMots, lireBande, creerWorkerParDefaut, facteurTenable, avecDelai, dictionnaireServi, CARACTERES,
+  motsDuResultat,
 } from './ocr.js';
 
 /** Image RGBA unie, avec de quoi peindre dessus. */
@@ -157,11 +158,45 @@ describe('etiquettesDepuisMots', () => {
 });
 
 describe('creerWorkerParDefaut', () => {
-  it('sert le dictionnaire en local quand il y est', async () => {
+  it('sert les TROIS fichiers en local quand ils y sont', async () => {
+    // Le dictionnaire seul ne suffisait pas : le cœur WebAssembly et le script
+    // de worker partaient encore sur le CDN, et c'est le cœur le plus lourd.
     const charger = vi.fn().mockResolvedValue('worker');
     const fetcher = vi.fn().mockResolvedValue({ ok: true });
     await creerWorkerParDefaut({ cheminLangue: '/tesseract', charger, fetcher });
+    expect(charger).toHaveBeenCalledWith('eng', undefined, {
+      langPath: '/tesseract',
+      corePath: '/tesseract',
+      workerPath: '/tesseract/worker.min.js',
+    });
+  });
+
+  it('prend ce qui est servi et laisse le reste au CDN', async () => {
+    // Un dossier à moitié rempli vaut mieux qu'un dossier refusé en bloc.
+    const charger = vi.fn().mockResolvedValue('worker');
+    const fetcher = vi.fn(async (url) => ({ ok: url.endsWith('.traineddata.gz') }));
+    await creerWorkerParDefaut({ cheminLangue: '/tesseract', charger, fetcher });
     expect(charger).toHaveBeenCalledWith('eng', undefined, { langPath: '/tesseract' });
+  });
+
+  it('accepte des chemins distincts pour le cœur et le worker', async () => {
+    const charger = vi.fn().mockResolvedValue('worker');
+    const fetcher = vi.fn().mockResolvedValue({ ok: true });
+    await creerWorkerParDefaut({
+      cheminLangue: '/dico', cheminCoeur: '/wasm', cheminWorker: '/js/w.js',
+      charger, fetcher,
+    });
+    expect(charger).toHaveBeenCalledWith('eng', undefined, {
+      langPath: '/dico', corePath: '/wasm', workerPath: '/js/w.js',
+    });
+  });
+
+  it('retombe sur le CDN quand RIEN n’est servi, sans attendre le moteur', async () => {
+    const charger = vi.fn().mockResolvedValue('worker');
+    const fetcher = vi.fn().mockResolvedValue({ ok: false });
+    expect(await creerWorkerParDefaut({ cheminLangue: '/tesseract', charger, fetcher })).toBe('worker');
+    expect(charger).toHaveBeenCalledTimes(1);
+    expect(charger).toHaveBeenCalledWith('eng');
   });
 
   it('RETOMBE sur la source par défaut si le local est servi mais inutilisable', async () => {
@@ -361,21 +396,52 @@ describe('dictionnaireServi', () => {
   });
 });
 
-describe('creerWorkerParDefaut — ne demande le local que s’il existe', () => {
-  it('n’essaie PAS le chemin local quand le fichier n’y est pas', async () => {
-    // C'est ce qui figeait tout : un langPath en 404 ne fait pas échouer
-    // createWorker proprement, et le repli ne se déclenchait jamais.
-    const charger = vi.fn().mockResolvedValue('worker');
-    const fetcher = vi.fn().mockResolvedValue({ ok: false });
-    expect(await creerWorkerParDefaut({ cheminLangue: '/tesseract', charger, fetcher })).toBe('worker');
-    expect(charger).toHaveBeenCalledTimes(1);
-    expect(charger).toHaveBeenCalledWith('eng');
+// ── Les mots, là où le moteur les range vraiment ─────────────────────────────
+
+describe('motsDuResultat', () => {
+  it('lit la forme imbriquée de tesseract.js 7', () => {
+    // C'est LE défaut qui rendait l'axe muet : le moteur lisait
+    // « 4440 4420 4400 4380 » sans faute, `data.words` restait vide, et
+    // aucune étiquette ne sortait. Rien dans les tests ne le voyait.
+    const data = {
+      text: '4440\n4420\n',
+      words: [],
+      blocks: [{
+        paragraphs: [{
+          lines: [
+            { words: [{ text: '4440', confidence: 94, bbox: { y0: 148, y1: 192 } }] },
+            { words: [{ text: '4420', confidence: 95, bbox: { y0: 600, y1: 644 } }] },
+          ],
+        }],
+      }],
+    };
+    expect(motsDuResultat(data).map((m) => m.text)).toEqual(['4440', '4420']);
   });
 
-  it('l’essaie quand il y est', async () => {
-    const charger = vi.fn().mockResolvedValue('worker');
-    const fetcher = vi.fn().mockResolvedValue({ ok: true });
-    await creerWorkerParDefaut({ cheminLangue: '/tesseract', charger, fetcher });
-    expect(charger).toHaveBeenCalledWith('eng', undefined, { langPath: '/tesseract' });
+  it('préfère la forme à plat quand elle est renseignée', () => {
+    const data = { words: [{ text: 'plat' }], blocks: [{ paragraphs: [{ lines: [{ words: [{ text: 'imbriqué' }] }] }] }] };
+    expect(motsDuResultat(data).map((m) => m.text)).toEqual(['plat']);
+  });
+
+  it('ne bronche pas sur un résultat creux ou tronqué', () => {
+    expect(motsDuResultat(null)).toEqual([]);
+    expect(motsDuResultat({})).toEqual([]);
+    expect(motsDuResultat({ words: [], blocks: [] })).toEqual([]);
+    expect(motsDuResultat({ blocks: [{}, { paragraphs: [{}, { lines: [{}] }] }] })).toEqual([]);
+  });
+});
+
+describe('lireBande demande les boîtes englobantes', () => {
+  it('passe { blocks: true } au moteur, sans quoi il ne rend que du texte', async () => {
+    const recognize = vi.fn().mockResolvedValue({
+      data: { blocks: [{ paragraphs: [{ lines: [{ words: [{ text: '4440', confidence: 90, bbox: { y0: 0, y1: 8 } }] }] }] }] },
+    });
+    const worker = { setParameters: vi.fn(), recognize, terminate: vi.fn() };
+    const données = new Uint8ClampedArray(4 * 10 * 10).fill(255);
+    const lues = await lireBande(données, 10, 10, { x0: 0, y0: 0, x1: 10, y1: 10 }, {
+      facteur: 1, creerWorker: () => worker,
+    });
+    expect(recognize).toHaveBeenCalledWith(expect.anything(), {}, { blocks: true });
+    expect(lues.map((e) => e.texte)).toEqual(['4440']);
   });
 });

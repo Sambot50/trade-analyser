@@ -162,17 +162,17 @@ export function avecDelai(promesse, ms, message) {
 }
 
 /**
- * Le dictionnaire local est-il réellement servi ?
+ * Ce fichier est-il réellement servi par l'application ?
  *
- * On le vérifie AVANT de le demander au moteur. Un `langPath` qui répond 404
- * ne fait pas échouer `createWorker` proprement : selon les versions il
- * réessaie ou reste suspendu, et le repli ne se déclenche jamais.
+ * On le vérifie AVANT de le demander au moteur. Un chemin qui répond 404 ne
+ * fait pas échouer `createWorker` proprement : selon les versions il réessaie
+ * ou reste suspendu, et le repli ne se déclenche jamais. C'est exactement ce
+ * qui laissait le bouton sur « Lecture… » indéfiniment.
  */
-export async function dictionnaireServi(cheminLangue, langue = 'eng', { fetcher, delaiMs = 3000 } = {}) {
-  if (!cheminLangue) return false;
+export async function fichierServi(url, { fetcher, delaiMs = 3000 } = {}) {
+  if (!url) return false;
   const f = fetcher ?? (typeof fetch === 'function' ? fetch : null);
   if (!f) return false;
-  const url = `${String(cheminLangue).replace(/\/$/, '')}/${langue}.traineddata.gz`;
   try {
     const r = await avecDelai(f(url, { method: 'HEAD' }), delaiMs, 'délai dépassé');
     return Boolean(r?.ok);
@@ -181,28 +181,70 @@ export async function dictionnaireServi(cheminLangue, langue = 'eng', { fetcher,
   }
 }
 
+const sansFinale = (chemin) => String(chemin).replace(/\/$/, '');
+
+/** Le dictionnaire de la langue demandée. */
+export async function dictionnaireServi(cheminLangue, langue = 'eng', options = {}) {
+  if (!cheminLangue) return false;
+  return fichierServi(`${sansFinale(cheminLangue)}/${langue}.traineddata.gz`, options);
+}
+
+/**
+ * Le cœur WebAssembly se décline par jeu d'instructions, et c'est le worker
+ * qui choisit la variante selon ce que sait faire le navigateur. On ne peut
+ * donc pas vérifier celle qu'il demandera : on sonde la plus probable, et le
+ * script de rapatriement dépose les trois ensemble, jamais une seule.
+ */
+export async function coeurServi(cheminCoeur, options = {}) {
+  if (!cheminCoeur) return false;
+  return fichierServi(`${sansFinale(cheminCoeur)}/tesseract-core-simd-lstm.wasm.js`, options);
+}
+
 /**
  * Le moteur, servi en local d'abord, depuis sa source habituelle ensuite.
  *
- * Servir le dictionnaire avec l'application est la bonne façon : rien ne sort
- * de la machine, et une coupure réseau n'empêche pas de lire un graphique.
- * Mais exiger ce fichier rendrait l'application inutilisable à qui ne l'a pas
- * encore déposé. On essaie donc le chemin local, et on retombe sur la source
- * par défaut s'il n'y est pas.
+ * tesseract.js va chercher TROIS choses sur un CDN, pas une : son script de
+ * worker, son cœur WebAssembly — le plus lourd des trois — et le dictionnaire
+ * de la langue. Ne rapatrier que le dictionnaire, comme on le faisait, ne
+ * supprimait donc pas la dépendance réseau ; ça n'en déplaçait qu'un tiers.
+ *
+ * Les trois sont vérifiés séparément et passés séparément. Un dossier complet
+ * rend la lecture possible hors ligne ; un dossier partiel prend ce qu'il a
+ * et laisse le reste au CDN, ce qui vaut mieux que de tout refuser. Exiger
+ * ces fichiers rendrait l'application inutilisable à qui ne les a pas encore
+ * déposés — `npm run assets:ocr` les met en place.
  */
-export async function creerWorkerParDefaut({ langue = 'eng', cheminLangue, charger, fetcher, delaiMs = 60_000 } = {}) {
+export async function creerWorkerParDefaut({
+  langue = 'eng', cheminLangue, cheminCoeur, cheminWorker,
+  charger, fetcher, delaiMs = 60_000,
+} = {}) {
   const createWorker = charger ?? (await import('tesseract.js')).createWorker;
 
-  // On ne demande le chemin local que s'il répond vraiment.
-  if (cheminLangue && await dictionnaireServi(cheminLangue, langue, { fetcher })) {
+  // Par défaut le cœur et le worker sont dans le même dossier que le dictionnaire.
+  const coeur = cheminCoeur ?? cheminLangue;
+  const worker = cheminWorker ?? (cheminLangue ? `${sansFinale(cheminLangue)}/worker.min.js` : null);
+
+  const [dico, coeurLa, workerLa] = await Promise.all([
+    dictionnaireServi(cheminLangue, langue, { fetcher }),
+    coeurServi(coeur, { fetcher }),
+    fichierServi(worker, { fetcher }),
+  ]);
+
+  const options = {};
+  if (dico) options.langPath = cheminLangue;
+  if (coeurLa) options.corePath = coeur;
+  if (workerLa) options.workerPath = worker;
+
+  if (Object.keys(options).length > 0) {
     try {
       return await avecDelai(
-        createWorker(langue, undefined, { langPath: cheminLangue }),
+        createWorker(langue, undefined, options),
         delaiMs,
-        `Le moteur de lecture n'a pas démarré en ${Math.round(delaiMs / 1000)} s depuis ${cheminLangue}.`,
+        `Le moteur de lecture n'a pas démarré en ${Math.round(delaiMs / 1000)} s `
+        + `depuis ${cheminLangue ?? 'les fichiers locaux'}.`,
       );
     } catch {
-      // Servi mais inutilisable : on retombe sur la source habituelle.
+      // Servis mais inutilisables : on retombe sur la source habituelle.
     }
   }
 
@@ -210,13 +252,31 @@ export async function creerWorkerParDefaut({ langue = 'eng', cheminLangue, charg
     createWorker(langue),
     delaiMs,
     `Le moteur de lecture n'a pas démarré en ${Math.round(delaiMs / 1000)} s. `
-    + `Son dictionnaire se télécharge au premier usage : vérifie ta connexion, `
-    + `ou dépose ${langue}.traineddata.gz dans les fichiers servis.`,
+    + `Ses fichiers se téléchargent au premier usage : vérifie ta connexion, `
+    + `ou lance « npm run assets:ocr » pour les servir en local.`,
   );
 }
 
 /** Les caractères qu'une graduation de prix peut contenir, et pas un de plus. */
 export const CARACTERES = '0123456789.,';
+
+/**
+ * Les mots d'un résultat, quelle que soit la version du moteur.
+ *
+ * tesseract.js les rendait à plat dans `data.words` ; depuis la 7 ils sont
+ * imbriqués sous `blocks > paragraphs > lines > words`, et `data.words` n'est
+ * plus renseigné. On lit les deux, parce qu'une montée de version ne doit pas
+ * ramener un axe muet sans qu'aucun test ne bronche.
+ */
+export function motsDuResultat(data) {
+  if (!data) return [];
+  if (Array.isArray(data.words) && data.words.length > 0) return data.words;
+  return (data.blocks ?? []).flatMap(
+    (bloc) => (bloc?.paragraphs ?? []).flatMap(
+      (par) => (par?.lines ?? []).flatMap((ligne) => ligne?.words ?? []),
+    ),
+  );
+}
 
 /**
  * Lit la bande d'axe. Le seul endroit qui touche Tesseract.
@@ -247,13 +307,16 @@ export async function lireBande(données, largeur, hauteur, bande, options = {})
       tessedit_pageseg_mode: '6',
     });
     const image = enImage ? await enImage(prete) : prete;
+    // `{ blocks: true }` n'est PAS cosmétique : sans lui, tesseract.js 7 ne
+    // rend que du texte, et `data.words` reste vide. L'axe se lisait donc
+    // parfaitement — « 4440 4420 4400 4380 » — pour ne produire aucune
+    // étiquette, faute de boîtes englobantes à reporter en ordonnées.
     const { data } = await avecDelai(
-      worker.recognize(image),
+      worker.recognize(image, {}, { blocks: true }),
       options.delaiLectureMs ?? 120_000,
       "La reconnaissance de caractères n'a pas abouti. Recadre la capture : une bande trop large prend des minutes.",
     );
-    const mots = data?.words ?? [];
-    return etiquettesDepuisMots(mots, { y0: bande.y0, facteur: prete.facteur ?? facteur });
+    return etiquettesDepuisMots(motsDuResultat(data), { y0: bande.y0, facteur: prete.facteur ?? facteur });
   } finally {
     await worker.terminate?.();
   }
