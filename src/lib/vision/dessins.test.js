@@ -92,19 +92,48 @@ describe('un trait horizontal qui traverse une bougie', () => {
     expect(Math.abs(apres[20].basMèche - cible.basMèche)).toBeLessThanOrEqual(2);
   });
 
-  // CE QUI N'EST PAS RÉSOLU, et il vaut mieux l'écrire que le laisser
-  // découvrir : un trait qui passe ENTRE deux bougies, dans une colonne où il
-  // n'y a rien d'autre, fait paraître cette colonne occupée. Les deux bougies
-  // voisines se soudent alors en un seul groupe, et la mèche du groupe s'étire
-  // jusqu'au trait.
-  //
-  // Le correctif de segment continu ne peut rien là : il choisit le meilleur
-  // segment DANS une colonne, et dans celle-ci le trait est le seul candidat.
-  // Y répondre demande de raisonner en composantes connexes sur l'image entière
-  // plutôt qu'en colonnes — un changement de modèle, pas un ajustement.
-  //
-  // En pratique le défaut reste limité : la ligne du prix courant est
-  // pointillée, donc elle ne tombe dans le vide qu'une colonne sur deux, et le
-  // graphique des captures réelles laisse peu de colonnes vides entre bougies.
-  it.todo('séparer deux bougies qu’un trait passant entre elles a soudées');
+  it('ne soude pas deux bougies quand il passe ENTRE elles', () => {
+    // Le défaut le plus grave qu'ait produit ce module, et le plus discret.
+    // Un trait qui passe dans une colonne vide la fait paraître occupée ; elle
+    // touche la bougie voisine, entre dans son groupe, et la mèche du groupe
+    // s'étire jusqu'au trait. Relevé sur une capture réelle, à six colonnes
+    // d'intervalle : un pixel de ligne à y=462, une bougie à y=150-183. La
+    // bougie obtenue avait quinze points de corps et mille cinq cent
+    // quatre-vingt-douze de mèche.
+    //
+    // Rien ne le signalait. La bougie restait une bougie, ses quatre prix
+    // restaient ordonnés entre eux. Seul l'order block bâti dessus — quarante
+    // pour cent du graphique — finissait par se voir à l'œil nu.
+    const nu = rendre();
+    const palette = detecterPalette(nu.données, nu.largeur, nu.hauteur);
+    const zone = zoneTrace(nu.données, nu.largeur, nu.hauteur, palette);
+    const extraire = (img) => colonnesDeBougies(img.données, img.largeur, img.hauteur, palette, zone)
+      .map(bougieDeColonnes).filter(Boolean);
+
+    const sans = extraire(nu);
+    const y = Math.round((zone.y0 + zone.y1) / 2);
+    const avec = extraire(rendre(
+      `<line x1="${zone.x0}" y1="${y}" x2="${zone.x1}" y2="${y}" `
+      + 'stroke="#10B981" stroke-width="1" stroke-dasharray="4 4"/>',
+    ));
+
+    expect(avec.length).toBe(sans.length);
+
+    // Quatre pixels, et pas deux, parce qu'un résidu subsiste et qu'il est
+    // légitime : là où le trait tombe juste au bord d'une mèche, il touche sa
+    // plage et s'y fond. Aucune règle de regroupement ne peut distinguer ce
+    // cas — deux objets qui se touchent se touchent.
+    //
+    // Ce qui compte est l'ordre de grandeur. Le défaut corrigé étirait une
+    // mèche de trois cents pixels à travers le graphique ; il en reste quatre,
+    // soit un demi pour cent de la hauteur du tracé.
+    const ecarts = sans.map((b, i) => Math.max(
+      Math.abs(avec[i].hautMèche - b.hautMèche),
+      Math.abs(avec[i].basMèche - b.basMèche),
+    ));
+    expect(Math.max(...ecarts)).toBeLessThanOrEqual(4);
+    expect(Math.max(...ecarts) / (zone.y1 - zone.y0)).toBeLessThan(0.01);
+    // Et il reste l'exception, pas la règle.
+    expect(ecarts.filter((e) => e > 2).length).toBeLessThanOrEqual(2);
+  });
 });
