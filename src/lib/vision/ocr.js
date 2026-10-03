@@ -99,11 +99,25 @@ export function binariser(img, { seuilAuto = true, seuil = 128 } = {}) {
   return { ...img, données: sortie, fondClair, coupure };
 }
 
+/**
+ * Le facteur d'agrandissement réellement tenable pour cette bande.
+ *
+ * Agrandir ×4 une bande déjà large d'une capture plein écran produirait une
+ * image de plusieurs dizaines de millions de pixels : l'OCR y passerait des
+ * minutes, pour lire les mêmes chiffres. On réduit le facteur plutôt que de
+ * laisser la lecture ne jamais rendre la main.
+ */
+export function facteurTenable(largeur, hauteur, demandé = 3, coteMax = 2400) {
+  const plusGrand = Math.max(largeur, hauteur);
+  if (!(plusGrand > 0)) return 1;
+  return Math.max(1, Math.min(Math.round(demandé), Math.floor(coteMax / plusGrand) || 1));
+}
+
 /** Bande d'axe prête pour l'OCR : découpée, agrandie, binarisée. */
-export function preparerBande(données, largeur, hauteur, bande, { facteur = 3 } = {}) {
+export function preparerBande(données, largeur, hauteur, bande, { facteur = 3, coteMax = 2400 } = {}) {
   const coupe = recadrer(données, largeur, hauteur, bande);
   if (!coupe) return null;
-  return binariser(agrandir(coupe, facteur));
+  return binariser(agrandir(coupe, facteurTenable(coupe.largeur, coupe.hauteur, facteur, coteMax)));
 }
 
 /**
@@ -168,7 +182,7 @@ export const CARACTERES = '0123456789.,';
  */
 export async function lireBande(données, largeur, hauteur, bande, options = {}) {
   const { facteur = 3, langue = 'eng', cheminLangue, creerWorker, enImage, caracteres = CARACTERES } = options;
-  const prete = preparerBande(données, largeur, hauteur, bande, { facteur });
+  const prete = preparerBande(données, largeur, hauteur, bande, { facteur, coteMax: options.coteMax });
   if (!prete) return null;
 
   const fabrique = creerWorker ?? (() => creerWorkerParDefaut({ langue, cheminLangue }));

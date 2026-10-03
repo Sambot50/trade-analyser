@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 import {
   recadrer, agrandir, luminance, binariser, preparerBande,
-  etiquettesDepuisMots, lireBande, creerWorkerParDefaut, CARACTERES,
+  etiquettesDepuisMots, lireBande, creerWorkerParDefaut, facteurTenable, CARACTERES,
 } from './ocr.js';
 
 /** Image RGBA unie, avec de quoi peindre dessus. */
@@ -295,5 +295,30 @@ describe('la chaîne sur une image réelle, moteur simulé', () => {
     const lu = reperesDepuisEtiquettes(etiquettes);
     expect(lu.convention).toBe('point');
     for (const { prix, y } of attendus) expect(lu.echelle.prixDeY(y)).toBeCloseTo(prix, 2);
+  });
+});
+
+describe('facteurTenable', () => {
+  // Agrandir ×4 une bande large d'une capture plein écran produirait des
+  // dizaines de millions de pixels : l'OCR y passerait des minutes pour lire
+  // les mêmes chiffres.
+  it('garde le facteur demandé sur une bande étroite', () => {
+    expect(facteurTenable(120, 600, 4)).toBe(4);
+  });
+
+  it('le réduit plutôt que de laisser l’image exploser', () => {
+    expect(facteurTenable(900, 900, 4, 2400)).toBe(2);
+    expect(facteurTenable(1800, 1000, 4, 2400)).toBe(1);
+  });
+
+  it('ne descend jamais sous 1', () => {
+    expect(facteurTenable(5000, 5000, 4, 2400)).toBe(1);
+    expect(facteurTenable(0, 0, 4)).toBe(1);
+  });
+
+  it('preparerBande applique le plafond', () => {
+    const d = new Uint8ClampedArray(1000 * 1000 * 4).fill(40);
+    const p = preparerBande(d, 1000, 1000, { x0: 0, x1: 1000, y0: 0, y1: 1000 }, { facteur: 4, coteMax: 2000 });
+    expect(Math.max(p.largeur, p.hauteur)).toBeLessThanOrEqual(2000);
   });
 });

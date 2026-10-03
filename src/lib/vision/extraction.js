@@ -118,9 +118,20 @@ export function detecterPalette(données, largeur, hauteur, { seuilChroma = 40 }
   //
   // Le mélange a toujours un chroma PLUS FAIBLE que la couleur pure dont il
   // vient. On garde donc, de chaque côté, le groupe au chroma le plus franc.
-  const retenus = [...groupes.values()]
-    .filter((g) => g.n * 20 >= Math.max(...[...groupes.values()].map((x) => x.n)))
-    .map((g) => ({ couleur: moyenne(g), n: g.n }));
+  // Le maximum se calcule UNE fois.
+  //
+  // Le recalculer dans le filtre, en reconstruisant le tableau à chaque
+  // groupe, rendait la fonction quadratique : une capture plein écran porte
+  // des milliers de teintes distinctes, et `Math.max(...)` sur un tableau de
+  // cette taille peut en plus faire déborder la pile d'appels. La lecture ne
+  // rendait jamais la main.
+  let plusGros = 0;
+  for (const g of groupes.values()) if (g.n > plusGros) plusGros = g.n;
+
+  const retenus = [];
+  for (const g of groupes.values()) {
+    if (g.n * 20 >= plusGros) retenus.push({ couleur: moyenne(g), n: g.n });
+  }
 
   const meilleur = (predicat) => retenus
     .filter((r) => predicat(r.couleur))

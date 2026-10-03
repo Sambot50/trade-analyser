@@ -201,3 +201,24 @@ describe('bougieDeColonnes', () => {
     expect(bougieDeColonnes(null)).toBeNull();
   });
 });
+
+describe('detecterPalette — tenir une capture plein écran', () => {
+  // Régression. Le maximum des groupes était recalculé DANS le filtre, en
+  // reconstruisant le tableau à chaque groupe : quadratique. Une capture
+  // d'écran entière porte des milliers de teintes distinctes, et la lecture
+  // ne rendait jamais la main — plus `Math.max(...)` qui déborde la pile sur
+  // un tableau de cette taille.
+  it('rend la main en quelques centaines de millisecondes sur 1920×1080', () => {
+    const L = 1920; const H = 1080;
+    const d = new Uint8ClampedArray(L * H * 4);
+    for (let i = 0; i < L * H; i++) {
+      d[i * 4] = (i * 7) % 256;
+      d[i * 4 + 1] = (i * 13) % 256;
+      d[i * 4 + 2] = (i * 29) % 256;
+      d[i * 4 + 3] = 255;
+    }
+    const debut = Date.now();
+    detecterPalette(d, L, H);
+    expect(Date.now() - debut).toBeLessThan(5000);
+  });
+});
