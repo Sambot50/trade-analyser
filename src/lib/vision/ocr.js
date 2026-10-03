@@ -128,6 +128,27 @@ export function etiquettesDepuisMots(mots, { y0 = 0, facteur = 1, confianceMinim
     .filter((e) => e && e.texte);
 }
 
+/**
+ * Le moteur, servi en local d'abord, depuis sa source habituelle ensuite.
+ *
+ * Servir le dictionnaire avec l'application est la bonne façon : rien ne sort
+ * de la machine, et une coupure réseau n'empêche pas de lire un graphique.
+ * Mais exiger ce fichier rendrait l'application inutilisable à qui ne l'a pas
+ * encore déposé. On essaie donc le chemin local, et on retombe sur la source
+ * par défaut s'il n'y est pas.
+ */
+export async function creerWorkerParDefaut({ langue = 'eng', cheminLangue, charger } = {}) {
+  const createWorker = charger ?? (await import('tesseract.js')).createWorker;
+  if (cheminLangue) {
+    try {
+      return await createWorker(langue, undefined, { langPath: cheminLangue });
+    } catch {
+      // Dictionnaire absent des fichiers servis : on continue sans.
+    }
+  }
+  return createWorker(langue);
+}
+
 /** Les caractères qu'une graduation de prix peut contenir, et pas un de plus. */
 export const CARACTERES = '0123456789.,';
 
@@ -146,14 +167,11 @@ export const CARACTERES = '0123456789.,';
  * `creerWorker` est injectable pour que le reste se teste sans moteur.
  */
 export async function lireBande(données, largeur, hauteur, bande, options = {}) {
-  const { facteur = 3, langue = 'eng', cheminLangue, creerWorker, enPng } = options;
+  const { facteur = 3, langue = 'eng', cheminLangue, creerWorker, enImage } = options;
   const prete = preparerBande(données, largeur, hauteur, bande, { facteur });
   if (!prete) return null;
 
-  const fabrique = creerWorker ?? (async () => {
-    const { createWorker } = await import('tesseract.js');
-    return createWorker(langue, undefined, cheminLangue ? { langPath: cheminLangue } : undefined);
-  });
+  const fabrique = creerWorker ?? (() => creerWorkerParDefaut({ langue, cheminLangue }));
 
   const worker = await fabrique();
   try {
@@ -162,7 +180,7 @@ export async function lireBande(données, largeur, hauteur, bande, options = {})
       // Un axe est une colonne de nombres isolés, pas un paragraphe.
       tessedit_pageseg_mode: '6',
     });
-    const image = enPng ? await enPng(prete) : prete;
+    const image = enImage ? await enImage(prete) : prete;
     const { data } = await worker.recognize(image);
     const mots = data?.words ?? [];
     return etiquettesDepuisMots(mots, { y0: bande.y0, facteur: prete.facteur ?? facteur });

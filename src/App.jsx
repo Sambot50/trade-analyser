@@ -13,6 +13,8 @@ import { toPngDataUrl } from './lib/image.js';
 import JournalView from './JournalView.jsx';
 import { enregistrerAnalyse, dossierMemorise, resoudreEnAttente } from './lib/journal/index.js';
 import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines, rrVerdict, breakEvenRate } from './lib/analysis.js';
+import { lireGraphique } from './lib/vision/lecture.js';
+import { pixelsDepuisDataUrl, enCanvas } from './lib/vision/navigateur.js';
 
 const LEVEL_LABELS = { entry: 'ENTRÉE', sl: 'STOP LOSS', tp1: 'TP 1', tp2: 'TP 2' };
 
@@ -31,6 +33,9 @@ export default function App() {
   const [showKeyValue, setShowKeyValue] = useState(false);
 
   const [visibleLevels, setVisibleLevels] = useState({ entry: true, sl: true, tp1: true, tp2: true });
+
+  const [lecture, setLecture] = useState(null);
+  const [lectureEnCours, setLectureEnCours] = useState(false);
 
   const [onglet, setOnglet] = useState('analyse');
   const [dossierJournal, setDossierJournal] = useState(null);
@@ -237,6 +242,38 @@ export default function App() {
     }
   };
 
+  /**
+   * Lit le graphique par la géométrie : aucun modèle, aucun appel réseau.
+   *
+   * Les couleurs, les bornes du tracé, la frontière du panneau de volume et
+   * l'échelle sont déduites de l'image elle-même ; les bougies en sont
+   * extraites, puis les figures que le dépôt sait déjà reconnaître.
+   */
+  const runLecture = async () => {
+    if (!imageSrc || lectureEnCours) return;
+    setLectureEnCours(true);
+    setLecture(null);
+    setErrorMsg('');
+    try {
+      const { données, largeur, hauteur } = await pixelsDepuisDataUrl(imageSrc);
+      // `cheminLangue` évite d'aller chercher le dictionnaire sur un CDN au
+      // moment où l'on s'en sert : il est servi avec l'application.
+      const r = await lireGraphique(données, largeur, hauteur, {
+        facteur: 4,
+        cheminLangue: '/tesseract',
+        enImage: enCanvas,
+      });
+      setLecture(r);
+      if (!r.ok) setErrorMsg(r.probleme);
+    } catch (err) {
+      console.error(err);
+      setLecture(null);
+      setErrorMsg(err.message || 'La lecture du graphique a échoué.');
+    } finally {
+      setLectureEnCours(false);
+    }
+  };
+
   const copySignal = async () => {
     if (!analysis) return;
 
@@ -400,6 +437,21 @@ export default function App() {
             {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             {loading ? `Analyse en cours via ${provider.label}…` : "Lancer l'analyse AI"}
           </button>
+
+          <button
+            onClick={runLecture}
+            disabled={!imageSrc || lectureEnCours}
+            className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 disabled:text-slate-700 text-slate-100 text-sm font-semibold py-3 rounded-xl transition border border-slate-700"
+          >
+            {lectureEnCours ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Ruler className="w-4 h-4" />}
+            {lectureEnCours ? 'Lecture de la géométrie…' : 'Lire les bougies (sans modèle)'}
+          </button>
+          <p className="text-[11px] text-slate-600 leading-relaxed">
+            Mesure l'image au lieu de l'interpréter : couleurs, bornes du tracé et échelle
+            déduites des pixels, puis structure, order blocks et prises de liquidité.
+          </p>
+
+          {lecture && <LectureCard lecture={lecture} />}
         </section>
 
         <aside className="lg:sticky lg:top-24">
@@ -701,6 +753,108 @@ function ScaleCard({ scale }) {
  * Un ratio seul est abstrait ; voir « risque 256,73 pour viser 223,27 » dit
  * immédiatement si la proposition tient debout.
  */
+/**
+ * Ce que la lecture géométrique a trouvé — ou l'étape où elle a buté.
+ *
+ * Nommer l'étape n'est pas un détail d'affichage : « l'axe n'a pas pu être
+ * lu » et « aucune bougie trouvée » demandent deux gestes opposés de la part
+ * de l'utilisateur.
+ */
+function LectureCard({ lecture }) {
+  if (!lecture.ok) {
+    const geste = {
+      palette: 'Vérifie que la capture montre bien des chandeliers, pas une courbe.',
+      zone: 'Recadre sur le graphique seul, sans la barre d\u2019outils.',
+      echelle: 'Agrandis la capture, ou dézoome l\u2019axe pour afficher plus de graduations.',
+      bougies: 'Le tracé a été trouvé mais reste vide : vérifie le recadrage.',
+    }[lecture.etape];
+
+    return (
+      <div className="bg-slate-900/60 border border-rose-900/50 rounded-xl p-4 flex flex-col gap-2">
+        <p className="text-[11px] uppercase tracking-wider text-rose-400 font-semibold">
+          Lecture interrompue — étape « {lecture.etape} »
+        </p>
+        <p className="text-[13px] text-slate-300 leading-relaxed">{lecture.probleme}</p>
+        {geste && <p className="text-[12px] text-slate-500 leading-relaxed">{geste}</p>}
+        {lecture.etiquettes?.length > 0 && (
+          <p className="text-[11px] text-slate-600 font-mono">
+            lu sur l\u2019axe : {lecture.etiquettes.map((e) => e.texte).join(' · ')}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  const { bougies, zone, convention, analyses } = lecture;
+  const obs = analyses.orderBlocks;
+
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+      <p className="text-[11px] uppercase tracking-wider text-indigo-400 font-semibold flex items-center gap-1.5">
+        <Ruler className="w-3.5 h-3.5" /> Mesuré sur l\u2019image
+      </p>
+
+      <div className="grid grid-cols-3 gap-2 text-[11px]">
+        <div>
+          <span className="text-slate-500">Bougies</span>
+          <p className="text-slate-200 font-semibold tabular-nums">{bougies.length}</p>
+        </div>
+        <div>
+          <span className="text-slate-500">Cassures</span>
+          <p className="text-slate-200 font-semibold tabular-nums">{analyses.cassures.length}</p>
+        </div>
+        <div>
+          <span className="text-slate-500">Order blocks</span>
+          <p className="text-slate-200 font-semibold tabular-nums">{obs.length}</p>
+        </div>
+      </div>
+
+      <p className="text-[11px] text-slate-600">
+        axe lu en convention « {convention} » · panneau de volume {zone.avecVolume ? 'détecté' : 'absent'}
+        {analyses.rejetes > 0 && ` · ${analyses.rejetes} candidat(s) écarté(s)`}
+      </p>
+
+      {!analyses.assezDeBougies && (
+        <p className="text-[12px] text-amber-400">
+          Trop peu de bougies pour chercher une structure. Dézoome la capture.
+        </p>
+      )}
+
+      {obs.length > 0 && (
+        <div className="flex flex-col gap-2 border-t border-slate-800 pt-3">
+          {obs.slice(0, 4).map((ob, i) => {
+            const q = ob.qualificatifs;
+            const marques = [
+              q.priseDeLiquidite && 'prise de liquidité',
+              q.fvg && 'FVG',
+              q.premiumDiscount?.enZoneFavorable && 'zone favorable',
+              q.premiumDiscount?.ote && 'OTE',
+            ].filter(Boolean);
+            return (
+              <div key={i} className="flex flex-col gap-1">
+                <p className="text-[12px] text-slate-200 font-semibold">
+                  OB {ob.sens ?? ''} — bougie {ob.index}
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  {marques.length ? marques.join(' · ') : 'aucun qualificatif'}
+                </p>
+              </div>
+            );
+          })}
+          {obs.length > 4 && (
+            <p className="text-[11px] text-slate-600">et {obs.length - 4} autre(s)</p>
+          )}
+        </div>
+      )}
+
+      <p className="text-[10px] text-slate-600 leading-relaxed border-t border-slate-800 pt-2.5">
+        Mesuré, pas interprété : aucun modèle n\u2019intervient ici. Les prix sont justes à
+        deux pixels près, soit la précision que porte l\u2019image.
+      </p>
+    </div>
+  );
+}
+
 function RiskCard({ analysis }) {
   const verdict = rrVerdict(analysis.rr);
   const breakEven = breakEvenRate(analysis.rr);

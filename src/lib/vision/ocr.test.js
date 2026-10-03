@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 import {
   recadrer, agrandir, luminance, binariser, preparerBande,
-  etiquettesDepuisMots, lireBande, CARACTERES,
+  etiquettesDepuisMots, lireBande, creerWorkerParDefaut, CARACTERES,
 } from './ocr.js';
 
 /** Image RGBA unie, avec de quoi peindre dessus. */
@@ -156,6 +156,32 @@ describe('etiquettesDepuisMots', () => {
   });
 });
 
+describe('creerWorkerParDefaut', () => {
+  it('sert le dictionnaire en local quand il y est', async () => {
+    const charger = vi.fn().mockResolvedValue('worker');
+    await creerWorkerParDefaut({ cheminLangue: '/tesseract', charger });
+    expect(charger).toHaveBeenCalledWith('eng', undefined, { langPath: '/tesseract' });
+  });
+
+  it('RETOMBE sur la source par défaut si le fichier local manque', async () => {
+    // Exiger le dictionnaire local rendrait l'application inutilisable à qui
+    // ne l'a pas encore déposé.
+    const charger = vi.fn()
+      .mockRejectedValueOnce(new Error('404'))
+      .mockResolvedValueOnce('worker');
+    expect(await creerWorkerParDefaut({ cheminLangue: '/tesseract', charger })).toBe('worker');
+    expect(charger).toHaveBeenCalledTimes(2);
+    expect(charger).toHaveBeenLastCalledWith('eng');
+  });
+
+  it('n’essaie pas le local quand aucun chemin n’est donné', async () => {
+    const charger = vi.fn().mockResolvedValue('worker');
+    await creerWorkerParDefaut({ charger });
+    expect(charger).toHaveBeenCalledTimes(1);
+    expect(charger).toHaveBeenCalledWith('eng');
+  });
+});
+
 describe('lireBande', () => {
   it('n’offre au moteur que les caractères d’une graduation', () => {
     expect(CARACTERES).toBe('0123456789.,');
@@ -261,7 +287,7 @@ describe('la chaîne sur une image réelle, moteur simulé', () => {
       terminate: async () => {},
     });
 
-    const etiquettes = await lireBande(r.pixels, r.width, r.height, bande, { facteur, creerWorker, enPng });
+    const etiquettes = await lireBande(r.pixels, r.width, r.height, bande, { facteur, creerWorker, enImage: enPng });
     expect(etiquettes).toHaveLength(4);
     for (let i = 0; i < 4; i++) expect(etiquettes[i].y).toBeCloseTo(attendus[i].y, 6);
 
