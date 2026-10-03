@@ -12,7 +12,7 @@ import { loadSettings, saveSettings } from './lib/settings.js';
 import { toPngDataUrl } from './lib/image.js';
 import JournalView from './JournalView.jsx';
 import { enregistrerAnalyse, dossierMemorise, resoudreEnAttente } from './lib/journal/index.js';
-import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines, rrVerdict, breakEvenRate } from './lib/analysis.js';
+import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines, rrVerdict, breakEvenRate, FRICTION_PAR_DEFAUT } from './lib/analysis.js';
 import { lireGraphique } from './lib/vision/lecture.js';
 import { pixelsDepuisDataUrl, enCanvas } from './lib/vision/navigateur.js';
 
@@ -202,8 +202,22 @@ export default function App() {
     setAnalysis(normalizeAnalysis(sample.analysis, 'demo'));
   };
 
+  /** Un symbole ou une unité que le modèle n'a visiblement pas su lire. */
+  const illisible = (v) => !v || /^(unknown|inconnu|n\/?a|intraday|\?+)$/i.test(String(v).trim());
+
   const journaliser = (analyseNormalisee, dureeMs) => {
-    enAttenteJournal.current = { analyse: analyseNormalisee, dureeMs };
+    // Le modèle rend parfois `UNKNOWN` et `intraday` devant un graphique qui
+    // affiche son symbole en toutes lettres. Sans symbole reconnaissable, le
+    // journal ne peut aller chercher aucune bougie, l'issue n'est jamais
+    // constatée, et le plan reste « en cours » pour toujours. La lecture
+    // géométrique, elle, l'a relevé par OCR : on s'en sert.
+    const t = lecture?.ok ? lecture.titre : null;
+    const analyse = {
+      ...analyseNormalisee,
+      symbol: illisible(analyseNormalisee.symbol) && t?.symbole ? t.symbole : analyseNormalisee.symbol,
+      timeframe: illisible(analyseNormalisee.timeframe) && t?.unite ? t.unite : analyseNormalisee.timeframe,
+    };
+    enAttenteJournal.current = { analyse, dureeMs };
   };
 
   const runAnalysis = async () => {
@@ -794,6 +808,22 @@ function LectureCard({ lecture }) {
         <Ruler className="w-3.5 h-3.5" /> Mesuré sur l\u2019image
       </p>
 
+      {(lecture.titre?.symbole || lecture.titre?.unite) && (
+        <div className="flex items-center gap-2 text-[12px]">
+          <span className="text-slate-200 font-semibold">{lecture.titre.symbole ?? '—'}</span>
+          <span className="text-slate-500">{lecture.titre.unite ?? 'unité non lue'}</span>
+          <span className="text-[10px] text-slate-600">lu sur le bandeau</span>
+        </div>
+      )}
+      {lecture.titre && !lecture.titre.symbole && (
+        <p className="text-[11px] text-amber-400">
+          Symbole non reconnu sur le bandeau — l\u2019issue devra être saisie à la main.
+          {lecture.titre.texte && (
+            <span className="text-slate-600 font-mono"> lu : « {lecture.titre.texte.slice(0, 60)} »</span>
+          )}
+        </p>
+      )}
+
       <div className="grid grid-cols-3 gap-2 text-[11px]">
         <div>
           <span className="text-slate-500">Bougies</span>
@@ -858,6 +888,7 @@ function LectureCard({ lecture }) {
 function RiskCard({ analysis }) {
   const verdict = rrVerdict(analysis.rr);
   const breakEven = breakEvenRate(analysis.rr);
+  const avecFrais = breakEvenRate(analysis.rr, FRICTION_PAR_DEFAUT);
 
   const risk = Math.abs(analysis.entry - analysis.stopLoss);
   const reward = Math.abs(analysis.tp1 - analysis.entry);
@@ -895,6 +926,23 @@ function RiskCard({ analysis }) {
         <p className={`text-[11px] mt-1 ${verdict.tone === 'bad' ? 'text-rose-300' : 'text-slate-500'}`}>
           Il te faut {(breakEven * 100).toFixed(0)} % de trades gagnants rien que pour être à l'équilibre.
         </p>
+      )}
+
+      {avecFrais !== null && (
+        avecFrais > 1 ? (
+          <p className="text-[11px] mt-1 text-rose-300 font-semibold">
+            Frais compris, aucun taux de réussite ne rend ce plan rentable : le ratio ne
+            couvre même pas l'aller-retour.
+          </p>
+        ) : (
+          <p className="text-[11px] mt-1 text-amber-400">
+            Frais compris, il en faut {(avecFrais * 100).toFixed(0)} %.{' '}
+            <span className="text-slate-600">
+              friction supposée {FRICTION_PAR_DEFAUT} R — mesurée sur l'or en 15 min (DEC-034),
+              à remesurer sur ton marché.
+            </span>
+          </p>
+        )
       )}
     </div>
   );

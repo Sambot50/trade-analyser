@@ -211,3 +211,33 @@ describe('breakEvenRate', () => {
     expect(breakEvenRate(null)).toBeNull();
   });
 });
+
+describe('breakEvenRate — avec la friction', () => {
+  it('rend la formule sans frais quand on n’en passe pas', () => {
+    expect(breakEvenRate(1)).toBeCloseTo(0.5, 9);
+    expect(breakEvenRate(2)).toBeCloseTo(1 / 3, 9);
+    expect(breakEvenRate(3)).toBeCloseTo(0.25, 9);
+  });
+
+  it('relève le seuil des frais : 50 % devient 54 % à ratio 1', () => {
+    // L'écart paraît mince. Il sépare un plan rentable d'un plan qui saigne.
+    expect(breakEvenRate(1, 0.08)).toBeCloseTo(0.54, 9);
+    expect(breakEvenRate(2, 0.08)).toBeCloseTo(0.36, 9);
+  });
+
+  it('annonce l’impossible plutôt que de rassurer', () => {
+    // Ratio 0,05 avec 0,08 R de frais : aucun taux de réussite ne suffit.
+    expect(breakEvenRate(0.05, 0.08)).toBeGreaterThan(1);
+  });
+
+  it('ignore une friction absurde au lieu de produire un chiffre faux', () => {
+    expect(breakEvenRate(1, -5)).toBeCloseTo(0.5, 9);
+    expect(breakEvenRate(1, NaN)).toBeCloseTo(0.5, 9);
+  });
+
+  it('refuse toujours un ratio nul ou négatif', () => {
+    expect(breakEvenRate(0, 0.08)).toBeNull();
+    expect(breakEvenRate(-1, 0.08)).toBeNull();
+    expect(breakEvenRate('1', 0.08)).toBeNull();
+  });
+});

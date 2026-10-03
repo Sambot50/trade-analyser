@@ -11,6 +11,7 @@
 import { detecterPalette, bougiesDepuisImage } from './extraction.js';
 import { zoneTrace, reperesDepuisEtiquettes } from './axe.js';
 import { lireBande } from './ocr.js';
+import { lireTitre } from './titre.js';
 import { pivots, cassures } from '../marche/structure.js';
 import { detecterEnDetail } from '../marche/orderblocks.js';
 import {
@@ -55,7 +56,7 @@ function sansCasse(f) {
  * c'est ce que fait le test, et ce que fera une saisie manuelle de secours.
  */
 export async function lireGraphique(données, largeur, hauteur, options = {}) {
-  const { etiquettes = null, fenetre = 5, pasMs = 900_000, ...reste } = options;
+  const { etiquettes = null, fenetre = 5, pasMs = 900_000, avecTitre = true, ...reste } = options;
 
   const palette = detecterPalette(données, largeur, hauteur);
   if (!palette) {
@@ -86,9 +87,17 @@ export async function lireGraphique(données, largeur, hauteur, options = {}) {
     return echec('bougies', 'Aucune bougie reconnue dans la zone de tracé.', { palette, zone, echelle: lu.echelle });
   }
 
+  // Le bandeau, pour que le journal sache contre quelles bougies résoudre.
+  // Son échec n'empêche rien : les prix restent lisibles sans lui.
+  let titre = { symbole: null, unite: null, texte: '' };
+  if (avecTitre && !etiquettes) {
+    try { titre = await lireTitre(données, largeur, hauteur, zone, reste); }
+    catch { /* bandeau illisible : la lecture des prix vaut quand même */ }
+  }
+
   return {
     ok: true, etape: 'fini',
-    palette, zone,
+    palette, zone, titre,
     echelle: lu.echelle, convention: lu.convention, reperes: lu.reperes,
     bougies,
     analyses: analyser(bougies, { fenetre }),

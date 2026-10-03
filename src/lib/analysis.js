@@ -183,10 +183,32 @@ export function rrVerdict(rr) {
 }
 
 /**
- * Taux de réussite minimal pour être à l'équilibre avec ce ratio.
- * Rend concret ce qu'un ratio inférieur à 1 exige réellement.
+ * La friction d'un aller-retour, en fraction de R.
+ *
+ * Mesurée sur l'or en 15 minutes, quatre ticks de frais : DEC-034. Elle DÉPEND
+ * DE L'INSTRUMENT et de la largeur du stop — un stop serré paie
+ * proportionnellement bien plus. Ce chiffre est un défaut raisonnable, pas une
+ * constante de la nature : il se remesure par marché.
  */
-export function breakEvenRate(rr) {
+export const FRICTION_PAR_DEFAUT = 0.08;
+
+/**
+ * Taux de réussite minimal pour être à l'équilibre, FRAIS COMPRIS.
+ *
+ * Sans frais, l'équilibre tient quand `p·rr = (1−p)`, d'où `1/(1+rr)`. Mais
+ * chaque trade paie sa friction qu'il gagne ou qu'il perde :
+ *
+ *     p·rr − (1−p) − f = 0   ⟹   p = (1 + f) / (1 + rr)
+ *
+ * À ratio 1 et friction 0,08, il faut 54 % et non 50 %. L'écart paraît mince ;
+ * il est exactement ce qui sépare un plan rentable d'un plan qui saigne
+ * lentement, et aucun journal ne le voyait.
+ *
+ * Rend une valeur supérieure à 1 quand le plan est IMPOSSIBLE : aucun taux de
+ * réussite ne couvre la friction avec un ratio aussi faible.
+ */
+export function breakEvenRate(rr, friction = 0) {
   if (typeof rr !== 'number' || !Number.isFinite(rr) || rr <= 0) return null;
-  return 1 / (1 + rr);
+  const f = Number.isFinite(friction) && friction >= 0 ? friction : 0;
+  return (1 + f) / (1 + rr);
 }

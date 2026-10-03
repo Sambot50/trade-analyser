@@ -167,7 +167,7 @@ export const CARACTERES = '0123456789.,';
  * `creerWorker` est injectable pour que le reste se teste sans moteur.
  */
 export async function lireBande(données, largeur, hauteur, bande, options = {}) {
-  const { facteur = 3, langue = 'eng', cheminLangue, creerWorker, enImage } = options;
+  const { facteur = 3, langue = 'eng', cheminLangue, creerWorker, enImage, caracteres = CARACTERES } = options;
   const prete = preparerBande(données, largeur, hauteur, bande, { facteur });
   if (!prete) return null;
 
@@ -176,7 +176,7 @@ export async function lireBande(données, largeur, hauteur, bande, options = {})
   const worker = await fabrique();
   try {
     await worker.setParameters({
-      tessedit_char_whitelist: CARACTERES,
+      tessedit_char_whitelist: caracteres,
       // Un axe est une colonne de nombres isolés, pas un paragraphe.
       tessedit_pageseg_mode: '6',
     });

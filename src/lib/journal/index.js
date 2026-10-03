@@ -5,7 +5,7 @@ import { construireEnregistrement, cheminDossier, ligneIndex, ligneMiseAJour, co
 import { genererRapport } from './report.js';
 import { genererSchemaDoc } from './schema-doc.js';
 import { resoudreIssue } from './resolve.js';
-import { recupererBougiesPaginees, symboleResolvable, MINUTES_PAR_BOUGIE } from './market.js';
+import { recupererBougiesPaginees, versPaireBinance, MINUTES_PAR_BOUGIE } from './market.js';
 import { deposerDansTampon, listerTampon, majEntree, ecrireFichier, ajouterLigne,
          sousDossier, lireLignesIndex } from './store.js';
 
@@ -134,11 +134,14 @@ export async function resoudreEnAttente({ racine, signal } = {}) {
   const rapport = [];
 
   for (const { record } of aResoudre) {
-    const symbole = record.marche.symbole;
+    const affiche = record.marche.symbole;
+    // Le symbole lu sur l'image est celui de la plateforme, pas celui de la
+    // source de bougies : `BTCUSD` à l'écran, `BTCUSDT` chez Binance.
+    const symbole = versPaireBinance(affiche);
 
-    if (!symboleResolvable(symbole)) {
+    if (!symbole) {
       rapport.push({ id: record.id, issue: 'non_resolvable',
-        message: `${symbole ?? 'symbole inconnu'} : pas de source publique, saisie manuelle requise.` });
+        message: `${affiche ?? 'symbole inconnu'} : pas de source publique, saisie manuelle requise.` });
       continue;
     }
 

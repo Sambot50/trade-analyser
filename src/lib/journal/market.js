@@ -21,6 +21,42 @@ export const INTERVALLE_RESOLUTION = '1m';
 export const MINUTES_PAR_BOUGIE = 1;
 
 /** Symboles que Binance peut résoudre. Le reste reste à saisir à la main. */
+/**
+ * Les bases crypto qu'on accepte de rapprocher d'une paire Binance.
+ *
+ * Cette liste est VOLONTAIREMENT explicite, et c'est tout l'enjeu : TradingView
+ * écrit `BTCUSD` là où Binance cote `BTCUSDT`, et un rapprochement naïf « USD
+ * veut dire USDT » transformerait `EURUSD` — du forex — en `EURUSDT`, une paire
+ * crypto qui existe et n'a rien à voir. Le journal résoudrait alors un plan
+ * contre les mauvaises bougies, sans que rien ne le signale.
+ *
+ * Mieux vaut un symbole déclaré non résolvable qu'un résultat faux.
+ */
+export const BASES_CRYPTO = Object.freeze([
+  'BTC', 'ETH', 'SOL', 'XRP', 'ADA', 'DOGE', 'BNB', 'LTC', 'LINK',
+  'AVAX', 'DOT', 'MATIC', 'TRX', 'ATOM', 'UNI', 'XLM', 'ETC', 'FIL', 'NEAR',
+]);
+
+/**
+ * Le symbole tel qu'il est AFFICHÉ, rapproché d'une paire Binance.
+ *
+ * Rend `null` dès qu'il y a le moindre doute.
+ */
+export function versPaireBinance(affiche) {
+  if (typeof affiche !== 'string') return null;
+  // `BINANCE:BTCUSDT`, `COMEX:GC1!` — le préfixe de place ne nous apprend rien.
+  const sansPlace = affiche.includes(':') ? affiche.slice(affiche.lastIndexOf(':') + 1) : affiche;
+  const nettoye = sansPlace.toUpperCase().replace(/[\s/\-_]/g, '');
+
+  const direct = symboleResolvable(nettoye);
+  if (direct) return direct;
+
+  // `BTCUSD` → `BTCUSDT`, mais seulement si la base est une crypto connue.
+  const m = /^([A-Z0-9]{2,15})USD$/.exec(nettoye);
+  if (m && BASES_CRYPTO.includes(m[1])) return symboleResolvable(`${m[1]}USDT`);
+  return null;
+}
+
 export function symboleResolvable(symbole) {
   if (typeof symbole !== 'string') return null;
   const nettoye = symbole.toUpperCase().replace(/[\s/\-_]/g, '');

@@ -6,7 +6,7 @@
 // résumé en langue naturelle. Le surcoût en octets est sans commune mesure
 // avec le coût d'une mauvaise interprétation six mois plus tard.
 
-import { breakEvenRate, computeRR, rrVerdict } from '../analysis.js';
+import { breakEvenRate, computeRR, rrVerdict, FRICTION_PAR_DEFAUT } from '../analysis.js';
 
 // v2 (2026-09-23) : la règle de sortie devient explicite. En v1, un trade
 // passé par TP1 puis stoppé était compté comme un gain de +1 R tout en
@@ -154,6 +154,10 @@ export function construireEnregistrement({ analyse, moteur, fichiers, horodatage
       ratioRisqueRendementTp1: rr1,
       ratioRisqueRendementTp2: rr2,
       tauxReussiteEquilibre: arrondir(breakEvenRate(rr1), 4),
+      // Le même seuil, frais compris. Le premier dit ce qu'il faudrait dans un
+      // monde sans courtier ; celui-ci, ce qu'il faut vraiment.
+      tauxReussiteEquilibreAvecFrais: arrondir(breakEvenRate(rr1, FRICTION_PAR_DEFAUT), 4),
+      frictionSupposee: FRICTION_PAR_DEFAUT,
       commentaireTauxEquilibre:
         'Proportion de trades gagnants nécessaire pour ne rien perdre avec ce ratio.',
       verdictRatio: verdict.tone === 'bad' ? 'defavorable'
