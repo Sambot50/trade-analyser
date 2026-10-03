@@ -92,13 +92,25 @@ describe('lireGraphique — ce qu’il dit quand ça échoue', () => {
     expect(r.probleme).toMatch(/chandeliers/);
   });
 
+  it('distingue ZÉRO graduation : la colonne de prix n’est pas dans l’image', async () => {
+    // Deux cas, deux gestes opposés. Agrandir une capture rognée sur le tracé
+    // ne fera jamais apparaître un axe qui n'y est pas.
+    const r = await lireGraphique(données, largeur, hauteur, { etiquettes: [] });
+    expect(r.ok).toBe(false);
+    expect(r.etape).toBe('echelle');
+    expect(r.probleme).toMatch(/Aucune graduation/);
+    expect(r.probleme).toMatch(/colonne de prix/);
+    expect(r.probleme).not.toMatch(/Agrandis/);
+  });
+
   it('nomme l’étape « echelle » sous trois graduations, et rend ce qu’il a déjà', async () => {
     const r = await lireGraphique(données, largeur, hauteur, {
       etiquettes: etiquettesDe(echelle, hauteur, [0.1, 0.8]),
     });
     expect(r.ok).toBe(false);
     expect(r.etape).toBe('echelle');
-    expect(r.probleme).toMatch(/trois graduations/);
+    expect(r.probleme).toMatch(/Seulement 2 graduations/);
+    expect(r.probleme).toMatch(/il en faut trois/);
     expect(r.zone).toBeDefined();          // le travail déjà fait n'est pas perdu
     expect(r.palette).toBeDefined();
   });

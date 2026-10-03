@@ -106,7 +106,16 @@ export async function lireGraphique(données, largeur, hauteur, options = {}) {
     }
 
     if (!lues || lues.length < 3) {
-      return echec('echelle', 'Moins de trois graduations lisibles sur l’axe. Agrandis la capture, ou saisis les deux prix extrêmes à la main.', { palette, zone, etiquettes: lues ?? [] });
+      // Zéro et deux ne demandent pas le même geste. Aucune étiquette veut
+      // presque toujours dire que la colonne de prix n'est pas DANS l'image —
+      // une capture rognée sur le tracé seul. Une ou deux veut dire que l'axe
+      // est là mais trop petit, ou masqué par l'étiquette du prix courant.
+      const message = (lues?.length ?? 0) === 0
+        ? 'Aucune graduation lue sur l’axe. La colonne de prix est-elle bien DANS la capture, '
+          + 'à droite du graphique ? Une capture rognée sur le tracé seul ne contient aucune échelle.'
+        : `Seulement ${lues.length} graduation${lues.length > 1 ? 's' : ''} lue${lues.length > 1 ? 's' : ''} sur l’axe, il en faut trois. `
+          + 'Agrandis la capture, ou saisis les deux prix extrêmes à la main.';
+      return echec('echelle', message, { palette, zone, etiquettes: lues ?? [] });
     }
 
     lu = reperesDepuisEtiquettes(lues);

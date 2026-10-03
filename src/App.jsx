@@ -908,7 +908,11 @@ function LectureCard({ lecture }) {
     const geste = {
       palette: 'Vérifie que la capture montre bien des chandeliers, pas une courbe.',
       zone: 'Recadre sur le graphique seul, sans la barre d’outils.',
-      echelle: 'Agrandis la capture, ou dézoome l’axe pour afficher plus de graduations.',
+      // Rien lu : le geste est de recadrer, pas d'agrandir. Agrandir une
+      // capture qui ne contient pas l'axe ne fera jamais apparaître l'axe.
+      echelle: (lecture.etiquettes?.length ?? 0) === 0
+        ? 'Reprends la capture en incluant la colonne de prix, à droite du graphique.'
+        : 'Agrandis la capture, ou dézoome l’axe pour afficher plus de graduations.',
       bougies: 'Le tracé a été trouvé mais reste vide : vérifie le recadrage.',
     }[lecture.etape];
 
