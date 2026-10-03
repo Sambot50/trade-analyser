@@ -9,6 +9,7 @@ import {
 import { SAMPLES } from './samples.js';
 import { PROVIDERS, analyzeChart, blockingReason, getProvider, listInstalledModels } from './lib/providers/index.js';
 import { loadSettings, saveSettings } from './lib/settings.js';
+import { chargerInstrument, enregistrerInstrument, resoudreInstrument } from './lib/instrument.js';
 import { toPngDataUrl } from './lib/image.js';
 import JournalView from './JournalView.jsx';
 import { enregistrerAnalyse, dossierMemorise, resoudreEnAttente } from './lib/journal/index.js';
@@ -38,6 +39,7 @@ export default function App() {
 
   const [lecture, setLecture] = useState(null);
   const [hauteurImage, setHauteurImage] = useState(0);
+  const [instrument, setInstrument] = useState(chargerInstrument);
   const [lectureEnCours, setLectureEnCours] = useState(false);
   const [prixHaut, setPrixHaut] = useState('');
   const [prixBas, setPrixBas] = useState('');
@@ -214,20 +216,21 @@ export default function App() {
     setAnalysis(normalizeAnalysis(sample.analysis, 'demo'));
   };
 
-  /** Un symbole ou une unité que le modèle n'a visiblement pas su lire. */
-  const illisible = (v) => !v || /^(unknown|inconnu|n\/?a|intraday|\?+)$/i.test(String(v).trim());
-
   const journaliser = (analyseNormalisee, dureeMs) => {
     // Le modèle rend parfois `UNKNOWN` et `intraday` devant un graphique qui
     // affiche son symbole en toutes lettres. Sans symbole reconnaissable, le
     // journal ne peut aller chercher aucune bougie, l'issue n'est jamais
-    // constatée, et le plan reste « en cours » pour toujours. La lecture
-    // géométrique, elle, l'a relevé par OCR : on s'en sert.
-    const t = lecture?.ok ? lecture.titre : null;
+    // constatée, et le plan reste « en cours » pour toujours. Deux secours :
+    // le bandeau lu par OCR, puis la saisie retenue d'une session à l'autre.
+    const { symbole, unite } = resoudreInstrument({
+      analyse: analyseNormalisee,
+      titre: lecture?.ok ? lecture.titre : null,
+      saisi: instrument,
+    });
     const analyse = {
       ...analyseNormalisee,
-      symbol: illisible(analyseNormalisee.symbol) && t?.symbole ? t.symbole : analyseNormalisee.symbol,
-      timeframe: illisible(analyseNormalisee.timeframe) && t?.unite ? t.unite : analyseNormalisee.timeframe,
+      symbol: symbole.valeur ?? analyseNormalisee.symbol,
+      timeframe: unite.valeur ?? analyseNormalisee.timeframe,
     };
     enAttenteJournal.current = { analyse, dureeMs };
   };
@@ -483,6 +486,14 @@ export default function App() {
           {lecture?.ok && analysis?.scale && (
             <ConfrontationCard analysis={analysis} lecture={lecture} hauteurImage={hauteurImage} />
           )}
+
+          <InstrumentCard
+            instrument={instrument}
+            onChange={(suivant) => { setInstrument(suivant); enregistrerInstrument(suivant); }}
+            resolu={resoudreInstrument({
+              analyse: analysis, titre: lecture?.ok ? lecture.titre : null, saisi: instrument,
+            })}
+          />
 
           {lecture && !lecture.ok && lecture.etape === 'echelle' && (
             <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-2.5">
@@ -899,6 +910,71 @@ function ConfrontationCard({ analysis, lecture, hauteurImage }) {
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+// L'instrument retenu, et d'où il vient.
+//
+// La provenance est affichée, pas seulement la valeur. Un symbole « saisi »
+// est le dernier recours : il décrit ce qu'on regardait la fois d'avant, pas
+// forcément la capture en cours. Le montrer est la seule protection contre
+// un journal qui range une analyse de l'or sous BTCUSD, erreur qui ne se voit
+// qu'au moment où l'on croit relire ses propres résultats.
+function InstrumentCard({ instrument, onChange, resolu }) {
+  const couleurs = { modèle: 'text-emerald-400', bandeau: 'text-indigo-400', saisi: 'text-amber-400' };
+  const ligne = (libelle, champ) => (
+    <div className="flex items-baseline justify-between gap-2 text-[11px]">
+      <span className="text-slate-500">{libelle}</span>
+      {champ.valeur ? (
+        <span className="text-slate-200 font-mono">
+          {champ.valeur} <span className={couleurs[champ.source] ?? 'text-slate-600'}>· {champ.source}</span>
+        </span>
+      ) : (
+        <span className="text-slate-600">non résolu</span>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+      <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1.5">
+        <LineChart className="w-3.5 h-3.5" /> Instrument
+      </p>
+
+      <div className="grid grid-cols-2 gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] text-slate-500 uppercase tracking-wider">Symbole</span>
+          <input
+            value={instrument.symbole ?? ''}
+            onChange={(e) => onChange({ ...instrument, symbole: e.target.value })}
+            placeholder="BTCUSD"
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[12px] text-slate-200 font-mono
+                       focus:outline-none focus:border-indigo-600"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] text-slate-500 uppercase tracking-wider">Unité de temps</span>
+          <input
+            value={instrument.unite ?? ''}
+            onChange={(e) => onChange({ ...instrument, unite: e.target.value })}
+            placeholder="15m"
+            className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[12px] text-slate-200 font-mono
+                       focus:outline-none focus:border-indigo-600"
+          />
+        </label>
+      </div>
+
+      <div className="flex flex-col gap-1 border-t border-slate-800 pt-2.5">
+        {ligne('Retenu pour le journal', resolu.symbole)}
+        {ligne('Horizon', resolu.unite)}
+      </div>
+
+      <p className="text-[11px] text-slate-600 leading-relaxed">
+        Sans symbole, le journal ne sait pas quelles bougies aller chercher : l’issue
+        n’est jamais constatée et le plan reste « en cours » indéfiniment. La saisie ne
+        sert qu’en dernier recours, quand ni le modèle ni le bandeau n’ont su lire.
+      </p>
     </div>
   );
 }
