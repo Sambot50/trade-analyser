@@ -529,15 +529,30 @@ export default function App() {
           )}
 
           {lecture?.ok && (
-            <button
-              onClick={enregistrerLaMesure}
-              disabled={mesureEnCours}
-              className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700
-                         disabled:opacity-50 text-slate-200 text-[13px] font-semibold rounded-xl py-2.5 transition"
-            >
-              {mesureEnCours ? <RefreshCw className="w-4 h-4 animate-spin" /> : <NotebookPen className="w-4 h-4" />}
-              {mesureEnCours ? 'Enregistrement…' : 'Enregistrer la mesure au journal'}
-            </button>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={enregistrerLaMesure}
+                disabled={mesureEnCours}
+                className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700
+                           disabled:opacity-50 text-slate-200 text-[13px] font-semibold rounded-xl py-2.5 transition"
+              >
+                {mesureEnCours ? <RefreshCw className="w-4 h-4 animate-spin" /> : <NotebookPen className="w-4 h-4" />}
+                {mesureEnCours ? 'Enregistrement…' : 'Enregistrer la mesure au journal'}
+              </button>
+
+              {/* L'avertissement est AVANT le clic, pas après. Une mesure sans
+                  symbole s'enregistre quand même — perdre la série serait pire
+                  — mais elle ne pourra jamais être rapprochée d'une source de
+                  marché, et on ne s'en aperçoit qu'en relisant le dossier. */}
+              {!resoudreInstrument({
+                analyse: analysis, titre: lecture.titre, saisi: instrument,
+              }).symbole.valeur && (
+                <p className="text-[11px] text-amber-400 leading-relaxed">
+                  Aucun symbole : cette mesure sera rangée sous « INCONNU » et ne pourra pas
+                  être rapprochée d’une source de marché. Renseigne-le ci-dessous d’abord.
+                </p>
+              )}
+            </div>
           )}
 
           <InstrumentCard

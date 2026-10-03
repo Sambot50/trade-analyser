@@ -3,7 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   mesureDepuisLecture, construireMesure, resumeMesure, ligneIndexMesure, TYPE_MESURE,
 } from './mesure.js';
-import { cheminDossier } from './schema.js';
+import { cheminDossier, construireId } from './schema.js';
 import { calculerStatistiques, genererRapport, estMesure } from './report.js';
 
 const lecture = {
@@ -132,5 +132,26 @@ describe('ligneIndexMesure', () => {
     for (const champ of ['direction', 'prixEntree', 'prixStopLoss', 'statut']) {
       expect(l[champ], champ).toBeUndefined();
     }
+  });
+});
+
+describe('un nom de dossier dit ce qui manque', () => {
+  const sans = { horodatage: '2026-10-03T13:34:15Z', marche: { symbole: null, uniteTemps: null }, type: 'mesure' };
+
+  it('remplace une valeur absente par un repli QUI SURVIT au nettoyage', () => {
+    // L'ancien repli valait « ? », effacé juste après par le filtre qui ne
+    // garde que lettres et chiffres : le dossier s'appelait `INCONNU--mesure`,
+    // avec un champ vide au milieu plutôt qu'un champ qui dit qu'il est vide.
+    expect(cheminDossier(sans)).toBe('2026-10-03/133415-INCONNU-NA-mesure');
+    expect(cheminDossier(sans)).not.toMatch(/--/);
+  });
+
+  it('garde la casse de l’unité de temps, et met le symbole en capitales', () => {
+    const r = { ...sans, marche: { symbole: 'btcusd', uniteTemps: '15m' } };
+    expect(cheminDossier(r)).toBe('2026-10-03/133415-BTCUSD-15m-mesure');
+  });
+
+  it('applique le même repli à l’identifiant', () => {
+    expect(construireId('2026-10-03T13:34:15Z', null, null)).toBe('2026-10-03T13:34:15Z-INCONNU-NA');
   });
 });

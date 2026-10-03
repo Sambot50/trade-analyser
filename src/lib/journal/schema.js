@@ -51,9 +51,24 @@ export function deviseDeCotation(symbole) {
 
 /** Identifiant stable, trié chronologiquement, lisible. */
 export function construireId(horodatage, symbole, uniteTemps) {
-  const symboleNettoye = (symbole || 'INCONNU').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const tf = (uniteTemps || '?').replace(/[^A-Za-z0-9]/g, '');
-  return `${horodatage}-${symboleNettoye}-${tf}`;
+  return `${horodatage}-${nettoyer(symbole, 'INCONNU')}-${nettoyer(uniteTemps, 'NA', { majuscules: false })}`;
+}
+
+/**
+ * Un fragment de nom de dossier, et son repli quand la valeur manque.
+ *
+ * Le repli doit SURVIVRE au nettoyage. L'ancien valait « ? », aussitôt effacé
+ * par le filtre qui ne garde que lettres et chiffres : un dossier sans unité
+ * de temps s'appelait `INCONNU--mesure`, avec un champ vide au milieu plutôt
+ * qu'un champ qui dit qu'il est vide. Un nom doit se lire, surtout quand il
+ * signale un manque.
+ */
+function nettoyer(valeur, repli, { majuscules = true } = {}) {
+  const brut = String(valeur ?? '');
+  const propre = majuscules
+    ? brut.toUpperCase().replace(/[^A-Z0-9]/g, '')
+    : brut.replace(/[^A-Za-z0-9]/g, '');
+  return propre || repli;
 }
 
 /**
@@ -66,10 +81,9 @@ export function construireId(horodatage, symbole, uniteTemps) {
 export function cheminDossier(record) {
   const jour = record.horodatage.slice(0, 10);
   const heure = record.horodatage.slice(11, 19).replace(/:/g, '');
-  const symbole = (record.marche.symbole || 'INCONNU').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const tf = (record.marche.uniteTemps || '?').replace(/[^A-Za-z0-9]/g, '');
   const suffixe = record.type === 'mesure' ? '-mesure' : '';
-  return `${jour}/${heure}-${symbole}-${tf}${suffixe}`;
+  return `${jour}/${heure}-${nettoyer(record.marche.symbole, 'INCONNU')}`
+    + `-${nettoyer(record.marche.uniteTemps, 'NA', { majuscules: false })}${suffixe}`;
 }
 
 /**
