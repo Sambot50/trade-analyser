@@ -56,7 +56,7 @@ function sansCasse(f) {
  * c'est ce que fait le test, et ce que fera une saisie manuelle de secours.
  */
 export async function lireGraphique(données, largeur, hauteur, options = {}) {
-  const { etiquettes = null, fenetre = 5, pasMs = 900_000, avecTitre = true, ...reste } = options;
+  const { etiquettes = null, echelleManuelle = null, fenetre = 5, pasMs = 900_000, avecTitre = true, ...reste } = options;
 
   const palette = detecterPalette(données, largeur, hauteur);
   if (!palette) {
@@ -68,18 +68,41 @@ export async function lireGraphique(données, largeur, hauteur, options = {}) {
     return echec('zone', 'Le tracé n’a pas pu être délimité. Recadre la capture sur le graphique seul.', { palette });
   }
 
-  const lues = etiquettes ?? await lireBande(
-    données, largeur, hauteur,
-    { x0: zone.axeX0, x1: zone.axeX1, y0: zone.y0, y1: zone.y1 },
-    reste,
-  );
-  if (!lues || lues.length < 3) {
-    return echec('echelle', 'Moins de trois graduations lisibles sur l’axe. Agrandis la capture, ou saisis deux prix à la main.', { palette, zone, etiquettes: lues ?? [] });
-  }
+  // La soupape : deux prix saisis à la main dispensent entièrement de l'OCR.
+  // Le haut et le bas du panneau des prix sont connus — `zoneTrace` les donne —
+  // et deux points suffisent à poser la droite.
+  let lu = null;
+  if (echelleManuelle) {
+    const { prixHaut, prixBas } = echelleManuelle;
+    if (!(Number.isFinite(prixHaut) && Number.isFinite(prixBas) && prixHaut > prixBas)) {
+      return echec('echelle', 'Les deux prix saisis doivent être des nombres, le haut au-dessus du bas.', { palette, zone });
+    }
+    const a = (prixBas - prixHaut) / (zone.y1 - zone.y0);
+    const b = prixHaut - a * zone.y0;
+    lu = { convention: 'manuelle', reperes: [{ prix: prixHaut, y: zone.y0 }, { prix: prixBas, y: zone.y1 }],
+      echelle: { a, b, n: 2, pireEcart: 0, prixDeY: (y) => a * y + b } };
+  } else {
+    let lues = null;
+    try {
+      lues = etiquettes ?? await lireBande(
+        données, largeur, hauteur,
+        { x0: zone.axeX0, x1: zone.axeX1, y0: zone.y0, y1: zone.y1 },
+        reste,
+      );
+    } catch (err) {
+      // Un moteur qui n'aboutit pas ne doit pas laisser l'écran figé : on rend
+      // l'échec avec sa raison, et la saisie manuelle reste ouverte.
+      return echec('echelle', `${err.message} Tu peux saisir les deux prix extrêmes de l’axe à la main.`, { palette, zone, etiquettes: [] });
+    }
 
-  const lu = reperesDepuisEtiquettes(lues);
-  if (!lu) {
-    return echec('echelle', 'Les graduations lues ne forment pas une droite : l’une est mal reconnue, ou l’axe est logarithmique.', { palette, zone, etiquettes: lues });
+    if (!lues || lues.length < 3) {
+      return echec('echelle', 'Moins de trois graduations lisibles sur l’axe. Agrandis la capture, ou saisis les deux prix extrêmes à la main.', { palette, zone, etiquettes: lues ?? [] });
+    }
+
+    lu = reperesDepuisEtiquettes(lues);
+    if (!lu) {
+      return echec('echelle', 'Les graduations lues ne forment pas une droite : l’une est mal reconnue, ou l’axe est logarithmique.', { palette, zone, etiquettes: lues });
+    }
   }
 
   const bougies = bougiesDepuisImage(données, largeur, hauteur, { palette, echelle: lu.echelle, zone, pasMs });

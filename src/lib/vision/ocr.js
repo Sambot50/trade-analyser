@@ -143,6 +143,45 @@ export function etiquettesDepuisMots(mots, { y0 = 0, facteur = 1, confianceMinim
 }
 
 /**
+ * Borne une promesse dans le temps.
+ *
+ * SANS CELA, UNE LECTURE QUI N'ABOUTIT PAS NE REND JAMAIS LA MAIN. Un worker
+ * dont le dictionnaire ne se charge pas n'échoue pas : il attend. Le `finally`
+ * qui remet le bouton en état n'est jamais atteint, et l'écran reste figé sur
+ * « lecture en cours » indéfiniment, sans message ni recours.
+ *
+ * Une opération qui dépend du réseau doit toujours pouvoir renoncer.
+ */
+export function avecDelai(promesse, ms, message) {
+  if (!(ms > 0)) return promesse;
+  let minuteur;
+  const garde = new Promise((_, rejeter) => {
+    minuteur = setTimeout(() => rejeter(new Error(message)), ms);
+  });
+  return Promise.race([promesse, garde]).finally(() => clearTimeout(minuteur));
+}
+
+/**
+ * Le dictionnaire local est-il réellement servi ?
+ *
+ * On le vérifie AVANT de le demander au moteur. Un `langPath` qui répond 404
+ * ne fait pas échouer `createWorker` proprement : selon les versions il
+ * réessaie ou reste suspendu, et le repli ne se déclenche jamais.
+ */
+export async function dictionnaireServi(cheminLangue, langue = 'eng', { fetcher, delaiMs = 3000 } = {}) {
+  if (!cheminLangue) return false;
+  const f = fetcher ?? (typeof fetch === 'function' ? fetch : null);
+  if (!f) return false;
+  const url = `${String(cheminLangue).replace(/\/$/, '')}/${langue}.traineddata.gz`;
+  try {
+    const r = await avecDelai(f(url, { method: 'HEAD' }), delaiMs, 'délai dépassé');
+    return Boolean(r?.ok);
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Le moteur, servi en local d'abord, depuis sa source habituelle ensuite.
  *
  * Servir le dictionnaire avec l'application est la bonne façon : rien ne sort
@@ -151,16 +190,29 @@ export function etiquettesDepuisMots(mots, { y0 = 0, facteur = 1, confianceMinim
  * encore déposé. On essaie donc le chemin local, et on retombe sur la source
  * par défaut s'il n'y est pas.
  */
-export async function creerWorkerParDefaut({ langue = 'eng', cheminLangue, charger } = {}) {
+export async function creerWorkerParDefaut({ langue = 'eng', cheminLangue, charger, fetcher, delaiMs = 60_000 } = {}) {
   const createWorker = charger ?? (await import('tesseract.js')).createWorker;
-  if (cheminLangue) {
+
+  // On ne demande le chemin local que s'il répond vraiment.
+  if (cheminLangue && await dictionnaireServi(cheminLangue, langue, { fetcher })) {
     try {
-      return await createWorker(langue, undefined, { langPath: cheminLangue });
+      return await avecDelai(
+        createWorker(langue, undefined, { langPath: cheminLangue }),
+        delaiMs,
+        `Le moteur de lecture n'a pas démarré en ${Math.round(delaiMs / 1000)} s depuis ${cheminLangue}.`,
+      );
     } catch {
-      // Dictionnaire absent des fichiers servis : on continue sans.
+      // Servi mais inutilisable : on retombe sur la source habituelle.
     }
   }
-  return createWorker(langue);
+
+  return avecDelai(
+    createWorker(langue),
+    delaiMs,
+    `Le moteur de lecture n'a pas démarré en ${Math.round(delaiMs / 1000)} s. `
+    + `Son dictionnaire se télécharge au premier usage : vérifie ta connexion, `
+    + `ou dépose ${langue}.traineddata.gz dans les fichiers servis.`,
+  );
 }
 
 /** Les caractères qu'une graduation de prix peut contenir, et pas un de plus. */
@@ -185,7 +237,7 @@ export async function lireBande(données, largeur, hauteur, bande, options = {})
   const prete = preparerBande(données, largeur, hauteur, bande, { facteur, coteMax: options.coteMax });
   if (!prete) return null;
 
-  const fabrique = creerWorker ?? (() => creerWorkerParDefaut({ langue, cheminLangue }));
+  const fabrique = creerWorker ?? (() => creerWorkerParDefaut({ langue, cheminLangue, delaiMs: options.delaiMoteurMs }));
 
   const worker = await fabrique();
   try {
@@ -195,7 +247,11 @@ export async function lireBande(données, largeur, hauteur, bande, options = {})
       tessedit_pageseg_mode: '6',
     });
     const image = enImage ? await enImage(prete) : prete;
-    const { data } = await worker.recognize(image);
+    const { data } = await avecDelai(
+      worker.recognize(image),
+      options.delaiLectureMs ?? 120_000,
+      "La reconnaissance de caractères n'a pas abouti. Recadre la capture : une bande trop large prend des minutes.",
+    );
     const mots = data?.words ?? [];
     return etiquettesDepuisMots(mots, { y0: bande.y0, facteur: prete.facteur ?? facteur });
   } finally {

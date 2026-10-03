@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 
 import {
   recadrer, agrandir, luminance, binariser, preparerBande,
-  etiquettesDepuisMots, lireBande, creerWorkerParDefaut, facteurTenable, CARACTERES,
+  etiquettesDepuisMots, lireBande, creerWorkerParDefaut, facteurTenable, avecDelai, dictionnaireServi, CARACTERES,
 } from './ocr.js';
 
 /** Image RGBA unie, avec de quoi peindre dessus. */
@@ -159,17 +159,17 @@ describe('etiquettesDepuisMots', () => {
 describe('creerWorkerParDefaut', () => {
   it('sert le dictionnaire en local quand il y est', async () => {
     const charger = vi.fn().mockResolvedValue('worker');
-    await creerWorkerParDefaut({ cheminLangue: '/tesseract', charger });
+    const fetcher = vi.fn().mockResolvedValue({ ok: true });
+    await creerWorkerParDefaut({ cheminLangue: '/tesseract', charger, fetcher });
     expect(charger).toHaveBeenCalledWith('eng', undefined, { langPath: '/tesseract' });
   });
 
-  it('RETOMBE sur la source par défaut si le fichier local manque', async () => {
-    // Exiger le dictionnaire local rendrait l'application inutilisable à qui
-    // ne l'a pas encore déposé.
+  it('RETOMBE sur la source par défaut si le local est servi mais inutilisable', async () => {
     const charger = vi.fn()
-      .mockRejectedValueOnce(new Error('404'))
+      .mockRejectedValueOnce(new Error('archive corrompue'))
       .mockResolvedValueOnce('worker');
-    expect(await creerWorkerParDefaut({ cheminLangue: '/tesseract', charger })).toBe('worker');
+    const fetcher = vi.fn().mockResolvedValue({ ok: true });
+    expect(await creerWorkerParDefaut({ cheminLangue: '/tesseract', charger, fetcher })).toBe('worker');
     expect(charger).toHaveBeenCalledTimes(2);
     expect(charger).toHaveBeenLastCalledWith('eng');
   });
@@ -320,5 +320,62 @@ describe('facteurTenable', () => {
     const d = new Uint8ClampedArray(1000 * 1000 * 4).fill(40);
     const p = preparerBande(d, 1000, 1000, { x0: 0, x1: 1000, y0: 0, y1: 1000 }, { facteur: 4, coteMax: 2000 });
     expect(Math.max(p.largeur, p.hauteur)).toBeLessThanOrEqual(2000);
+  });
+});
+
+describe('avecDelai', () => {
+  it('laisse passer une promesse qui aboutit', async () => {
+    await expect(avecDelai(Promise.resolve('ok'), 1000, 'trop long')).resolves.toBe('ok');
+  });
+
+  it('REND LA MAIN sur une promesse qui n’aboutit jamais', async () => {
+    // Le défaut qui figeait l'écran : un worker dont le dictionnaire ne se
+    // charge pas n'échoue pas, il attend. Le `finally` n'était jamais atteint.
+    await expect(avecDelai(new Promise(() => {}), 20, 'délai dépassé')).rejects.toThrow('délai dépassé');
+  });
+
+  it('sans délai, se contente de la promesse', async () => {
+    await expect(avecDelai(Promise.resolve(1), 0, 'x')).resolves.toBe(1);
+  });
+});
+
+describe('dictionnaireServi', () => {
+  it('ne prétend pas servir ce qui répond 404', async () => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: false });
+    expect(await dictionnaireServi('/tesseract', 'eng', { fetcher })).toBe(false);
+  });
+
+  it('confirme un dictionnaire réellement servi', async () => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: true });
+    expect(await dictionnaireServi('/tesseract', 'eng', { fetcher })).toBe(true);
+    expect(fetcher).toHaveBeenCalledWith('/tesseract/eng.traineddata.gz', { method: 'HEAD' });
+  });
+
+  it('ne reste pas suspendu si la requête n’aboutit pas', async () => {
+    const fetcher = vi.fn().mockImplementation(() => new Promise(() => {}));
+    expect(await dictionnaireServi('/tesseract', 'eng', { fetcher, delaiMs: 20 })).toBe(false);
+  });
+
+  it('rend faux sans chemin', async () => {
+    expect(await dictionnaireServi(null)).toBe(false);
+  });
+});
+
+describe('creerWorkerParDefaut — ne demande le local que s’il existe', () => {
+  it('n’essaie PAS le chemin local quand le fichier n’y est pas', async () => {
+    // C'est ce qui figeait tout : un langPath en 404 ne fait pas échouer
+    // createWorker proprement, et le repli ne se déclenchait jamais.
+    const charger = vi.fn().mockResolvedValue('worker');
+    const fetcher = vi.fn().mockResolvedValue({ ok: false });
+    expect(await creerWorkerParDefaut({ cheminLangue: '/tesseract', charger, fetcher })).toBe('worker');
+    expect(charger).toHaveBeenCalledTimes(1);
+    expect(charger).toHaveBeenCalledWith('eng');
+  });
+
+  it('l’essaie quand il y est', async () => {
+    const charger = vi.fn().mockResolvedValue('worker');
+    const fetcher = vi.fn().mockResolvedValue({ ok: true });
+    await creerWorkerParDefaut({ cheminLangue: '/tesseract', charger, fetcher });
+    expect(charger).toHaveBeenCalledWith('eng', undefined, { langPath: '/tesseract' });
   });
 });

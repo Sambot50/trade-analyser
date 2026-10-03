@@ -36,6 +36,8 @@ export default function App() {
 
   const [lecture, setLecture] = useState(null);
   const [lectureEnCours, setLectureEnCours] = useState(false);
+  const [prixHaut, setPrixHaut] = useState('');
+  const [prixBas, setPrixBas] = useState('');
 
   const [onglet, setOnglet] = useState('analyse');
   const [dossierJournal, setDossierJournal] = useState(null);
@@ -263,7 +265,7 @@ export default function App() {
    * l'échelle sont déduites de l'image elle-même ; les bougies en sont
    * extraites, puis les figures que le dépôt sait déjà reconnaître.
    */
-  const runLecture = async () => {
+  const runLecture = async (echelleManuelle = null) => {
     if (!imageSrc || lectureEnCours) return;
     setLectureEnCours(true);
     setLecture(null);
@@ -276,6 +278,7 @@ export default function App() {
         facteur: 4,
         cheminLangue: '/tesseract',
         enImage: enCanvas,
+        echelleManuelle,
       });
       setLecture(r);
       if (!r.ok) setErrorMsg(r.probleme);
@@ -466,6 +469,41 @@ export default function App() {
           </p>
 
           {lecture && <LectureCard lecture={lecture} />}
+
+          {lecture && !lecture.ok && lecture.etape === 'echelle' && (
+            <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4 flex flex-col gap-2.5">
+              <p className="text-[12px] text-slate-300 font-semibold">
+                Saisis les deux prix extrêmes de l’axe
+              </p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Le prix tout en haut du graphique et celui tout en bas, lus sur l’axe de
+                ta capture. Deux nombres suffisent : l’OCR devient inutile.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  value={prixHaut} onChange={(e) => setPrixHaut(e.target.value)}
+                  placeholder="prix en haut" inputMode="decimal"
+                  className="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-[13px] text-slate-100 font-mono"
+                />
+                <input
+                  value={prixBas} onChange={(e) => setPrixBas(e.target.value)}
+                  placeholder="prix en bas" inputMode="decimal"
+                  className="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-[13px] text-slate-100 font-mono"
+                />
+              </div>
+              <button
+                onClick={() => runLecture({
+                  prixHaut: Number(String(prixHaut).replace(',', '.')),
+                  prixBas: Number(String(prixBas).replace(',', '.')),
+                })}
+                disabled={lectureEnCours || !prixHaut || !prixBas}
+                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-600 text-white text-sm font-semibold py-2.5 rounded-lg transition"
+              >
+                <Ruler className="w-4 h-4" />
+                Relire avec cette échelle
+              </button>
+            </div>
+          )}
         </section>
 
         <aside className="lg:sticky lg:top-24">

@@ -131,3 +131,43 @@ describe('analyser', () => {
     for (const ob of a.orderBlocks) expect(ob.qualificatifs).toBeTypeOf('object');
   });
 });
+
+describe('la soupape : l’échelle saisie à la main', () => {
+  // Sans elle, un moteur d'OCR qui n'aboutit pas rend la lecture impossible.
+  // Deux prix lus sur l'axe en cinq secondes suffisent à s'en passer.
+  const bougies = serie(40);
+  const { données, largeur, hauteur, echelle } = rendre(bougies);
+
+  it('se passe entièrement de l’OCR', async () => {
+    const r = await lireGraphique(données, largeur, hauteur, {
+      echelleManuelle: { prixHaut: echelle.priceTop, prixBas: echelle.priceBottom },
+      avecTitre: false,
+    });
+    expect(r.ok).toBe(true);
+    expect(r.convention).toBe('manuelle');
+    expect(r.bougies).toHaveLength(bougies.length);
+  });
+
+  it('refuse deux prix incohérents plutôt que de tracer n’importe quoi', async () => {
+    for (const m of [{ prixHaut: 100, prixBas: 200 }, { prixHaut: NaN, prixBas: 1 }, { prixHaut: 5, prixBas: 5 }]) {
+      const r = await lireGraphique(données, largeur, hauteur, { echelleManuelle: m, avecTitre: false });
+      expect(r.ok).toBe(false);
+      expect(r.etape).toBe('echelle');
+    }
+  });
+});
+
+describe('un moteur qui n’aboutit pas ne fige pas l’écran', () => {
+  const { données, largeur, hauteur } = rendre(serie(40));
+
+  it('rend l’échec avec sa raison au lieu d’attendre sans fin', async () => {
+    const r = await lireGraphique(données, largeur, hauteur, {
+      avecTitre: false,
+      creerWorker: async () => { throw new Error("Le moteur n'a pas démarré en 60 s."); },
+    });
+    expect(r.ok).toBe(false);
+    expect(r.etape).toBe('echelle');
+    expect(r.probleme).toMatch(/60 s/);
+    expect(r.probleme).toMatch(/à la main/);
+  });
+});
