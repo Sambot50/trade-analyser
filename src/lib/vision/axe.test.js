@@ -112,12 +112,21 @@ describe('reperesDepuisEtiquettes', () => {
     expect(r.echelle.prixDeY(100)).toBeCloseTo(1234, 3);
   });
 
-  it('REFUSE quand une étiquette est mal lue au point de casser la droite', () => {
+  it('ÉCARTE l’étiquette abîmée et conclut sur les autres', () => {
     const abime = [
       { texte: '4440', y: 100 }, { texte: '44', y: 200 },
       { texte: '4400', y: 300 }, { texte: '4380', y: 400 },
     ];
-    expect(reperesDepuisEtiquettes(abime)).toBeNull();
+    const r = reperesDepuisEtiquettes(abime);
+    expect(r.echelle.n).toBe(3);
+    expect(r.echelle.prixDeY(100)).toBeCloseTo(4440, 3);
+  });
+
+  it('REFUSE quand il ne reste pas trois étiquettes alignées', () => {
+    expect(reperesDepuisEtiquettes([
+      { texte: '4440', y: 100 }, { texte: '7', y: 200 },
+      { texte: '99999', y: 300 }, { texte: '1', y: 400 },
+    ])).toBeNull();
   });
 
   it('REFUSE sous trois étiquettes lisibles', () => {
@@ -232,8 +241,18 @@ describe('zoneTrace — ce qui est coloré à droite du tracé', () => {
     }
     // Une étiquette de prix : une ligne de texte, vingt pixels de haut.
     if (etiquette) for (let x = etiquette[0]; x < etiquette[1]; x++) for (let y = 180; y < 200; y++) pose(x, y, PALETTE.baisse);
-    // Un panneau latéral : des lignes de texte, mais sur toute la hauteur.
-    if (panneau) for (let x = panneau[0]; x < panneau[1]; x++) for (let y = 40; y < 340; y++) pose(x, y, PALETTE.baisse);
+    // Un panneau latéral : des lignes de texte réparties sur la hauteur, aux
+    // extrémités IRRÉGULIÈRES — sans quoi ce serait un bloc plein, qu'on
+    // écarte désormais comme on écarte une étiquette de prix.
+    if (panneau) {
+      for (let x = panneau[0]; x < panneau[1]; x++) {
+        const decale = (x * 13) % 11;
+        for (let ligne = 0; ligne < 10; ligne++) {
+          const y0 = 50 + ligne * 28 + decale;
+          for (let y = y0; y < y0 + 12; y++) pose(x, y, PALETTE.baisse);
+        }
+      }
+    }
     return { d, L, H };
   }
 
@@ -265,5 +284,66 @@ describe('zoneTrace — ce qui est coloré à droite du tracé', () => {
     const z = zoneTrace(d, L, H, PALETTE);
     expect(z.axeX1).toBe(700);
     expect(z.axeX1 - z.axeX0).toBeGreaterThan(80);
+  });
+});
+
+describe('zoneTrace — une capture à la TradingView', () => {
+  // Le cas réel qui a résisté à deux corrections fausses. Mesuré sur cette
+  // image : les colonnes de l'étiquette de prix font 18 pixels de haut,
+  // exactement la MÉDIANE des colonnes de bougies. Ni un seuil de hauteur ni
+  // un écart horizontal ne peuvent les séparer — l'étiquette touche presque
+  // la dernière bougie. Seule l'uniformité du bloc les distingue.
+  const L = 900; const H = 500; const X1 = 800;
+  const HAUT = 40; const BAS = 460; const ph = 87400; const pb = 83800;
+  const y = (p) => HAUT + ((ph - p) / (ph - pb)) * (BAS - HAUT);
+
+  function capture({ avecEtiquette = true } = {}) {
+    const P = [`<rect width="${L}" height="${H}" fill="#ffffff"/>`];
+    for (let p = 84000; p <= 87200; p += 200) {
+      P.push(`<text x="${X1 + 8}" y="${y(p) + 4}" fill="#787b86" font-family="Arial" font-size="11">${p}</text>`);
+    }
+    let prix = 85000; const bg = [];
+    for (let i = 0; i < 90; i++) {
+      const pas = 180 * Math.sin(i / 7) + 90 * Math.sin(i / 3.3);
+      const o = prix; const c = prix + pas; const a = 40 + 30 * Math.abs(Math.sin(i / 2));
+      bg.push({ o, c, h: Math.max(o, c) + a, b: Math.min(o, c) - a });
+      prix = c;
+    }
+    const cr = (X1 - 20) / bg.length; const co = cr * 0.6;
+    bg.forEach((b, i) => {
+      const cx = 20 + (i + 0.5) * cr;
+      const col = b.c >= b.o ? '#26a69a' : '#ef5350';
+      P.push(`<line x1="${cx}" y1="${y(b.h)}" x2="${cx}" y2="${y(b.b)}" stroke="${col}" stroke-width="1.2"/>`);
+      const yh = Math.min(y(b.o), y(b.c)); const yb = Math.max(y(b.o), y(b.c));
+      P.push(`<rect x="${cx - co / 2}" y="${yh}" width="${co}" height="${Math.max(1, yb - yh)}" fill="${col}"/>`);
+    });
+    if (avecEtiquette) {
+      P.push(`<rect x="${X1 + 2}" y="${y(84572.67) - 9}" width="58" height="18" fill="#ef5350"/>`);
+    }
+    const r = new Resvg(`<svg xmlns="http://www.w3.org/2000/svg" width="${L}" height="${H}">${P.join('')}</svg>`,
+      { fitTo: { mode: 'width', value: L } }).render();
+    return { données: r.pixels, largeur: r.width, hauteur: r.height };
+  }
+
+  it('n’avale pas l’étiquette du prix courant', () => {
+    const { données, largeur, hauteur } = capture();
+    const z = zoneTrace(données, largeur, hauteur, detecterPalette(données, largeur, hauteur));
+    expect(z.x1).toBeLessThan(X1 + 2);
+    expect(z.x1).toBeGreaterThan(X1 - 20);
+  });
+
+  it('laisse les graduations DANS la bande d’axe', () => {
+    const { données, largeur, hauteur } = capture();
+    const z = zoneTrace(données, largeur, hauteur, detecterPalette(données, largeur, hauteur));
+    expect(z.axeX0).toBeLessThanOrEqual(X1 + 8);
+    expect(z.axeX1 - z.axeX0).toBeGreaterThan(60);
+  });
+
+  it('donne la même bordure droite sans l’étiquette — elle ne décale rien', () => {
+    const avec = capture({ avecEtiquette: true });
+    const sans = capture({ avecEtiquette: false });
+    const za = zoneTrace(avec.données, avec.largeur, avec.hauteur, detecterPalette(avec.données, avec.largeur, avec.hauteur));
+    const zs = zoneTrace(sans.données, sans.largeur, sans.hauteur, detecterPalette(sans.données, sans.largeur, sans.hauteur));
+    expect(Math.abs(za.x1 - zs.x1)).toBeLessThanOrEqual(2);
   });
 });

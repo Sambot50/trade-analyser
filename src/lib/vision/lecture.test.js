@@ -106,8 +106,8 @@ describe('lireGraphique — ce qu’il dit quand ça échoue', () => {
   it('nomme l’étape « echelle » quand les graduations ne forment pas une droite', async () => {
     const r = await lireGraphique(données, largeur, hauteur, {
       etiquettes: [
-        { texte: '4440', y: 100 }, { texte: '44', y: 200 },
-        { texte: '4400', y: 300 }, { texte: '4380', y: 400 },
+        { texte: '4440', y: 100 }, { texte: '7', y: 200 },
+        { texte: '99999', y: 300 }, { texte: '1', y: 400 },
       ],
     });
     expect(r.ok).toBe(false);

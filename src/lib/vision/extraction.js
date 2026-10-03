@@ -242,31 +242,63 @@ export function bougieDeColonnes(groupe) {
  * chiffre mal lu, casse l'alignement et doit faire échouer la lecture plutôt
  * que produire une échelle fausse.
  */
-export function echelleDepuisReperes(reperes, { ecartMaximal = 0.01 } = {}) {
+export function echelleDepuisReperes(reperes, { ecartMaximal = 0.01, minimum = 3 } = {}) {
   const points = (reperes ?? [])
     .filter((r) => Number.isFinite(r?.prix) && Number.isFinite(r?.y))
     .sort((a, b) => a.y - b.y);
-  if (points.length < 3) return null;
+  if (points.length < minimum) return null;
 
-  // Moindres carrés : prix = a·y + b.
-  const n = points.length;
-  const sy = points.reduce((s, p) => s + p.y, 0);
-  const sp = points.reduce((s, p) => s + p.prix, 0);
-  const syy = points.reduce((s, p) => s + p.y * p.y, 0);
-  const syp = points.reduce((s, p) => s + p.y * p.prix, 0);
-  const dénom = n * syy - sy * sy;
-  if (dénom === 0) return null;
-  const a = (n * syp - sy * sp) / dénom;
+  const droiteEntre = (p, q) => {
+    if (p.y === q.y) return null;
+    const a = (q.prix - p.prix) / (q.y - p.y);
+    return a < 0 ? { a, b: p.prix - a * p.y } : null;   // le prix décroît vers le bas
+  };
+
+  // CONSENSUS plutôt qu'ajustement global.
+  //
+  // Un seul chiffre mal lu faisait auparavant tout rejeter. Or il y a toujours
+  // un intrus sur une capture réelle : l'étiquette du prix courant posée sur
+  // l'axe, un chiffre de watchlist, un « 15 » du bandeau. Exiger que TOUT
+  // s'aligne, c'est renoncer dès qu'une seule graduation est abîmée.
+  //
+  // On cherche donc la droite sur laquelle le PLUS de repères tombent, et on
+  // écarte le reste. Trois points alignés suffisent à décrire un axe ; les
+  // intrus, eux, ne s'alignent sur rien.
+  let meilleur = null;
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      const d = droiteEntre(points[i], points[j]);
+      if (!d) continue;
+      const dedans = points.filter((p) => Math.abs(p.prix - (d.a * p.y + d.b))
+        <= ecartMaximal * Math.abs(points.at(-1).prix - points[0].prix || 1));
+      if (!meilleur || dedans.length > meilleur.length) meilleur = dedans;
+    }
+  }
+  if (!meilleur || meilleur.length < minimum) return null;
+
+  // Réajustement par moindres carrés sur les seuls repères retenus.
+  const n = meilleur.length;
+  const sy = meilleur.reduce((s, p) => s + p.y, 0);
+  const sp = meilleur.reduce((s, p) => s + p.prix, 0);
+  const syy = meilleur.reduce((s, p) => s + p.y * p.y, 0);
+  const syp = meilleur.reduce((s, p) => s + p.y * p.prix, 0);
+  const denom = n * syy - sy * sy;
+  if (denom === 0) return null;
+  const a = (n * syp - sy * sp) / denom;
   const b = (sp - a * sy) / n;
-  if (!(a < 0)) return null;        // en pixels, le prix décroît vers le bas
+  if (!(a < 0)) return null;
 
-  const etendue = Math.abs(points[0].prix - points.at(-1).prix);
+  const etendue = Math.abs(meilleur[0].prix - meilleur.at(-1).prix);
   if (!(etendue > 0)) return null;
-  const residus = points.map((p) => Math.abs(p.prix - (a * p.y + b)) / etendue);
-  const pire = Math.max(...residus);
-  if (pire > ecartMaximal) return null;
+  const pireEcart = Math.max(...meilleur.map((p) => Math.abs(p.prix - (a * p.y + b)) / etendue));
+  if (pireEcart > ecartMaximal) return null;
 
-  return { a, b, n, pireEcart: pire, prixDeY: (y) => a * y + b };
+  return {
+    a, b, n, pireEcart,
+    retenus: meilleur,
+    rejetes: points.filter((p) => !meilleur.includes(p)),
+    prixDeY: (y) => a * y + b,
+  };
 }
 
 /** La série de bougies, en prix, prête pour toutes les analyses du dépôt. */

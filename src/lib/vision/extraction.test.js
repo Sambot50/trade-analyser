@@ -78,9 +78,22 @@ describe('échelle depuis des repères', () => {
     expect(echelleDepuisReperes(droits.slice(0, 2))).toBeNull();
   });
 
-  it('REFUSE un repère mal lu : 4 440 compris 4.440 casse l’alignement', () => {
+  it('ÉCARTE un repère mal lu au lieu de tout rejeter', () => {
+    // Il y a toujours un intrus sur une capture réelle : l'étiquette du prix
+    // courant posée sur l'axe, un chiffre de watchlist. Renoncer dès qu'une
+    // graduation est abîmée revient à ne jamais lire un axe.
     const faussés = [{ prix: 4440, y: 10 }, { prix: 4.44, y: 20 }, { prix: 4420, y: 30 }, { prix: 4410, y: 40 }];
-    expect(echelleDepuisReperes(faussés)).toBeNull();
+    const e = echelleDepuisReperes(faussés);
+    expect(e).not.toBeNull();
+    expect(e.n).toBe(3);
+    expect(e.rejetes.map((r) => r.prix)).toEqual([4.44]);
+    expect(e.prixDeY(10)).toBeCloseTo(4440, 6);
+  });
+
+  it('refuse quand même quand il n’y a plus trois repères alignés', () => {
+    expect(echelleDepuisReperes([
+      { prix: 4440, y: 10 }, { prix: 7, y: 20 }, { prix: 99999, y: 30 }, { prix: 1, y: 40 },
+    ])).toBeNull();
   });
 
   it('REFUSE un axe non linéaire, donc logarithmique', () => {

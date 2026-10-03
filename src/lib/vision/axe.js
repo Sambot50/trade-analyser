@@ -104,7 +104,7 @@ export function reperesDepuisEtiquettes(etiquettes, options = {}) {
  * Sans cette frontière, chaque bougie avale sa propre barre de volume et son
  * plus bas plonge de cent cinquante pixels.
  */
-export function zoneTrace(données, largeur, hauteur, palette, { seuilChroma = 25, ecartTeinteMax = 25, ecartTolere = 60, largeurPanneau = 110 } = {}) {
+export function zoneTrace(données, largeur, hauteur, palette, { seuilChroma = 25, ecartTeinteMax = 25, ecartTolere = 60, largeurPanneau = 110, largeurBlocPlein = 20 } = {}) {
   if (!palette) return null;
   const tH = teinte(palette.hausse);
   const tB = teinte(palette.baisse);
@@ -141,9 +141,34 @@ export function zoneTrace(données, largeur, hauteur, palette, { seuilChroma = 2
   const medianeHauteur = hauteurs[hauteurs.length >> 1];
   const seuilHauteur = Math.max(6, medianeHauteur * 0.2);
 
+  // UN BLOC PLEIN DE HAUTEUR RIGOUREUSEMENT CONSTANTE N'EST PAS DES BOUGIES.
+  //
+  // C'est ce qui a fini par trancher, après deux tentatives fausses. L'étiquette
+  // du prix courant, mesurée sur une capture réelle, fait 18 pixels de haut —
+  // exactement la MÉDIANE des colonnes de bougies du même graphique. Aucun
+  // seuil de hauteur ne peut donc les séparer, et l'écart horizontal non plus
+  // puisqu'elle touche presque la dernière bougie.
+  //
+  // Ce qui la distingue vraiment, c'est l'uniformité : cinquante-huit colonnes
+  // consécutives au même haut et au même bas. Des bougies voisines, elles, ne
+  // partagent jamais leurs extrémités plus de quelques colonnes — la largeur
+  // d'un corps.
+  const uniforme = new Uint8Array(largeur);
+  let debutRun = 0;
+  for (let x = 1; x <= largeur; x++) {
+    const rompu = x === largeur || hautCol[x] === -1
+      || hautCol[x] !== hautCol[debutRun] || basCol[x] !== basCol[debutRun];
+    if (!rompu) continue;
+    if (hautCol[debutRun] !== -1 && x - debutRun >= largeurBlocPlein) {
+      for (let k = debutRun; k < x; k++) uniforme[k] = 1;
+    }
+    debutRun = x;
+  }
+
   const colonneOccupee = new Uint8Array(largeur);
   let trouve = false;
   for (let x = 0; x < largeur; x++) {
+    if (uniforme[x]) continue;
     if (hautCol[x] === -1 || basCol[x] - hautCol[x] < seuilHauteur) continue;
     colonneOccupee[x] = 1;
     trouve = true;
