@@ -100,6 +100,15 @@ export const PART_EPAISSEUR_MINIMALE = 1 / 3;
 export const TROU_TOLERE = 2;
 
 /**
+ * Décalage vertical toléré entre deux colonnes d'une même bougie.
+ *
+ * L'anticrénelage peut décaler d'un rang le premier pixel coloré d'une colonne
+ * par rapport à sa voisine. Un pixel l'absorbe, et reste très loin de
+ * rapprocher un pixel de trait isolé du corps d'une bougie.
+ */
+export const RECOUVREMENT_TOLERE = 1;
+
+/**
  * Combien de pixels chaque couleur occupe dans une colonne, en médiane.
  *
  * Toutes les candidates en UNE passe, et ce n'est pas une optimisation de
@@ -299,11 +308,48 @@ export function colonnesDeBougies(données, largeur, hauteur, palette, zone = nu
     colonnes.push(meilleur ? { x, ...meilleur } : null);
   }
 
+  // Deux colonnes voisines appartiennent à la même bougie si elles SE
+  // RECOUVRENT verticalement.
+  //
+  // La contiguïté seule ne suffit pas, et le défaut qu'elle cause est le plus
+  // grave que ce module ait produit. La ligne pointillée du prix courant pose
+  // un pixel isolé dans une colonne par ailleurs vide ; cette colonne touche
+  // la bougie voisine, entre dans son groupe, et la mèche du groupe s'étend
+  // jusqu'au trait. Relevé sur une capture réelle :
+  //
+  //     x=789 : un seul pixel à y=462   ← la ligne du prix courant
+  //     x=790 : 162-165                 ← la vraie bougie
+  //     x=792 : 150-183                 ← sa mèche
+  //
+  // La bougie obtenue avait quinze points de corps et mille cinq cent
+  // quatre-vingt-douze de mèche, et l'order block construit dessus couvrait
+  // quarante pour cent du graphique. Rien ne le signalait : la bougie restait
+  // une bougie, avec quatre prix cohérents entre eux.
+  //
+  // Filtrer sur la hauteur de colonne ne marche pas — un doji dont le corps
+  // couvre un pixel a des colonnes aussi courtes qu'un pixel de trait, et les
+  // écarter le ferait disparaître, décalant toute la série.
+  //
+  // Le recouvrement les sépare sans rien supposer : les colonnes d'une même
+  // bougie partagent son corps ou sa mèche, donc une plage commune. Un pixel
+  // posé à l'écart n'en partage aucune.
   const groupes = [];
   let courant = [];
+  let hautGroupe = 0; let basGroupe = 0;
+
   for (const c of colonnes) {
-    if (c) { courant.push(c); continue; }
-    if (courant.length) { groupes.push(courant); courant = []; }
+    if (!c) {
+      if (courant.length) { groupes.push(courant); courant = []; }
+      continue;
+    }
+    const recouvre = courant.length
+      && c.haut <= basGroupe + RECOUVREMENT_TOLERE
+      && c.bas >= hautGroupe - RECOUVREMENT_TOLERE;
+
+    if (courant.length && !recouvre) { groupes.push(courant); courant = []; }
+    if (!courant.length) { hautGroupe = c.haut; basGroupe = c.bas; }
+    else { hautGroupe = Math.min(hautGroupe, c.haut); basGroupe = Math.max(basGroupe, c.bas); }
+    courant.push(c);
   }
   if (courant.length) groupes.push(courant);
 
