@@ -76,13 +76,89 @@ export function saturation([r, v, b]) {
 }
 
 /**
- * Les deux couleurs de bougie et la couleur de fond, relevées sur l'image.
+ * Part de l'épaisseur dominante en deçà de laquelle une couleur trace un trait.
  *
- * Les pixels saturés sont regroupés par teinte ; les deux groupes les plus
- * fournis sont la hausse et la baisse. Le vert est reconnu par sa composante
- * verte dominante — c'est la seule convention qu'on suppose, et elle n'a pas
- * d'exception connue sur un graphique financier.
+ * Le seuil est RELATIF, et il doit l'être. Un seuil absolu ne peut pas marcher :
+ * une ligne de tendance tracée à la main fait trois à cinq pixels, soit
+ * l'épaisseur d'un corps de bougie sur un graphique très dézoomé. Aucun nombre
+ * fixe ne sépare les deux.
+ *
+ * Ce qui les sépare, c'est le RAPPORT. Sur la capture qui a révélé le défaut :
+ * bougies à 25 et 32 pixels, ligne de tendance à 5. Un tiers de l'épaisseur
+ * dominante de son côté écarte la ligne sans jamais menacer des bougies, qui
+ * sont par construction les plus épaisses de leur couleur.
  */
+export const PART_EPAISSEUR_MINIMALE = 1 / 3;
+
+/**
+ * Trou toléré dans une colonne avant de la couper en deux segments.
+ *
+ * L'anticrénelage éclaircit parfois la jonction entre une mèche d'un pixel et
+ * son corps, au point de la faire passer sous le seuil de chroma. Deux pixels
+ * absorbent ce cas sans rapprocher pour autant un trait isolé du corps.
+ */
+export const TROU_TOLERE = 2;
+
+/**
+ * Décalage vertical toléré entre deux colonnes d'une même bougie.
+ *
+ * L'anticrénelage peut décaler d'un rang le premier pixel coloré d'une colonne
+ * par rapport à sa voisine. Un pixel l'absorbe, et reste très loin de
+ * rapprocher un pixel de trait isolé du corps d'une bougie.
+ */
+export const RECOUVREMENT_TOLERE = 1;
+
+/**
+ * Combien de pixels chaque couleur occupe dans une colonne, en médiane.
+ *
+ * Toutes les candidates en UNE passe, et ce n'est pas une optimisation de
+ * confort : une passe par couleur sur une capture plein écran demandait
+ * dix-neuf secondes, parce que la teinte de chaque pixel était recalculée
+ * autant de fois qu'il y a de candidates. Elle l'est maintenant une fois,
+ * puis comparée à chacune — le coût retombe à celui d'une seule lecture.
+ *
+ * Ne comptent que les colonnes où la couleur est présente : une couleur
+ * absente des trois quarts de l'image n'en est pas plus fine là où elle est.
+ * La médiane, et non la moyenne, pour qu'une bougie de forte amplitude ne
+ * fasse pas passer un trait pour un corps.
+ */
+export function epaisseursMedianes(données, largeur, hauteur, couleurs, { colonnesVisees = 500 } = {}) {
+  const teintes = couleurs.map((c) => teinte(c));
+  const comptes = couleurs.map(() => new Int32Array(largeur));
+
+  // Une colonne sur N suffit. On cherche une MÉDIANE sur des centaines de
+  // colonnes : en échantillonner cinq cents donne le même verdict que les
+  // mille neuf cent vingt d'une capture plein écran, pour un quart du temps.
+  // Et le temps compte ici : cette passe s'ajoute à chaque lecture.
+  const pas = Math.max(1, Math.floor(largeur / colonnesVisees));
+
+  for (let x = 0; x < largeur; x += pas) {
+    for (let y = 0; y < hauteur; y++) {
+      const p = pixel(données, largeur, x, y);
+      if (p[3] < 128 || chroma(p) < 25) continue;
+      const t = teinte(p);
+      if (t === null) continue;
+      // Un pixel compte pour TOUTES les candidates dont il est proche, et
+      // s'arrêter à la première serait faux : la version d'une couleur
+      // mélangée au fond — le panneau de volume en transparence — garde la
+      // teinte de la couleur pure à quelques degrés près. Sortir plus tôt
+      // donnait zéro d'épaisseur aux vraies couleurs de bougie, absorbées par
+      // leur propre reflet.
+      for (let k = 0; k < teintes.length; k++) {
+        if (teintes[k] !== null && ecartTeinte(t, teintes[k]) < 25) comptes[k][x]++;
+      }
+    }
+  }
+
+  return comptes.map((parColonne) => {
+    const n = [];
+    for (const v of parColonne) if (v) n.push(v);
+    if (!n.length) return 0;
+    n.sort((a, b) => a - b);
+    return n[n.length >> 1];
+  });
+}
+
 export function detecterPalette(données, largeur, hauteur, { seuilChroma = 40 } = {}) {
   const groupes = new Map();
   let fond = null;
@@ -133,9 +209,38 @@ export function detecterPalette(données, largeur, hauteur, { seuilChroma = 40 }
     if (g.n * 20 >= plusGros) retenus.push({ couleur: moyenne(g), n: g.n });
   }
 
-  const meilleur = (predicat) => retenus
-    .filter((r) => predicat(r.couleur))
-    .sort((a, b) => chroma(b.couleur) - chroma(a.couleur))[0]?.couleur ?? null;
+  // Puis on écarte ce qui n'a PAS la forme d'une bougie.
+  //
+  // Le chroma seul ne suffit pas, et le cas qui l'a montré est banal : une
+  // ligne de tendance tracée à la main. Un trait bleu vif porte plus de pixels
+  // et plus de chroma que les bougies vertes d'un thème clair, et son canal
+  // vert dépasse son canal rouge — il était donc élu « couleur de hausse ».
+  // Comme il traverse le graphique sans interruption, l'extraction n'y voyait
+  // plus qu'UNE bougie, haute de six cents pixels.
+  //
+  // Ce qui sépare les deux n'est pas la couleur, c'est l'épaisseur. Un trait
+  // occupe un ou deux pixels dans chaque colonne qu'il croise ; un corps de
+  // bougie en occupe des dizaines. Mesuré sur la capture en cause : médiane
+  // de 1 pour le trait, de 32 pour les bougies.
+  const epaisseurs = epaisseursMedianes(données, largeur, hauteur, retenus.map((r) => r.couleur));
+  retenus.forEach((r, i) => { r.epaisseur = epaisseurs[i]; });
+
+  const meilleur = (predicat) => {
+    const candidats = retenus.filter((r) => predicat(r.couleur));
+    // L'épaisseur FILTRE, elle ne classe pas, et la distinction est
+    // essentielle : une barre de volume est plus épaisse qu'une bougie, et
+    // classer par épaisseur la ferait gagner — ramenant le défaut que le
+    // chroma avait justement résolu, celui du reflet en transparence dans le
+    // panneau de volume.
+    //
+    // Deux questions, deux critères. L'épaisseur répond « trait ou surface ».
+    // Le chroma répond « couleur pure ou mélangée au fond ». Les confondre
+    // revient à perdre une des deux réponses.
+    const plusEpaisse = Math.max(0, ...candidats.map((r) => r.epaisseur));
+    const bougies = candidats.filter((r) => r.epaisseur >= plusEpaisse * PART_EPAISSEUR_MINIMALE);
+    const lot = bougies.length ? bougies : candidats;
+    return lot.sort((a, b) => chroma(b.couleur) - chroma(a.couleur))[0]?.couleur ?? null;
+  };
 
   const verte = meilleur((c) => c[1] > c[0]);
   const rouge = meilleur((c) => c[0] >= c[1]);
@@ -166,22 +271,85 @@ export function colonnesDeBougies(données, largeur, hauteur, palette, zone = nu
 
   const colonnes = [];
   for (let x = x0; x < x1; x++) {
-    let haut = -1; let bas = -1; let n = 0; let nHausse = 0;
+    // Les pixels d'une bougie SE TOUCHENT : la mèche prolonge le corps, sans
+    // interruption. Un pixel isolé à la bonne teinte, loin du reste, vient
+    // d'ailleurs — la ligne pointillée du prix courant, une moyenne mobile,
+    // un niveau tracé à la main. Prendre le premier et le dernier pixel de la
+    // colonne, comme on le faisait, laissait n'importe lequel de ces traits
+    // étirer la mèche jusqu'à lui : sur une capture où la ligne du prix
+    // courant croise le tracé, le « plus haut » de dix bougies de suite
+    // valait exactement le prix courant.
+    //
+    // On ne retient donc que le segment continu le plus fourni. La tolérance
+    // d'un trou de deux pixels couvre l'anticrénelage, qui éclaircit parfois
+    // la jonction entre une mèche fine et son corps au point de la faire
+    // passer sous le seuil de chroma.
+    let meilleur = null;
+    let debut = -1; let fin = -1; let n = 0; let nHausse = 0;
+
+    const fermer = () => {
+      if (debut === -1) return;
+      if (!meilleur || n > meilleur.n) meilleur = { haut: debut, bas: fin, n, nHausse };
+      debut = -1; n = 0; nHausse = 0;
+    };
+
     for (let y = y0; y < y1; y++) {
       const p = pixel(données, largeur, x, y);
-      if (!appartient(p)) continue;
-      if (haut === -1) haut = y;
-      bas = y; n++;
+      if (!appartient(p)) {
+        if (debut !== -1 && y - fin > TROU_TOLERE) fermer();
+        continue;
+      }
+      if (debut === -1) debut = y;
+      fin = y; n++;
       if (ecartTeinte(teinte(p), tHausse) < ecartTeinte(teinte(p), tBaisse)) nHausse++;
     }
-    colonnes.push(n ? { x, haut, bas, n, nHausse } : null);
+    fermer();
+
+    colonnes.push(meilleur ? { x, ...meilleur } : null);
   }
 
+  // Deux colonnes voisines appartiennent à la même bougie si elles SE
+  // RECOUVRENT verticalement.
+  //
+  // La contiguïté seule ne suffit pas, et le défaut qu'elle cause est le plus
+  // grave que ce module ait produit. La ligne pointillée du prix courant pose
+  // un pixel isolé dans une colonne par ailleurs vide ; cette colonne touche
+  // la bougie voisine, entre dans son groupe, et la mèche du groupe s'étend
+  // jusqu'au trait. Relevé sur une capture réelle :
+  //
+  //     x=789 : un seul pixel à y=462   ← la ligne du prix courant
+  //     x=790 : 162-165                 ← la vraie bougie
+  //     x=792 : 150-183                 ← sa mèche
+  //
+  // La bougie obtenue avait quinze points de corps et mille cinq cent
+  // quatre-vingt-douze de mèche, et l'order block construit dessus couvrait
+  // quarante pour cent du graphique. Rien ne le signalait : la bougie restait
+  // une bougie, avec quatre prix cohérents entre eux.
+  //
+  // Filtrer sur la hauteur de colonne ne marche pas — un doji dont le corps
+  // couvre un pixel a des colonnes aussi courtes qu'un pixel de trait, et les
+  // écarter le ferait disparaître, décalant toute la série.
+  //
+  // Le recouvrement les sépare sans rien supposer : les colonnes d'une même
+  // bougie partagent son corps ou sa mèche, donc une plage commune. Un pixel
+  // posé à l'écart n'en partage aucune.
   const groupes = [];
   let courant = [];
+  let hautGroupe = 0; let basGroupe = 0;
+
   for (const c of colonnes) {
-    if (c) { courant.push(c); continue; }
-    if (courant.length) { groupes.push(courant); courant = []; }
+    if (!c) {
+      if (courant.length) { groupes.push(courant); courant = []; }
+      continue;
+    }
+    const recouvre = courant.length
+      && c.haut <= basGroupe + RECOUVREMENT_TOLERE
+      && c.bas >= hautGroupe - RECOUVREMENT_TOLERE;
+
+    if (courant.length && !recouvre) { groupes.push(courant); courant = []; }
+    if (!courant.length) { hautGroupe = c.haut; basGroupe = c.bas; }
+    else { hautGroupe = Math.min(hautGroupe, c.haut); basGroupe = Math.max(basGroupe, c.bas); }
+    courant.push(c);
   }
   if (courant.length) groupes.push(courant);
 
