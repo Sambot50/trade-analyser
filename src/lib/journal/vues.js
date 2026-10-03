@@ -9,7 +9,8 @@
 // régénérées à chaque écriture, qui ne contiennent RIEN d'unique. Les
 // supprimer ne perd rien ; elles reviennent à la prochaine écriture.
 
-import { ETATS, orderBlocksDe, compteParEtat, tauxValidation } from './jugement.js';
+import { ETATS, trouvaillesDe, compteParEtat, tauxValidation } from './jugement.js';
+import { libelleDuType } from '../marche/trouvailles.js';
 
 const LIBELLE_ETAT = { en_attente: 'en attente', valide: 'validés', invalide: 'invalidés' };
 
@@ -34,11 +35,11 @@ function rang(ob) {
   const q = ob.qualificatifs
     ? Object.entries(ob.qualificatifs).filter(([, v]) => v === true).map(([k]) => k).join(', ')
     : '';
-  return `| ${ob.horodatage?.slice(11, 16) ?? '—'} | ${ob.symbole ?? 'INCONNU'} `
+  return `| ${ob.horodatage?.slice(11, 16) ?? '—'} | ${libelleDuType(ob.type)} | ${ob.symbole ?? 'INCONNU'} `
     + `| ${ob.uniteTemps ?? '—'} | ${ob.sens ?? '—'} | ${zone} | ${q || '—'} | \`${ob.dossier ?? '—'}\` |`;
 }
 
-const ENTETE = '| heure | symbole | ut | sens | zone | critères | dossier |\n|---|---|---|---|---|---|---|';
+const ENTETE = '| heure | figure | symbole | ut | sens | zone | critères | dossier |\n|---|---|---|---|---|---|---|---|';
 
 function fiche(titre, obs, note) {
   const out = [`# ${titre}`, ''];
@@ -61,7 +62,7 @@ function fiche(titre, obs, note) {
  * écrire, les comparer, ou les afficher.
  */
 export function genererVues(lignes, { genereLe } = {}) {
-  const obs = orderBlocksDe(lignes);
+  const obs = trouvaillesDe(lignes);
   const fichiers = new Map();
 
   // Validité d'abord, date ensuite.
@@ -79,6 +80,10 @@ export function genererVues(lignes, { genereLe } = {}) {
           ? 'Du plus ancien au plus récent : une zone d’il y a trois jours a eu le temps '
             + 'd’être tranchée, une zone d’il y a dix minutes non.'
           : null));
+  }
+
+  for (const [type, liste] of grouper(obs, (o) => o.type ?? 'inconnu')) {
+    fichiers.set(`vues/par-figure/${type}.md`, fiche(libelleDuType(type), liste));
   }
 
   for (const [symbole, liste] of grouper(obs, (o) => o.symbole ?? 'INCONNU')) {
@@ -124,6 +129,7 @@ baisser le taux à mesure qu'on détecte.
 | | |
 |---|---|
 | \`par-validite/\` | ton jugement, puis la date — commence par \`en_attente/TOUT.md\` |
+| \`par-figure/\` | order blocks, et les figures qui s'y ajouteront |
 | \`par-symbole/\` | tout ce qui concerne un instrument |
 | \`par-mois/\` | la vue chronologique |
 

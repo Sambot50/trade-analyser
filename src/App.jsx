@@ -17,7 +17,7 @@ import FileDAttente from './FileDAttente.jsx';
 import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines, rrVerdict, breakEvenRate, FRICTION_PAR_DEFAUT } from './lib/analysis.js';
 import { lireGraphique } from './lib/vision/lecture.js';
 import { pixelsDepuisDataUrl, enCanvas } from './lib/vision/navigateur.js';
-import { rectanglesDesOrderBlocks, etiquetteDuRectangle } from './lib/vision/trace.js';
+import { rectanglesDesTrouvailles, etiquetteDuRectangle } from './lib/vision/trace.js';
 import { confronter, ECART_PREOCCUPANT } from './lib/vision/confrontation.js';
 
 const LEVEL_LABELS = { entry: 'ENTRÉE', sl: 'STOP LOSS', tp1: 'TP 1', tp2: 'TP 2' };
@@ -143,7 +143,7 @@ export default function App() {
 
       // Les zones mesurées se tracent même sans analyse du modèle : elles ne
       // lui doivent rien, et c'est tout l'intérêt de les voir côte à côte.
-      for (const rect of rectanglesDesOrderBlocks(lecture, canvas.width)) {
+      for (const rect of rectanglesDesTrouvailles(lecture, canvas.width)) {
         dessinerZone(ctx, rect);
       }
 
