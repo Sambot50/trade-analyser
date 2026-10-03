@@ -136,6 +136,50 @@ paires crypto cotées sur Binance uniquement.
 \`manuelle\` — saisie par l'utilisateur. C'est le cas du forex, des indices et
 des actions, faute de source publique gratuite et fiable.
 
+## Deux types d'enregistrement
+
+Un dossier contient soit une **analyse**, soit une **mesure**. La ligne d'index
+porte \`type\`, absent sur une analyse et valant \`"mesure"\` sur l'autre ; le
+dossier d'une mesure est suffixé \`-mesure\` et contient \`mesure.json\` au lieu
+de \`analyse.json\`.
+
+Ils ne répondent pas à la même question.
+
+| | analyse | mesure |
+|---|---|---|
+| produite par | un modèle de vision | la géométrie de l'image |
+| contient | un plan : entrée, stop, objectifs | une série de bougies et une structure |
+| a une issue | oui, constatée plus tard | **non** — rien à résoudre |
+| compte dans le taux de réussite | oui | **non** |
+
+Une mesure n'a ni entrée ni stop : elle ne peut ni gagner ni perdre. La compter
+avec les analyses gonflerait le total et la ferait figurer indéfiniment parmi
+les plans « en cours », ce qui est précisément la conclusion fausse que
+\`RAPPORT.md\` doit empêcher. Les statistiques les excluent, le rapport les
+compte à part.
+
+## mesure.json
+
+\`\`\`
+mesure.nombreDeBougies        combien de bougies ont été reconstruites
+mesure.conventionDecimale     « point » ou « virgule » — voir le commentaire embarqué
+mesure.echelleDesPrix         prix en haut et en bas du tracé, et la hauteur en pixels
+mesure.bornesDuTrace          la zone de tracé dans l'image, panneau de volume compris
+mesure.bandeau                symbole et unité lus sur le titre, ou null
+mesure.structure.cassures     index, sens et prix de chaque cassure de structure
+mesure.structure.orderBlocks  index de bougie, sens, bornes de zone, qualificatifs
+mesure.bougies                la série complète : ouverture, clôture, plus haut, plus bas
+\`\`\`
+
+La série est conservée en entier, et c'est délibéré : c'est la seule donnée du
+journal qui soit irremplaçable. La capture se relit toujours, mais elle ne se
+re-mesure pas à l'identique si le code d'extraction change entre-temps.
+
+Les prix viennent des pixels, pas d'une source de marché. Ils ne portent pas
+plus de précision que le quadrillage de l'image — compter deux pixels
+d'incertitude. Ne pas les comparer à des cours de référence sans tenir compte
+de ça.
+
 ## Ce que ce journal ne dit pas
 
 - **Aucun de ces trades n'a été exécuté.** Ce sont des plans produits par un

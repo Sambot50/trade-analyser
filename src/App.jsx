@@ -12,7 +12,7 @@ import { loadSettings, saveSettings } from './lib/settings.js';
 import { chargerInstrument, enregistrerInstrument, resoudreInstrument } from './lib/instrument.js';
 import { toPngDataUrl } from './lib/image.js';
 import JournalView from './JournalView.jsx';
-import { enregistrerAnalyse, dossierMemorise, resoudreEnAttente } from './lib/journal/index.js';
+import { enregistrerAnalyse, enregistrerMesure, dossierMemorise, resoudreEnAttente } from './lib/journal/index.js';
 import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines, rrVerdict, breakEvenRate, FRICTION_PAR_DEFAUT } from './lib/analysis.js';
 import { lireGraphique } from './lib/vision/lecture.js';
 import { pixelsDepuisDataUrl, enCanvas } from './lib/vision/navigateur.js';
@@ -40,6 +40,7 @@ export default function App() {
   const [lecture, setLecture] = useState(null);
   const [hauteurImage, setHauteurImage] = useState(0);
   const [instrument, setInstrument] = useState(chargerInstrument);
+  const [mesureEnCours, setMesureEnCours] = useState(false);
   const [lectureEnCours, setLectureEnCours] = useState(false);
   const [prixHaut, setPrixHaut] = useState('');
   const [prixBas, setPrixBas] = useState('');
@@ -278,6 +279,46 @@ export default function App() {
    * l'échelle sont déduites de l'image elle-même ; les bougies en sont
    * extraites, puis les figures que le dépôt sait déjà reconnaître.
    */
+  /**
+   * La mesure au journal, avec l'aperçu tel qu'il est tracé à l'écran.
+   *
+   * L'aperçu est pris sur le canevas plutôt que reconstruit : c'est ce qu'on
+   * regarde d'abord en rouvrant un dossier, et il porte les zones aux pixels
+   * près. Le reconstruire ailleurs serait une seconde implémentation à tenir
+   * en accord avec la première.
+   */
+  const enregistrerLaMesure = async () => {
+    if (!lecture?.ok || mesureEnCours) return;
+    setMesureEnCours(true);
+    try {
+      const canvas = canvasRef.current;
+      const resolu = resoudreInstrument({ analyse: analysis, titre: lecture.titre, saisi: instrument });
+      const { erreurDisque } = await enregistrerMesure({
+        lecture,
+        marche: {
+          symbole: resolu.symbole.valeur,
+          unite: resolu.unite.valeur,
+          provenanceSymbole: resolu.symbole.source,
+        },
+        captureDataUrl: imageSrc,
+        apercuDataUrl: canvas ? canvas.toDataURL('image/png') : null,
+        dimensions: canvas ? { largeur: canvas.width, hauteur: canvas.height } : null,
+        dossierRacine: dossierJournal,
+      });
+      setNoteJournal(
+        erreurDisque
+          ? `Mesure enregistrée en mémoire, mais pas sur disque : ${erreurDisque}`
+          : dossierJournal
+            ? 'Mesure enregistrée dans le journal.'
+            : 'Mesure enregistrée en mémoire du navigateur — connecte un dossier pour la garder.'
+      );
+    } catch (err) {
+      setNoteJournal(`Échec de l’enregistrement de la mesure : ${err.message}`);
+    } finally {
+      setMesureEnCours(false);
+    }
+  };
+
   const runLecture = async (echelleManuelle = null) => {
     if (!imageSrc || lectureEnCours) return;
     setLectureEnCours(true);
@@ -485,6 +526,18 @@ export default function App() {
 
           {lecture?.ok && analysis?.scale && (
             <ConfrontationCard analysis={analysis} lecture={lecture} hauteurImage={hauteurImage} />
+          )}
+
+          {lecture?.ok && (
+            <button
+              onClick={enregistrerLaMesure}
+              disabled={mesureEnCours}
+              className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700
+                         disabled:opacity-50 text-slate-200 text-[13px] font-semibold rounded-xl py-2.5 transition"
+            >
+              {mesureEnCours ? <RefreshCw className="w-4 h-4 animate-spin" /> : <NotebookPen className="w-4 h-4" />}
+              {mesureEnCours ? 'Enregistrement…' : 'Enregistrer la mesure au journal'}
+            </button>
           )}
 
           <InstrumentCard

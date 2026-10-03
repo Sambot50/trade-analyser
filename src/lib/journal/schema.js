@@ -56,13 +56,20 @@ export function construireId(horodatage, symbole, uniteTemps) {
   return `${horodatage}-${symboleNettoye}-${tf}`;
 }
 
-/** Chemin du dossier de l'analyse, relatif à la racine du journal. */
+/**
+ * Chemin du dossier de l'enregistrement, relatif à la racine du journal.
+ *
+ * Une mesure prend le suffixe `-mesure` : analysée et mesurée dans la même
+ * seconde, les deux se retrouveraient sinon dans le même dossier, et la
+ * seconde écrasserait le `capture.png` de la première.
+ */
 export function cheminDossier(record) {
   const jour = record.horodatage.slice(0, 10);
   const heure = record.horodatage.slice(11, 19).replace(/:/g, '');
   const symbole = (record.marche.symbole || 'INCONNU').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const tf = (record.marche.uniteTemps || '?').replace(/[^A-Za-z0-9]/g, '');
-  return `${jour}/${heure}-${symbole}-${tf}`;
+  const suffixe = record.type === 'mesure' ? '-mesure' : '';
+  return `${jour}/${heure}-${symbole}-${tf}${suffixe}`;
 }
 
 /**
