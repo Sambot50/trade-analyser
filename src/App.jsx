@@ -456,7 +456,7 @@ export default function App() {
           </button>
 
           <button
-            onClick={runLecture}
+            onClick={() => runLecture()}
             disabled={!imageSrc || lectureEnCours}
             className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 disabled:text-slate-700 text-slate-100 text-sm font-semibold py-3 rounded-xl transition border border-slate-700"
           >

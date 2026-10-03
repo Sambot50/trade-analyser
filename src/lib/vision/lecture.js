@@ -71,8 +71,18 @@ export async function lireGraphique(données, largeur, hauteur, options = {}) {
   // La soupape : deux prix saisis à la main dispensent entièrement de l'OCR.
   // Le haut et le bas du panneau des prix sont connus — `zoneTrace` les donne —
   // et deux points suffisent à poser la droite.
+  //
+  // `estEchelle` existe parce qu'en JSX, `onClick={f}` passe L'ÉVÈNEMENT DU
+  // CLIC en premier argument. Un paramètre optionnel en première position le
+  // reçoit donc comme s'il s'agissait d'une saisie, et la lecture échouait sur
+  // « les deux prix doivent être des nombres » alors que l'utilisateur n'avait
+  // rien saisi. Mieux vaut ignorer ce qui ne ressemble pas à une échelle que
+  // dépendre d'un appel correct partout.
+  const estEchelle = (v) => v && typeof v === 'object'
+    && ('prixHaut' in v || 'prixBas' in v);
+
   let lu = null;
-  if (echelleManuelle) {
+  if (estEchelle(echelleManuelle)) {
     const { prixHaut, prixBas } = echelleManuelle;
     if (!(Number.isFinite(prixHaut) && Number.isFinite(prixBas) && prixHaut > prixBas)) {
       return echec('echelle', 'Les deux prix saisis doivent être des nombres, le haut au-dessus du bas.', { palette, zone });

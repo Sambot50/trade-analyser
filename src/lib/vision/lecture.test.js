@@ -171,3 +171,29 @@ describe('un moteur qui n’aboutit pas ne fige pas l’écran', () => {
     expect(r.probleme).toMatch(/à la main/);
   });
 });
+
+describe('ce qui n’est pas une échelle est ignoré', () => {
+  // En JSX, `onClick={f}` passe l'évènement du clic en premier argument. Un
+  // paramètre optionnel en première position le reçoit comme une saisie, et
+  // la lecture échouait sur « les deux prix doivent être des nombres » alors
+  // que rien n'avait été saisi.
+  const { données, largeur, hauteur, echelle } = rendre(serie(40));
+  const etiquettes = etiquettesDe(echelle, hauteur);
+
+  it('traite un évènement de clic comme une absence de saisie', async () => {
+    const evenementDeClic = { type: 'click', target: {}, preventDefault() {}, nativeEvent: {} };
+    const r = await lireGraphique(données, largeur, hauteur, {
+      etiquettes, echelleManuelle: evenementDeClic, avecTitre: false,
+    });
+    expect(r.ok).toBe(true);
+    expect(r.convention).toBe('point');
+  });
+
+  it('mais garde la validation pour une vraie saisie incohérente', async () => {
+    const r = await lireGraphique(données, largeur, hauteur, {
+      etiquettes, echelleManuelle: { prixHaut: 100, prixBas: 200 }, avecTitre: false,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.probleme).toMatch(/haut au-dessus du bas/);
+  });
+});
