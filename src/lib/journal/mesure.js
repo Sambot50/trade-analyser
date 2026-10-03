@@ -13,6 +13,7 @@
 // graphique montrait vraiment — plutôt que ce qu'un modèle en a dit.
 
 import { SCHEMA_VERSION, deviseDeCotation, construireId } from './schema.js';
+import { trouvaillesDeMesure, duType, libelleDuType } from '../marche/trouvailles.js';
 
 /** Le type que porte un enregistrement de mesure, et que l'analyse n'a pas. */
 export const TYPE_MESURE = 'mesure';
@@ -64,12 +65,16 @@ export function mesureDepuisLecture(lecture, { dimensions } = {}) {
       cassures: analyses.cassures.map((c) => ({
         index: c.index, sens: c.sens ?? null, prix: arrondir(c.prix),
       })),
-      orderBlocks: analyses.orderBlocks.map((ob) => ({
-        indexBougie: ob.index,
-        sens: ob.sens ?? null,
-        prixHautDeZone: arrondir(ob.zone?.haut),
-        prixBasDeZone: arrondir(ob.zone?.bas),
-        qualificatifs: ob.qualificatifs ?? null,
+      // Une seule liste typée, et non une liste par figure. C'est ce qui fait
+      // qu'ajouter un marteau ou une englobante ne touchera ni ce fichier, ni
+      // le tracé, ni l'index, ni la file d'attente.
+      trouvailles: (analyses.trouvailles ?? analyses.orderBlocks ?? []).map((t) => ({
+        type: t.type ?? 'order_block',
+        indexBougie: t.index,
+        sens: t.sens ?? null,
+        prixHautDeZone: arrondir(t.zone?.haut),
+        prixBasDeZone: arrondir(t.zone?.bas),
+        qualificatifs: t.qualificatifs ?? null,
       })),
       candidatsEcartes: analyses.rejetes ?? 0,
       assezDeBougies: analyses.assezDeBougies ?? null,
@@ -95,7 +100,7 @@ export function resumeMesure(record) {
   const haut = mesure.echelleDesPrix.prixEnHautDuTrace;
   const bas = mesure.echelleDesPrix.prixEnBasDuTrace;
   const devise = marche.devise ? ` ${marche.devise}` : '';
-  const obs = mesure.structure.orderBlocks.length;
+  const obs = duType(trouvaillesDeMesure({ structure: mesure.structure }), 'order_block').length;
   return (
     `Mesure ${marche.symbole ?? 'symbole inconnu'} ${marche.uniteTemps ?? ''} — `.replace(/\s+—/, ' —')
     + `${mesure.nombreDeBougies} bougies entre ${bas} et ${haut}${devise}, `
@@ -157,7 +162,8 @@ export function ligneIndexMesure(record, dossier) {
     devise: record.marche.devise,
     nombreDeBougies: record.mesure.nombreDeBougies,
     cassures: record.mesure.structure.cassures.length,
-    orderBlocks: record.mesure.structure.orderBlocks.length,
+    trouvailles: trouvaillesDeMesure(record.mesure).length,
+    orderBlocks: duType(trouvaillesDeMesure(record.mesure), 'order_block').length,
     prixEnHautDuTrace: record.mesure.echelleDesPrix.prixEnHautDuTrace,
     prixEnBasDuTrace: record.mesure.echelleDesPrix.prixEnBasDuTrace,
   };

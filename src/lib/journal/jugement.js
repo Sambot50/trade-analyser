@@ -11,6 +11,7 @@
 // n'a simplement pas encore eu lieu.
 
 import { SCHEMA_VERSION } from './schema.js';
+import { TYPES, estTypeConnu } from '../marche/trouvailles.js';
 
 export const ETATS = ['en_attente', 'valide', 'invalide'];
 
@@ -41,21 +42,23 @@ export function etatValide(etat) {
  * lire : la file d'attente, les vues et un futur backtest s'en servent sans
  * ouvrir un seul `mesure.json`.
  */
-export function ligneOrderBlock(record, ob, dossier) {
+export function ligneTrouvaille(record, t, dossier) {
   return {
     schemaVersion: SCHEMA_VERSION,
-    type: 'order_block',
-    id: idOrderBlock(record.id, ob.indexBougie),
+    // Le type vient de la trouvaille elle-même. Une figure nouvelle n'a donc
+    // rien à changer ici : elle s'indexe, s'attend et se juge comme les autres.
+    type: t.type ?? 'order_block',
+    id: idOrderBlock(record.id, t.indexBougie),
     idEnregistrement: record.id,
     horodatage: record.horodatage,
     dossier,
     symbole: record.marche?.symbole ?? null,
     uniteTemps: record.marche?.uniteTemps ?? null,
-    indexBougie: ob.indexBougie,
-    sens: ob.sens ?? null,
-    prixHautDeZone: ob.prixHautDeZone ?? null,
-    prixBasDeZone: ob.prixBasDeZone ?? null,
-    qualificatifs: ob.qualificatifs ?? null,
+    indexBougie: t.indexBougie,
+    sens: t.sens ?? null,
+    prixHautDeZone: t.prixHautDeZone ?? null,
+    prixBasDeZone: t.prixBasDeZone ?? null,
+    qualificatifs: t.qualificatifs ?? null,
     etat: ETAT_INITIAL,
   };
 }
@@ -67,11 +70,11 @@ export function ligneOrderBlock(record, ob, dossier) {
  * « voici ce qui est devenu vrai », pas « voici l'état complet ». Y recopier
  * le reste inviterait à écrire deux versions d'un même fait.
  */
-export function ligneJugement({ id, etat, note, horodatage }) {
+export function ligneJugement({ id, etat, note, horodatage, type = 'order_block' }) {
   if (!etatValide(etat)) throw new Error(`État inconnu : "${etat}". Attendu ${ETATS.join(', ')}.`);
   return {
     schemaVersion: SCHEMA_VERSION,
-    type: 'order_block',
+    type,
     id,
     maj: horodatage,
     etat,
@@ -79,8 +82,21 @@ export function ligneJugement({ id, etat, note, horodatage }) {
   };
 }
 
-/** Les order blocks d'un index réduit, tous états confondus. */
-export const orderBlocksDe = (lignes) => (lignes ?? []).filter((l) => l?.type === 'order_block');
+/**
+ * Les trouvailles jugeables d'un index réduit, tous états confondus.
+ *
+ * Filtrées sur le REGISTRE et non sur un type écrit en dur : une figure
+ * nouvelle entre dans la file d'attente, les vues et le taux de validation
+ * du seul fait d'être déclarée jugeable.
+ */
+export const trouvaillesDe = (lignes) => (lignes ?? [])
+  .filter((l) => estTypeConnu(l?.type) && TYPES[l.type].juge);
+
+/** Celles d'un type donné. */
+export const duTypeDansIndex = (lignes, type) => trouvaillesDe(lignes).filter((l) => l.type === type);
+
+/** Rétrocompatible : les order blocks seuls. */
+export const orderBlocksDe = (lignes) => duTypeDansIndex(lignes, 'order_block');
 
 /**
  * Ce qui reste à juger, du plus ancien au plus récent.
@@ -89,8 +105,9 @@ export const orderBlocksDe = (lignes) => (lignes ?? []).filter((l) => l?.type ==
  * a eu le temps d'être tranchée, une zone d'il y a dix minutes non. Présenter
  * les récentes en tête remplirait la file de cas qu'on ne peut pas juger.
  */
-export function fileDAttente(lignes, { symbole = null } = {}) {
-  return orderBlocksDe(lignes)
+export function fileDAttente(lignes, { symbole = null, type = null } = {}) {
+  return trouvaillesDe(lignes)
+    .filter((l) => !type || l.type === type)
     .filter((l) => (l.etat ?? ETAT_INITIAL) === ETAT_INITIAL)
     .filter((l) => !symbole || l.symbole === symbole)
     .sort((a, b) => (a.horodatage < b.horodatage ? -1 : 1));
@@ -99,7 +116,7 @@ export function fileDAttente(lignes, { symbole = null } = {}) {
 /** Combien de zones dans chaque état, pour savoir où l'on en est. */
 export function compteParEtat(lignes) {
   const compte = Object.fromEntries(ETATS.map((e) => [e, 0]));
-  for (const l of orderBlocksDe(lignes)) {
+  for (const l of trouvaillesDe(lignes)) {
     const e = etatValide(l.etat) ? l.etat : ETAT_INITIAL;
     compte[e]++;
   }

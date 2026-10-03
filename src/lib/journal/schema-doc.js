@@ -180,14 +180,20 @@ plus de précision que le quadrillage de l'image — compter deux pixels
 d'incertitude. Ne pas les comparer à des cours de référence sans tenir compte
 de ça.
 
-## Les order blocks, et leur jugement
+## Les trouvailles, et leur jugement
 
-Chaque order block détecté reçoit **sa propre ligne** dans \`index.jsonl\`,
-\`type: "order_block"\`, en plus de la ligne de la mesure. C'est ce qui permet à
+Une **trouvaille** est ce qu'une analyse technique relève sur un graphique :
+order block aujourd'hui, et demain marteau, englobante, fair value gap. Ce qui
+change d'une figure à l'autre est la façon de la trouver ; tout le reste —
+dessiner, indexer, attendre, juger, cataloguer — est commun.
+
+Chaque trouvaille reçoit **sa propre ligne** dans \`index.jsonl\`, portant son
+\`type\`, en plus de la ligne de la mesure. C'est ce qui permet à
 l'index de rester le seul fichier à lire : la file d'attente, les vues et un
 backtest s'en servent sans ouvrir un seul \`mesure.json\`.
 
 \`\`\`
+type               order_block | (les figures à venir)
 id                 <id de la mesure>#ob<rang de la bougie>
 idEnregistrement   la mesure dont il vient
 indexBougie        son rang dans la série mesurée
@@ -197,6 +203,15 @@ prixBasDeZone
 qualificatifs      ce que l'analyse a relevé : prise de liquidité, FVG, OTE...
 etat               en_attente | valide | invalide
 \`\`\`
+
+### Les enregistrements antérieurs restent lisibles
+
+Avant ce contrat, une mesure portait \`structure.orderBlocks\` sans type. Ces
+fichiers **ne sont pas migrés** : un journal déjà écrit ne se réécrit pas, on
+apprend à le relire. Une liste \`orderBlocks\` est lue comme des trouvailles de
+type \`order_block\`, ce qui est exact — c'était le seul type qui existait.
+
+Les enregistrements neufs portent \`structure.trouvailles\`, typée.
 
 ### Trois états, et le troisième n'est pas un oubli
 
@@ -242,6 +257,7 @@ est le catalogue.
 |---|---|
 | \`vues/par-validite/<etat>/<date>.md\` | ton jugement d'abord, la date ensuite |
 | \`vues/par-validite/<etat>/TOUT.md\` | l'ensemble d'un état, sans ouvrir chaque jour |
+| \`vues/par-figure/<type>.md\` | une fiche par figure |
 | \`vues/par-symbole/<SYMBOLE>.md\` | tout ce qui concerne un instrument |
 | \`vues/par-mois/<AAAA-MM>.md\` | la vue chronologique |
 

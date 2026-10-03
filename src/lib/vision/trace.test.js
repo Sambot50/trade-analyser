@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { rectangleDeLOrderBlock, rectanglesDesOrderBlocks, etiquetteDuRectangle } from './trace.js';
+import { rectangleDeLOrderBlock, rectanglesDesTrouvailles, etiquetteDuRectangle } from './trace.js';
 
 // Échelle : 4400 en haut (y = 0), 4300 en bas (y = 500). 0,2 prix par pixel.
 const echelle = { yDePrix: (p) => (4400 - p) * 5, prixDeY: (y) => 4400 - y / 5 };
@@ -39,7 +39,7 @@ describe('rectangleDeLOrderBlock', () => {
   });
 });
 
-describe('rectanglesDesOrderBlocks', () => {
+describe('rectanglesDesTrouvailles', () => {
   const lecture = {
     ok: true, bougies, echelle,
     analyses: {
@@ -51,18 +51,18 @@ describe('rectanglesDesOrderBlocks', () => {
   };
 
   it('rend les zones dans l’ordre des bougies', () => {
-    expect(rectanglesDesOrderBlocks(lecture, 800).map((r) => r.index)).toEqual([10, 30]);
+    expect(rectanglesDesTrouvailles(lecture, 800).map((r) => r.index)).toEqual([10, 30]);
   });
 
   it('rend un tableau vide plutôt que null — l’appelant dessine en boucle', () => {
-    expect(rectanglesDesOrderBlocks(null, 800)).toEqual([]);
-    expect(rectanglesDesOrderBlocks({ ok: false }, 800)).toEqual([]);
-    expect(rectanglesDesOrderBlocks({ ok: true, analyses: { orderBlocks: [] } }, 800)).toEqual([]);
+    expect(rectanglesDesTrouvailles(null, 800)).toEqual([]);
+    expect(rectanglesDesTrouvailles({ ok: false }, 800)).toEqual([]);
+    expect(rectanglesDesTrouvailles({ ok: true, analyses: { orderBlocks: [] } }, 800)).toEqual([]);
   });
 
   it('écarte en silence une zone impossible à placer, sans perdre les autres', () => {
     const abime = { ...lecture, analyses: { orderBlocks: [...lecture.analyses.orderBlocks, { index: 999, zone: { bas: 1, haut: 2 } }] } };
-    expect(rectanglesDesOrderBlocks(abime, 800)).toHaveLength(2);
+    expect(rectanglesDesTrouvailles(abime, 800)).toHaveLength(2);
   });
 });
 

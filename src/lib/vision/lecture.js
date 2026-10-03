@@ -14,6 +14,7 @@ import { lireBande } from './ocr.js';
 import { lireTitre } from './titre.js';
 import { pivots, cassures } from '../marche/structure.js';
 import { detecterEnDetail } from '../marche/orderblocks.js';
+import { normaliser as normaliserTrouvaille, duType } from '../marche/trouvailles.js';
 import {
   priseDeLiquidite, fvgDeLImpulsion, premiumDiscount, fraicheur, virginiteNiveau,
 } from '../marche/qualificatifs.js';
@@ -23,14 +24,18 @@ const echec = (etape, probleme, suite = {}) => ({ ok: false, etape, probleme, ..
 /** Les figures que le dépôt sait déjà reconnaître, appliquées à la série. */
 export function analyser(bougies, { fenetre = 5 } = {}) {
   if (bougies.length < fenetre * 2 + 3) {
-    return { assezDeBougies: false, pivots: null, cassures: [], orderBlocks: [], rejetes: 0 };
+    return { assezDeBougies: false, pivots: null, cassures: [], trouvailles: [], orderBlocks: [], rejetes: 0 };
   }
   const p = pivots(bougies, fenetre);
   const evenements = cassures(bougies, fenetre);
   const { retenus, rejetes } = detecterEnDetail(bougies, evenements);
 
-  const orderBlocks = retenus.map((ob) => ({
+  // Chaque order block devient une TROUVAILLE : même forme que toute analyse
+  // à venir — un type, un rang, une zone, des qualificatifs. Ce qui change
+  // d'une figure à l'autre est la façon de la trouver, pas ce qu'on en fait.
+  const trouvailles = retenus.map((ob) => normaliserTrouvaille({
     ...ob,
+    type: 'order_block',
     // Chaque qualificatif est entouré : l'un d'eux qui lèverait sur une série
     // reconstruite ferait disparaître tous les autres de l'écran.
     qualificatifs: {
@@ -40,9 +45,18 @@ export function analyser(bougies, { fenetre = 5 } = {}) {
       fraicheur: sansCasse(() => fraicheur(bougies, ob)),
       virginite: sansCasse(() => virginiteNiveau(bougies, ob)),
     },
-  }));
+  })).filter(Boolean);
 
-  return { assezDeBougies: true, pivots: p, cassures: evenements, orderBlocks, rejetes: rejetes.length };
+  return {
+    assezDeBougies: true,
+    pivots: p,
+    cassures: evenements,
+    trouvailles,
+    // Vue dérivée, pour que les lecteurs qui ne connaissent que les order
+    // blocks continuent de marcher pendant qu'on les fait migrer un à un.
+    orderBlocks: duType(trouvailles, 'order_block'),
+    rejetes: rejetes.length,
+  };
 }
 
 function sansCasse(f) {

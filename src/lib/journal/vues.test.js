@@ -1,19 +1,19 @@
 import { describe, it, expect } from 'vitest';
 
 import { genererVues } from './vues.js';
-import { ligneOrderBlock, ligneJugement } from './jugement.js';
+import { ligneTrouvaille, ligneJugement } from './jugement.js';
 import { reduireIndex } from './schema.js';
 
 const record = (h, symbole) => ({ id: `${h}-${symbole}`, horodatage: h, marche: { symbole, uniteTemps: '15m' } });
-const ob = (i, extra = {}) => ({ indexBougie: i, sens: 'haussier', prixHautDeZone: 4180, prixBasDeZone: 4166,
+const ob = (i, extra = {}) => ({ type: 'order_block', indexBougie: i, sens: 'haussier', prixHautDeZone: 4180, prixBasDeZone: 4166,
   qualificatifs: { priseDeLiquidite: true, fvg: false }, ...extra });
 
 function lignes() {
   const r1 = record('2026-10-03T13:45:12Z', 'XAUUSD');
   const r2 = record('2026-10-04T09:10:00Z', 'BTCUSD');
-  const a = ligneOrderBlock(r1, ob(10), '2026-10-03/134512-XAUUSD-15m-mesure');
-  const b = ligneOrderBlock(r1, ob(42), '2026-10-03/134512-XAUUSD-15m-mesure');
-  const c = ligneOrderBlock(r2, ob(7), '2026-10-04/091000-BTCUSD-15m-mesure');
+  const a = ligneTrouvaille(r1, ob(10), '2026-10-03/134512-XAUUSD-15m-mesure');
+  const b = ligneTrouvaille(r1, ob(42), '2026-10-03/134512-XAUUSD-15m-mesure');
+  const c = ligneTrouvaille(r2, ob(7), '2026-10-04/091000-BTCUSD-15m-mesure');
   return reduireIndex([
     a, b, c,
     ligneJugement({ id: a.id, etat: 'valide', note: 'rejet net', horodatage: '2026-10-05T08:00:00Z' }),
@@ -38,9 +38,16 @@ describe('genererVues', () => {
   });
 
   it('place chaque zone dans le bon état, et nulle part ailleurs', () => {
-    expect(v.get('vues/par-validite/valide/2026-10-03.md')).toMatch(/\| 13:45 \| XAUUSD \|/);
+    expect(v.get('vues/par-validite/valide/2026-10-03.md')).toMatch(/\| 13:45 \| Order block \| XAUUSD \|/);
     expect(v.get('vues/par-validite/valide/TOUT.md')).not.toMatch(/BTCUSD/);
     expect(v.get('vues/par-validite/en_attente/TOUT.md')).not.toMatch(/XAUUSD/);
+  });
+
+  it('croise par FIGURE, pour que chaque analyse ait sa fiche', () => {
+    // C'est la vue qui n'avait pas lieu d'être tant qu'il n'existait qu'un
+    // type. Elle existe maintenant parce qu'il va y en avoir d'autres.
+    expect(v.get('vues/par-figure/order_block.md')).toMatch(/3 zones/);
+    expect(v.get('vues/par-figure/order_block.md')).toMatch(/# Order block/);
   });
 
   it('croise aussi par symbole et par mois', () => {
