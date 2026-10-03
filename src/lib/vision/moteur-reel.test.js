@@ -74,3 +74,64 @@ describe.skipIf(!servi)('le moteur réel, sur un axe rendu', () => {
     expect(pire / verite.priceTop).toBeLessThan(0.0005);
   }, 120_000);
 });
+
+// ── L'axe en thème CLAIR, qui est celui que l'utilisateur capture ───────────
+//
+// Tout le reste de ce dépôt dessine en thème sombre, parce que c'est ce que
+// l'application rend. L'axe lu sur une capture d'écran, lui, est celui de
+// TradingView tel que l'utilisateur l'a configuré — souvent clair : des
+// graduations grises #787B86 sur blanc, plus l'étiquette du prix courant en
+// blanc sur noir.
+//
+// Cette bande-là mettait la lecture en échec, et rien ne le voyait : la
+// binarisation érodait les graduations grises jusqu'à l'illisible, et seule
+// l'étiquette du prix courant survivait — assez contrastée pour franchir
+// n'importe quel seuil. Une étiquette lue, dix-neuf perdues, et le message
+// « moins de trois graduations lisibles » pour tout diagnostic.
+
+function bandeClaire({ police = 11 } = {}) {
+  const prix = Array.from({ length: 20 }, (_, i) => ({
+    texte: `${(87000 - i * 200).toLocaleString('en-US')}.00`, y: 30 + i * 45,
+  }));
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="880">
+    <rect width="100%" height="100%" fill="#FFFFFF"/>
+    ${prix.map((p) => `<text x="10" y="${p.y}" font-family="Arial, Helvetica, sans-serif"
+      font-size="${police}" fill="#787B86">${p.texte}</text>`).join('\n')}
+    <rect x="4" y="52" width="92" height="20" fill="#131722"/>
+    <text x="10" y="67" font-family="Arial, Helvetica, sans-serif" font-size="${police}"
+      font-weight="bold" fill="#FFFFFF">86,903.65</text>
+  </svg>`;
+  const r = new Resvg(svg).render();
+  return { données: r.pixels, largeur: r.width, hauteur: r.height, attendus: prix };
+}
+
+describe.skipIf(!servi)('l’axe en thème clair, moteur réel', () => {
+  it('lit les graduations grises malgré l’étiquette du prix courant', async () => {
+    const { données, largeur, hauteur } = bandeClaire();
+    const { createWorker } = await import('tesseract.js');
+    const lues = await lireBande(données, largeur, hauteur, { x0: 0, y0: 0, x1: largeur, y1: hauteur }, {
+      facteur: 4,
+      enImage: enPng,
+      creerWorker: () => createWorker('eng', undefined, { langPath: DOSSIER, corePath: DOSSIER }),
+    });
+
+    // Avec la binarisation d'avant : 1 sur 20, et c'était l'étiquette de prix.
+    expect(lues.length).toBeGreaterThanOrEqual(12);
+
+    const essai = reperesDepuisEtiquettes(lues);
+    expect(essai).not.toBeNull();
+    expect(essai.convention).toBe('point');
+
+    // L'échelle est linéaire par construction : 200 unités tous les 45 pixels.
+    // Le consensus doit la retrouver, et écarter l'étiquette de prix qui ne
+    // tombe sur aucune graduation.
+    expect(essai.echelle.pireEcart).toBeLessThan(0.01);
+    // Le niveau absolu n'est PAS vérifiable ici : l'ordonnée d'un `<text>` SVG
+    // est sa ligne de base, l'OCR rend le centre de la boîte. Quatre pixels
+    // d'écart, soit dix-huit unités de prix — un décalage du repère, pas de
+    // l'échelle. C'est la PENTE qui doit être juste, et elle l'est au millième.
+    const prixEn = (y) => essai.echelle.prixDeY(y);
+    const pente = (prixEn(0) - prixEn(855)) / 855;
+    expect(pente).toBeCloseTo(200 / 45, 3);
+  }, 120_000);
+});

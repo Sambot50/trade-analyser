@@ -64,7 +64,41 @@ export function agrandir(img, facteur = 3) {
 export const luminance = ([r, v, b]) => 0.2126 * r + 0.7152 * v + 0.0722 * b;
 
 /**
+ * Met en niveaux de gris, sans rien décider.
+ *
+ * C'est ce qu'on donne au moteur par défaut, et c'est un revirement : la bande
+ * était binarisée avant d'être lue, au motif d'aider le moteur. Mesuré, elle
+ * l'empêchait de lire. Sur un axe TradingView en thème clair — graduations
+ * grises #787B86 sur blanc — la binarisation faisait tomber 17 lectures sur 20
+ * à une seule : l'étiquette du prix courant, blanche sur noir, assez contrastée
+ * pour survivre à n'importe quel seuil. Les graduations, elles, disparaissaient.
+ *
+ * La raison tient au lissage. Un glyphe de 11 pixels n'a presque aucun pixel à
+ * sa couleur nominale : il est fait de valeurs intermédiaires entre le gris du
+ * trait et le blanc du fond. Un seuil global tranche dans cette pente et érode
+ * les traits jusqu'à l'illisible. Tesseract binarise de lui-même, par-dessus, et
+ * le fait mieux : il travaille sur des voisinages, pas sur la bande entière.
+ *
+ * Vérifié aussi en thème sombre, où la binarisation avait été écrite : même
+ * lecture, même échelle, même écart. Elle ne servait nulle part.
+ */
+export function enNiveauxDeGris(img) {
+  const n = img.largeur * img.hauteur;
+  const sortie = new Uint8ClampedArray(n * 4);
+  for (let i = 0; i < n; i++) {
+    const v = luminance([img.données[i * 4], img.données[i * 4 + 1], img.données[i * 4 + 2]]);
+    sortie[i * 4] = v; sortie[i * 4 + 1] = v; sortie[i * 4 + 2] = v; sortie[i * 4 + 3] = 255;
+  }
+  return { ...img, données: sortie };
+}
+
+/**
  * Binarise en noir sur blanc, en détectant la polarité.
+ *
+ * N'est plus utilisée par défaut — voir `enNiveauxDeGris`. Gardée pour les
+ * captures très dégradées, où un seuil franc peut encore aider, et parce que
+ * la mesure qui l'a écartée vaut pour les captures d'écran d'aujourd'hui, pas
+ * pour toutes.
  *
  * Un thème sombre porte du texte clair sur fond foncé ; Tesseract attend
  * l'inverse. La polarité se déduit de la luminance MÉDIANE : le fond occupe
@@ -114,10 +148,11 @@ export function facteurTenable(largeur, hauteur, demandé = 3, coteMax = 2400) {
 }
 
 /** Bande d'axe prête pour l'OCR : découpée, agrandie, binarisée. */
-export function preparerBande(données, largeur, hauteur, bande, { facteur = 3, coteMax = 2400 } = {}) {
+export function preparerBande(données, largeur, hauteur, bande, { facteur = 3, coteMax = 2400, binarisation = false } = {}) {
   const coupe = recadrer(données, largeur, hauteur, bande);
   if (!coupe) return null;
-  return binariser(agrandir(coupe, facteurTenable(coupe.largeur, coupe.hauteur, facteur, coteMax)));
+  const grand = agrandir(coupe, facteurTenable(coupe.largeur, coupe.hauteur, facteur, coteMax));
+  return binarisation ? binariser(grand) : enNiveauxDeGris(grand);
 }
 
 /**
@@ -294,7 +329,9 @@ export function motsDuResultat(data) {
  */
 export async function lireBande(données, largeur, hauteur, bande, options = {}) {
   const { facteur = 3, langue = 'eng', cheminLangue, creerWorker, enImage, caracteres = CARACTERES } = options;
-  const prete = preparerBande(données, largeur, hauteur, bande, { facteur, coteMax: options.coteMax });
+  const prete = preparerBande(données, largeur, hauteur, bande, {
+    facteur, coteMax: options.coteMax, binarisation: options.binarisation,
+  });
   if (!prete) return null;
 
   const fabrique = creerWorker ?? (() => creerWorkerParDefaut({ langue, cheminLangue, delaiMs: options.delaiMoteurMs }));

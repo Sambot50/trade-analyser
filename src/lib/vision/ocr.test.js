@@ -102,12 +102,29 @@ describe('luminance et binarisation', () => {
 });
 
 describe('preparerBande', () => {
-  it('enchaîne découpe, agrandissement et binarisation', () => {
+  it('enchaîne découpe et agrandissement, en NIVEAUX DE GRIS', () => {
     const img = image(40, 20, [11, 17, 32]);
     for (let x = 32; x < 36; x++) img.poser(x, 10, [200, 200, 200]);
+    // Le bord lissé d'un glyphe : ni le trait, ni le fond.
+    img.poser(31, 10, [105, 105, 105]);
     const p = preparerBande(img.données, 40, 20, { x0: 30, x1: 40, y0: 0, y1: 20 }, { facteur: 4 });
     expect([p.largeur, p.hauteur]).toEqual([40, 80]);
     expect(p.facteur).toBe(4);
+    // Rien n'est tranché : les valeurs intermédiaires du lissage survivent,
+    // et c'est précisément ce qui rend un petit glyphe lisible.
+    expect(p.fondClair).toBeUndefined();
+    const valeurs = new Set();
+    for (let i = 0; i < p.largeur * p.hauteur; i++) valeurs.add(p.données[i * 4]);
+    expect(valeurs.size).toBe(3);   // fond, bord lissé, trait — les trois survivent
+    // Gris veut dire gris : les trois canaux portent la même valeur.
+    expect(p.données[0]).toBe(p.données[1]);
+    expect(p.données[1]).toBe(p.données[2]);
+  });
+
+  it('binarise encore si on le demande explicitement', () => {
+    const img = image(40, 20, [11, 17, 32]);
+    for (let x = 32; x < 36; x++) img.poser(x, 10, [200, 200, 200]);
+    const p = preparerBande(img.données, 40, 20, { x0: 30, x1: 40, y0: 0, y1: 20 }, { facteur: 4, binarisation: true });
     expect(p.fondClair).toBe(false);
   });
 
