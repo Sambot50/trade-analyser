@@ -40,9 +40,18 @@ describe('normaliser', () => {
     expect(t).toMatchObject({ type: 'order_block', index: 5, zone: null, ms: null });
   });
 
-  it('ne laisse passer que les champs du contrat', () => {
-    const t = normaliser({ ...ob, bidule: 'parasite' });
-    expect(Object.keys(t).sort()).toEqual(['index', 'ms', 'plan', 'qualificatifs', 'sens', 'type', 'zone']);
+  it('GARDE ce qui n’est pas du contrat, au lieu de le jeter', () => {
+    // La première version jetait. Elle a fait disparaître `indexCassure` d'un
+    // order block sans qu'aucun test ne bronche, parce que rien en aval ne
+    // s'en servait encore. Un contrat dit ce qui est commun ; il n'autorise
+    // pas à perdre ce qui est propre à une figure.
+    const t = normaliser({ ...ob, indexCassure: 80, indexOrigine: 60 });
+    expect(Object.keys(t).sort()).toEqual(['details', 'index', 'ms', 'plan', 'qualificatifs', 'sens', 'type', 'zone']);
+    expect(t.details).toEqual({ indexCassure: 80, indexOrigine: 60 });
+  });
+
+  it('rend `details` nul quand il n’y a rien à garder', () => {
+    expect(normaliser(ob).details).toBeNull();
   });
 });
 

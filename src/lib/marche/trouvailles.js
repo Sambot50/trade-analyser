@@ -42,8 +42,24 @@ export function aUneZone(t) {
  * Mieux vaut qu'elle n'existe pas que de la voir réapparaître à chaque lecture
  * comme une nouvelle zone à juger.
  */
+const CHAMPS_DU_CONTRAT = ['type', 'index', 'ms', 'sens', 'zone', 'qualificatifs', 'plan', 'details'];
+
 export function normaliser(brut) {
   if (!brut || !estTypeConnu(brut.type) || !Number.isFinite(brut.index)) return null;
+
+  // Ce qui n'est pas du contrat va dans `details`, au lieu d'être jeté.
+  //
+  // La première version jetait. Elle a fait disparaître `indexCassure` et
+  // `indexOrigine` d'un order block sans qu'aucun test ne bronche, parce que
+  // rien en aval ne s'en servait ENCORE — exactement le défaut silencieux que
+  // ce contrat existe pour empêcher. Un contrat dit ce qui est commun ; il
+  // n'autorise pas à perdre ce qui est propre à une figure.
+  const details = {};
+  for (const [clef, valeur] of Object.entries(brut)) {
+    if (!CHAMPS_DU_CONTRAT.includes(clef)) details[clef] = valeur;
+  }
+  if (brut.details) Object.assign(details, brut.details);
+
   return {
     type: brut.type,
     index: brut.index,
@@ -52,6 +68,7 @@ export function normaliser(brut) {
     zone: aUneZone(brut) ? { haut: brut.zone.haut, bas: brut.zone.bas } : null,
     qualificatifs: brut.qualificatifs ?? null,
     plan: brut.plan ?? null,
+    details: Object.keys(details).length ? details : null,
   };
 }
 
