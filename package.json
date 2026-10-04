@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "samples": "node scripts/make-samples.mjs",
     "assets:ocr": "node scripts/assets-ocr.mjs",
-    "postinstall": "node scripts/assets-ocr.mjs"
+    "postinstall": "node scripts/assets-ocr.mjs",
+    "predev": "node scripts/liberer-port.mjs"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",
