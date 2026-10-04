@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 import {
-  ETATS, ETAT_INITIAL, idOrderBlock, etatValide, ligneOrderBlock, ligneJugement,
+  ETATS, ETAT_INITIAL, idOrderBlock, etatValide, ligneTrouvaille, ligneJugement,
   fileDAttente, compteParEtat, tauxValidation, orderBlocksDe,
 } from './jugement.js';
 import { reduireIndex } from './schema.js';
@@ -11,7 +11,8 @@ const record = {
   horodatage: '2026-10-03T13:45:12Z',
   marche: { symbole: 'XAUUSD', uniteTemps: '15m' },
 };
-const ob = { indexBougie: 71, sens: 'haussier', prixHautDeZone: 4180.5, prixBasDeZone: 4166.2,
+const ob = { type: 'order_block', indexBougie: 71, sens: 'haussier',
+  prixHautDeZone: 4180.5, prixBasDeZone: 4166.2,
   qualificatifs: { priseDeLiquidite: true, fvg: true, ote: false } };
 
 describe('idOrderBlock', () => {
@@ -20,8 +21,8 @@ describe('idOrderBlock', () => {
   });
 });
 
-describe('ligneOrderBlock', () => {
-  const l = ligneOrderBlock(record, ob, '2026-10-03/134512-XAUUSD-15m-mesure');
+describe('ligneTrouvaille', () => {
+  const l = ligneTrouvaille(record, ob, '2026-10-03/134512-XAUUSD-15m-mesure');
 
   it('naît EN ATTENTE, pas jugée', () => {
     // Une zone détectée n'a rien prouvé : le prix n'y est pas encore revenu.
@@ -60,7 +61,7 @@ describe('ligneJugement', () => {
   });
 
   it('se fusionne avec la ligne d’origine par l’identifiant', () => {
-    const detectee = ligneOrderBlock(record, ob, 'd');
+    const detectee = ligneTrouvaille(record, ob, 'd');
     const jugee = ligneJugement({ id: detectee.id, etat: 'invalide', horodatage: '2026-10-05T08:00:00Z' });
     const [fusion] = reduireIndex([detectee, jugee]);
     expect(fusion.etat).toBe('invalide');

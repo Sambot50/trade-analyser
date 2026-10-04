@@ -1,7 +1,8 @@
 // Orchestration du journal : produire, écrire, résoudre.
 
 import { construireMesure, ligneIndexMesure, TYPE_MESURE } from './mesure.js';
-import { ligneOrderBlock, ligneJugement, idOrderBlock } from './jugement.js';
+import { ligneTrouvaille, ligneJugement, idOrderBlock } from './jugement.js';
+import { trouvaillesDeMesure } from '../marche/trouvailles.js';
 import { genererVues } from './vues.js';
 import { construireEnregistrement, cheminDossier, ligneIndex, ligneMiseAJour, construireResume,
          reduireIndex, HORIZON_RESOLUTION_MINUTES, OBJECTIF_JOURNAL } from './schema.js';
@@ -151,8 +152,8 @@ export async function deverserSurDisque(racine) {
     // ouvrir un seul `mesure.json`. Chaque zone naît « en attente » — elle
     // n'a rien prouvé tant que le prix n'y est pas revenu.
     if (mesure) {
-      for (const ob of entree.record.mesure?.structure?.orderBlocks ?? []) {
-        await ajouterLigne(racine, 'index.jsonl', ligneOrderBlock(entree.record, ob, chemin));
+      for (const t of trouvaillesDeMesure(entree.record.mesure)) {
+        await ajouterLigne(racine, 'index.jsonl', ligneTrouvaille(entree.record, t, chemin));
       }
     }
 
@@ -189,12 +190,13 @@ export async function regenererFichiersRacine(racine) {
  * détection. Le jugement s'ajoute, daté, et la réduction de l'index les
  * fusionne par identifiant.
  */
-export async function jugerOrderBlock({ racine, idEnregistrement, indexBougie, etat, note }) {
+export async function jugerOrderBlock({ racine, idEnregistrement, indexBougie, etat, note, type }) {
   if (!racine) throw new Error('Aucun dossier de journal connecté : le jugement ne pourrait aller nulle part.');
   const ligne = ligneJugement({
     id: idOrderBlock(idEnregistrement, indexBougie),
     etat,
     note,
+    type,
     horodatage: maintenantIso(),
   });
   await ajouterLigne(racine, 'index.jsonl', ligne);

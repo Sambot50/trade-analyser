@@ -11,6 +11,8 @@
 // être.
 
 /** Une zone d'order block, en pixels de l'image analysée. */
+import { dessinables } from '../marche/trouvailles.js';
+
 export function rectangleDeLOrderBlock(ob, bougies, echelle, largeurImage) {
   if (!ob?.zone || !echelle?.yDePrix) return null;
   const ancre = bougies?.[ob.index];
@@ -42,11 +44,23 @@ export function rectangleDeLOrderBlock(ob, bougies, echelle, largeurImage) {
  * Rend un tableau vide plutôt que `null` : l'appelant dessine en boucle, et
  * une absence ne doit pas l'obliger à se protéger.
  */
-export function rectanglesDesOrderBlocks(lecture, largeurImage) {
-  if (!lecture?.ok || !lecture.analyses?.orderBlocks?.length) return [];
-  return lecture.analyses.orderBlocks
-    .map((ob) => rectangleDeLOrderBlock(ob, lecture.bougies, lecture.echelle, largeurImage))
+export function rectanglesDesTrouvailles(lecture, largeurImage) {
+  if (!lecture?.ok) return [];
+  // Tout ce qui porte une zone se dessine, quelle que soit la figure. Nommer
+  // les order blocks ici obligerait à revenir modifier ce fichier à chaque
+  // analyse ajoutée — et un oubli donnerait une figure détectée, enregistrée,
+  // jugeable, mais invisible sur l'image.
+  // Le repli sur `orderBlocks` sert les lectures produites avant le contrat :
+  // elles n'ont pas de type, et sans lui rien ne se dessinerait plus.
+  const liste = (lecture.analyses?.trouvailles ?? lecture.analyses?.orderBlocks ?? [])
+    .map((t) => (t?.type ? t : { ...t, type: 'order_block' }));
+
+  return dessinables(liste)
+    .map((t) => rectangleDeLOrderBlock(t, lecture.bougies, lecture.echelle, largeurImage))
     .filter(Boolean)
+    // Dans l'ordre des bougies, pas dans celui de la détection : c'est l'ordre
+    // de lecture du graphique, et il décide aussi de quel rectangle se dessine
+    // par-dessus l'autre quand deux zones se chevauchent.
     .sort((a, b) => a.index - b.index);
 }
 
