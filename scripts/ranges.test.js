@@ -58,3 +58,79 @@ describe('rendre', () => {
     expect(ligne).not.toMatch(/0\.0 %/);
   });
 });
+
+// ── Vérifier l'instrument avant de lui faire confiance ──────────────────────
+
+import { facteurDeDispersion, parBlocs } from './ranges.mjs';
+
+/** Un générateur reproductible, pour que l'assertion ne dépende pas du hasard. */
+function groupesIndependants({ k, n, p, graine = 12345 }) {
+  let g = graine;
+  const alea = () => { g = (g * 1103515245 + 12345) % 2147483648; return g / 2147483648; };
+  return Array.from({ length: k }, () => {
+    let c = 0;
+    for (let j = 0; j < n; j++) if (alea() < p) c++;
+    return { tranches: n, continuation: c, retour: n - c, indecis: 0, tauxContinuation: c / n };
+  });
+}
+
+describe('facteurDeDispersion — l’instrument, mesuré sur ce dont on connaît la réponse', () => {
+  it('rend environ 1 sur des groupes VRAIMENT indépendants', () => {
+    // C'est la vérification qui autorise à se servir du reste. Si l'instrument
+    // rendait 3 sur des données indépendantes, un facteur de 3 sur des données
+    // réelles ne prouverait rien du tout.
+    //
+    // Il rend 0,94 et non 1,00 : l'écart type d'un petit échantillon
+    // sous-estime légèrement la vraie dispersion. C'est une propriété connue
+    // de l'estimateur, pas un résultat.
+    const f = [];
+    for (let graine = 1; graine <= 20; graine++) {
+      f.push(facteurDeDispersion(groupesIndependants({ k: 30, n: 150, p: 0.355, graine })).facteur);
+    }
+    const moyenne = f.reduce((a, b) => a + b, 0) / f.length;
+    expect(moyenne).toBeGreaterThan(0.8);
+    expect(moyenne).toBeLessThan(1.15);
+  });
+
+  it('DÉTECTE une dépendance quand on en fabrique une', () => {
+    // Des groupes dont le taux est tiré autour d'une valeur qui bouge d'un
+    // groupe à l'autre : c'est ce que produit un marché commun poussant toute
+    // une grappe d'issues dans le même sens.
+    let g = 999;
+    const alea = () => { g = (g * 1103515245 + 12345) % 2147483648; return g / 2147483648; };
+    const groupes = Array.from({ length: 30 }, () => {
+      const p = 0.355 + (alea() - 0.5) * 0.4;    // le taux lui-même dérive
+      let c = 0;
+      for (let j = 0; j < 150; j++) if (alea() < p) c++;
+      return { tranches: 150, continuation: c, tauxContinuation: c / 150 };
+    });
+    expect(facteurDeDispersion(groupes).facteur).toBeGreaterThan(2);
+  });
+
+  it('refuse de conclure sous trois groupes', () => {
+    expect(facteurDeDispersion(groupesIndependants({ k: 2, n: 100, p: 0.4 }))).toBeNull();
+    expect(facteurDeDispersion([])).toBeNull();
+  });
+
+  it('ignore les groupes où rien n’est tranché', () => {
+    const avec = [...groupesIndependants({ k: 5, n: 100, p: 0.4 }),
+      { tranches: 0, continuation: 0, tauxContinuation: null }];
+    expect(facteurDeDispersion(avec).groupes).toBe(5);
+  });
+});
+
+describe('parBlocs', () => {
+  const bougies = serieAleatoire({ graine: 11, minutes: 30_000, sigma: 0.4 });
+
+  it('découpe en blocs DISJOINTS, mesurés séparément', () => {
+    // Des blocs qui se chevaucheraient reproduiraient le défaut qu'on cherche
+    // à mesurer, et le facteur trouvé vaudrait 1 par construction.
+    const r = parBlocs(bougies, {}, 6);
+    expect(r.blocs).toHaveLength(6);
+    expect(r.dispersion.groupes).toBeLessThanOrEqual(6);
+  });
+
+  it('refuse une série trop courte pour être découpée', () => {
+    expect(parBlocs(bougies.slice(0, 200), {}, 8)).toBeNull();
+  });
+});

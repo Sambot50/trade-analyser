@@ -39,11 +39,80 @@ export function mesurer(bougies, { fenetre = FENETRE, seuil = SEUIL_COMPRESSION,
 /** Ce que le hasard donne dans les mêmes conditions, sur plusieurs graines. */
 export function temoin(options, { graines = 12, minutes = 40_000, sigma = 0.4 } = {}) {
   const tout = [];
+  const parGraine = [];
   for (let g = 1; g <= graines; g++) {
     const m = mesurer(serieAleatoire({ graine: g, minutes, sigma }), options);
     tout.push(...m.issues);
+    parGraine.push(m.stats);
   }
-  return { issues: tout, stats: statistiques(tout) };
+  return { issues: tout, stats: statistiques(tout), parGraine };
+}
+
+/**
+ * De combien l'erreur type annoncée est-elle fausse ?
+ *
+ * La formule usuelle √(p(1−p)/n) suppose les observations INDÉPENDANTES. Ici
+ * elles ne le sont pas : avec une fenêtre de 20 bougies et un horizon de 20,
+ * deux ranges voisins partagent presque toutes leurs bougies, et un même
+ * mouvement de marché pousse toute une grappe d'issues dans le même sens. La
+ * formule croit compter mille observations là où il y en a peut-être cent.
+ *
+ * On ne SUPPOSE donc pas le facteur — on le mesure. Des échantillons qu'on
+ * sait indépendants (des blocs de temps disjoints, ou des graines distinctes)
+ * donnent une dispersion observée ; son rapport à la dispersion annoncée est
+ * le facteur de correction.
+ *
+ * Ce dépôt l'a déjà fait une fois, sur une autre règle, et a trouvé 3,8
+ * (DEC-032). Rien ne dit que ce soit le même ici.
+ */
+export function facteurDeDispersion(groupes) {
+  const utiles = groupes.filter((g) => g && g.tranches > 0 && g.tauxContinuation !== null);
+  if (utiles.length < 3) return null;
+
+  const taux = utiles.map((g) => g.tauxContinuation);
+  const moyenne = taux.reduce((a, b) => a + b, 0) / taux.length;
+  const variance = taux.reduce((s, t) => s + (t - moyenne) ** 2, 0) / (taux.length - 1);
+  const seObservee = Math.sqrt(variance / taux.length);
+
+  // L'erreur type que la formule annoncerait sur l'ensemble mis bout à bout.
+  const total = utiles.reduce((s, g) => s + g.tranches, 0);
+  const succes = utiles.reduce((s, g) => s + g.continuation, 0);
+  const p = succes / total;
+  const seAnnoncee = Math.sqrt((p * (1 - p)) / total);
+
+  return {
+    groupes: utiles.length,
+    total,
+    taux: moyenne,
+    tauxGroupe: taux,
+    seObservee,
+    seAnnoncee,
+    facteur: seAnnoncee > 0 ? seObservee / seAnnoncee : null,
+  };
+}
+
+/**
+ * Découpe la série en blocs de temps DISJOINTS, et mesure chacun seul.
+ *
+ * Disjoints et contigus : c'est ce qui les rend à peu près indépendants. Des
+ * blocs qui se chevaucheraient reproduiraient le défaut qu'on cherche à
+ * mesurer, et le facteur trouvé serait de un par construction.
+ *
+ * Un range à cheval sur deux blocs est perdu — la détection repart de zéro à
+ * chaque bloc. C'est le prix de l'indépendance, et il est faible : avec huit
+ * blocs on perd au plus sept ranges.
+ */
+export function parBlocs(bougies, options, nombre = 8) {
+  const taille = Math.floor(bougies.length / nombre);
+  if (taille < 100) return null;
+
+  const blocs = [];
+  for (let k = 0; k < nombre; k++) {
+    const debut = k * taille;
+    const fin = k === nombre - 1 ? bougies.length : debut + taille;
+    blocs.push(mesurer(bougies.slice(debut, fin), options).stats);
+  }
+  return { blocs, dispersion: facteurDeDispersion(blocs) };
 }
 
 export function rendre(nom, s, n) {
@@ -68,18 +137,56 @@ async function principal() {
   console.log('série                 tranchés   continuation   intervalle à 95 %');
   console.log('─'.repeat(78));
 
+  let reel = null;
+  let bougies = null;
   if (args.csv) {
     const unite = args.ut ?? '15m';
     const { bougies: brutes } = analyserCsv(await readFile(args.csv, 'utf8'), {
       unite: args.utCsv ?? unite, decalageHeures: Number(args.decalageHeures ?? 0),
     });
-    const bougies = args.utCsv && args.utCsv !== unite ? agreger(brutes, unite) : brutes;
-    const m = mesurer(bougies, options);
-    console.log(rendre(`réel (${unite})`, m.stats, m.ranges));
+    bougies = args.utCsv && args.utCsv !== unite ? agreger(brutes, unite) : brutes;
+    reel = mesurer(bougies, options);
+    console.log(rendre(`réel (${unite})`, reel.stats, reel.ranges));
   }
 
   const t = temoin(options, { graines: Number(args.graines ?? 12) });
   console.log(rendre('marche aléatoire', t.stats));
+
+  const nBlocs = Number(args.blocs ?? 0);
+  if (nBlocs >= 3) {
+    console.log('\n' + '═'.repeat(78));
+    console.log(`L'ERREUR TYPE EST-ELLE CELLE QU'ON CROIT ? — ${nBlocs} blocs disjoints\n`);
+    console.log('échantillon           groupes   taux      é.t. annoncée   é.t. observée   facteur');
+    console.log('─'.repeat(78));
+
+    const lignes = [];
+    if (bougies) {
+      const b = parBlocs(bougies, options, nBlocs);
+      if (b?.dispersion) lignes.push(['réel, par blocs', b.dispersion, b.blocs]);
+      else console.log('réel : série trop courte pour être découpée en blocs utilisables.');
+    }
+    const d = facteurDeDispersion(t.parGraine);
+    if (d) lignes.push(['témoin, par graines', d, t.parGraine]);
+
+    for (const [nom, x] of lignes) {
+      console.log(`${nom.padEnd(22)}${String(x.groupes).padStart(7)}`
+        + `${(100 * x.taux).toFixed(1).padStart(8)} %`
+        + `${(100 * x.seAnnoncee).toFixed(2).padStart(14)} pts`
+        + `${(100 * x.seObservee).toFixed(2).padStart(14)} pts`
+        + `${x.facteur === null ? '—' : '×' + x.facteur.toFixed(2)}`.padStart(10));
+    }
+    for (const [nom, x] of lignes) {
+      console.log(`\n  ${nom} : ${x.tauxGroupe.map((v) => (100 * v).toFixed(1)).join(' · ')}`);
+    }
+
+    console.log('\nUn facteur proche de 1 dirait que la formule a raison et que les');
+    console.log('observations sont bien indépendantes. Au-delà, elle compte des');
+    console.log('observations qui n’en sont pas, et tout écart jugé significatif avec');
+    console.log('elle doit être relu en divisant son z par ce facteur.');
+    console.log('\nAvec huit groupes, le facteur lui-même est imprécis : il repose sur une');
+    console.log('variance estimée sur sept degrés de liberté. Le lire comme un ordre de');
+    console.log('grandeur, pas comme une décimale.');
+  }
 
   console.log('');
   console.log('Un taux de continuation ne dit rien seul : une marche sans structure');
