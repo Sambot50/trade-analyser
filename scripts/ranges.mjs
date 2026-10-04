@@ -36,16 +36,34 @@ export function mesurer(bougies, { fenetre = FENETRE, seuil = SEUIL_COMPRESSION,
   return { bougies: bougies.length, ranges: ranges.length, sortis: sortis.length, issues, stats: statistiques(issues) };
 }
 
-/** Ce que le hasard donne dans les mêmes conditions, sur plusieurs graines. */
-export function temoin(options, { graines = 12, minutes = 40_000, sigma = 0.4 } = {}) {
+/**
+ * Ce que le hasard donne DANS LES MÊMES CONDITIONS, sur plusieurs graines.
+ *
+ * « Les mêmes conditions » inclut l'unité de temps, et ce n'était pas le cas
+ * au départ. Le générateur produit des bougies d'une MINUTE ; les données
+ * réelles étaient en quinze. Le taux de continuation dépend de cette unité —
+ * mesuré, 36,7 % en une minute contre 28,3 % en quinze, sur le même hasard.
+ *
+ * La conséquence a été spectaculaire et instructive. Contre le témoin d'une
+ * minute, le réel ressortait à −4,70 points, z = −1,99, p = 0,023. Contre le
+ * témoin de quinze minutes, il ressort à +3,70 points, z = +1,89, p = 0,029.
+ * Le SIGNE s'inverse, et les deux paraissent significatifs.
+ *
+ * Un témoin mal construit ne rend pas un résultat faible : il en fabrique un
+ * faux, aussi convaincant que le vrai. L'agrégation est donc faite ici, et
+ * l'unité est rendue avec le résultat pour qu'un désaccord se voie.
+ */
+export function temoin(options, { graines = 12, minutes = 220_000, sigma = 0.4, unite = null } = {}) {
   const tout = [];
   const parGraine = [];
   for (let g = 1; g <= graines; g++) {
-    const m = mesurer(serieAleatoire({ graine: g, minutes, sigma }), options);
+    const brut = serieAleatoire({ graine: g, minutes, sigma });
+    const bougies = unite && unite !== '1m' ? agreger(brut, unite) : brut;
+    const m = mesurer(bougies, options);
     tout.push(...m.issues);
     parGraine.push(m.stats);
   }
-  return { issues: tout, stats: statistiques(tout), parGraine };
+  return { issues: tout, stats: statistiques(tout), parGraine, unite: unite ?? '1m' };
 }
 
 /**
@@ -137,10 +155,13 @@ async function principal() {
   console.log('série                 tranchés   continuation   intervalle à 95 %');
   console.log('─'.repeat(78));
 
+  // L'unité gouverne LES DEUX séries. La fixer une seule fois, au même
+  // endroit, est ce qui empêche le témoin de dériver loin du réel.
+  const unite = args.ut ?? '15m';
+
   let reel = null;
   let bougies = null;
   if (args.csv) {
-    const unite = args.ut ?? '15m';
     const { bougies: brutes } = analyserCsv(await readFile(args.csv, 'utf8'), {
       unite: args.utCsv ?? unite, decalageHeures: Number(args.decalageHeures ?? 0),
     });
@@ -149,8 +170,12 @@ async function principal() {
     console.log(rendre(`réel (${unite})`, reel.stats, reel.ranges));
   }
 
-  const t = temoin(options, { graines: Number(args.graines ?? 12) });
-  console.log(rendre('marche aléatoire', t.stats));
+  const t = temoin(options, { graines: Number(args.graines ?? 12), unite });
+  console.log(rendre(`marche aléatoire (${t.unite})`, t.stats));
+  if (t.unite !== unite) {
+    console.log(`\nATTENTION : le témoin est en ${t.unite} et le réel en ${unite}.`);
+    console.log('Le taux dépend de l’unité — les comparer n’a aucun sens.');
+  }
 
   const nBlocs = Number(args.blocs ?? 0);
   if (nBlocs >= 3) {

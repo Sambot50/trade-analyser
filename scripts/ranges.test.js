@@ -134,3 +134,25 @@ describe('parBlocs', () => {
     expect(parBlocs(bougies.slice(0, 200), {}, 8)).toBeNull();
   });
 });
+
+describe('le témoin doit avoir LA MÊME unité que le réel', () => {
+  it('rend un taux DIFFÉRENT selon l’unité des bougies', () => {
+    // Le défaut qui a inversé le signe du premier résultat. Le générateur
+    // produit des bougies d'une minute ; les données réelles étaient en
+    // quinze. Comparer les deux donnait −4,70 points, z = −1,99, p = 0,023 ;
+    // l'unité corrigée donne +3,70 points, z = +1,89, p = 0,029.
+    //
+    // Un témoin mal construit ne rend pas un résultat faible : il en fabrique
+    // un faux, aussi convaincant que le vrai.
+    const court = temoin({}, { graines: 4, minutes: 60_000 });
+    const long = temoin({}, { graines: 4, minutes: 60_000, unite: '15m' });
+    expect(court.unite).toBe('1m');
+    expect(long.unite).toBe('15m');
+    expect(long.stats.tranches).toBeLessThan(court.stats.tranches);
+    expect(long.stats.tauxContinuation).not.toBeCloseTo(court.stats.tauxContinuation, 2);
+  });
+
+  it('rend l’unité AVEC le résultat, pour qu’un désaccord se voie', () => {
+    expect(temoin({}, { graines: 3, minutes: 40_000, unite: '1h' }).unite).toBe('1h');
+  });
+});
