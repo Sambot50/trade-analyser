@@ -61,7 +61,7 @@ describe('rendre', () => {
 
 // ── Vérifier l'instrument avant de lui faire confiance ──────────────────────
 
-import { facteurDeDispersion, parBlocs } from './ranges.mjs';
+import { facteurDeDispersion, parBlocs, balayage, ecart } from './ranges.mjs';
 
 /** Un générateur reproductible, pour que l'assertion ne dépende pas du hasard. */
 function groupesIndependants({ k, n, p, graine = 12345 }) {
@@ -154,5 +154,33 @@ describe('le témoin doit avoir LA MÊME unité que le réel', () => {
 
   it('rend l’unité AVEC le résultat, pour qu’un désaccord se voie', () => {
     expect(temoin({}, { graines: 3, minutes: 40_000, unite: '1h' }).unite).toBe('1h');
+  });
+});
+
+describe('balayage et ecart', () => {
+  it('rend TOUS les seuils, jamais le meilleur', () => {
+    // Retenir le meilleur de six seuils, c'est choisir parmi six tirages : le
+    // meilleur paraîtra significatif par arithmétique, même sur des données
+    // sans structure. DEC-025 a vu ainsi un effet de 21,8 points s'évaporer
+    // à −0,2 sur des données fraîches.
+    const r = balayage(null, {}, { seuils: [0.7, 0.5], graines: 2, unite: '15m' });
+    expect(r).toHaveLength(2);
+    expect(r.map((x) => x.seuil)).toEqual([0.7, 0.5]);
+    expect(r.every((x) => x.temoin)).toBe(true);
+  });
+
+  it('serre le compte de ranges quand le seuil baisse', () => {
+    const r = balayage(null, {}, { seuils: [0.8, 0.3], graines: 3, unite: '15m' });
+    expect(r[1].temoin.tranches).toBeLessThan(r[0].temoin.tranches);
+  });
+
+  it('calcule l’écart et son z, ou refuse', () => {
+    const a = { tranches: 1260, continuation: 403, tauxContinuation: 403 / 1260 };
+    const b = { tranches: 974, continuation: 276, tauxContinuation: 276 / 974 };
+    const e = ecart(a, b);
+    expect(e.points).toBeCloseTo(3.65, 1);
+    expect(e.z).toBeCloseTo(1.89, 1);
+    expect(ecart(a, { tranches: 0, tauxContinuation: null })).toBeNull();
+    expect(ecart(null, b)).toBeNull();
   });
 });

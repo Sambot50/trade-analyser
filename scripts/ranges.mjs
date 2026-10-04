@@ -141,6 +141,43 @@ export function rendre(nom, s, n) {
     + (n !== undefined ? `   ${n} ranges` : '');
 }
 
+/**
+ * Le même test à plusieurs seuils de compression, tous rendus.
+ *
+ * ┌───────────────────────────────────────────────────────────────────────┐
+ * │ LA LIGNE LA PLUS BASSE N'EST PAS UN RÉSULTAT.                         │
+ * │                                                                       │
+ * │ Essayer six seuils et retenir celui dont le `p` est le plus petit,    │
+ * │ c'est choisir parmi six tirages — et le meilleur de six paraîtra      │
+ * │ significatif par arithmétique, sur des données sans aucune structure. │
+ * │ Ce dépôt l'a déjà fait : DEC-025 a vu un effet de 21,8 points         │
+ * │ s'évaporer à −0,2 sur des données fraîches, parce qu'il était la      │
+ * │ meilleure de vingt-cinq variables.                                    │
+ * │                                                                       │
+ * │ Ce balayage sert à voir si l'écart est STABLE quand on resserre, pas  │
+ * │ à trouver où il est le plus grand. Un écart qui n'existe qu'à un      │
+ * │ seuil est un accident ; un écart qui tient sur toute la plage mérite  │
+ * │ d'être gelé et éprouvé sur des données jamais regardées.              │
+ * └───────────────────────────────────────────────────────────────────────┘
+ */
+export function balayage(bougies, options, { seuils, graines = 12, unite }) {
+  return seuils.map((seuil) => {
+    const o = { ...options, seuil };
+    const r = bougies ? mesurer(bougies, o) : null;
+    const t = temoin(o, { graines, unite });
+    return { seuil, reel: r?.stats ?? null, ranges: r?.ranges ?? null, temoin: t.stats };
+  });
+}
+
+/** L'écart entre deux taux, et ce qu'il vaut. Null si l'un des deux manque. */
+export function ecart(a, b) {
+  if (!a?.tranches || !b?.tranches || a.tauxContinuation === null || b.tauxContinuation === null) return null;
+  const p = (a.continuation + b.continuation) / (a.tranches + b.tranches);
+  const se = Math.sqrt(p * (1 - p) * (1 / a.tranches + 1 / b.tranches));
+  const z = se > 0 ? (a.tauxContinuation - b.tauxContinuation) / se : null;
+  return { points: (a.tauxContinuation - b.tauxContinuation) * 100, z };
+}
+
 async function principal() {
   const args = parseArgs(process.argv.slice(2));
   const options = {
@@ -211,6 +248,33 @@ async function principal() {
     console.log('\nAvec huit groupes, le facteur lui-même est imprécis : il repose sur une');
     console.log('variance estimée sur sept degrés de liberté. Le lire comme un ordre de');
     console.log('grandeur, pas comme une décimale.');
+  }
+
+  if (args.balayage) {
+    const seuils = String(args.balayage).includes(',')
+      ? String(args.balayage).split(',').map(Number)
+      : [0.70, 0.60, 0.50, 0.40, 0.30, 0.25];
+    console.log('\n' + '═'.repeat(78));
+    console.log('L’ÉCART TIENT-IL QUAND ON RESSERRE ?\n');
+    console.log('seuil    ranges   tranchés    réel    témoin     écart        z');
+    console.log('─'.repeat(78));
+    for (const r of balayage(bougies, options, { seuils, graines: Number(args.graines ?? 12), unite })) {
+      const e = ecart(r.reel, r.temoin);
+      console.log(`${r.seuil.toFixed(2).padStart(5)}`
+        + `${String(r.ranges ?? '—').padStart(10)}`
+        + `${String(r.reel?.tranches ?? '—').padStart(11)}`
+        + `${(r.reel?.tauxContinuation === null || !r.reel ? '—' : (100 * r.reel.tauxContinuation).toFixed(1) + ' %').padStart(9)}`
+        + `${(r.temoin.tauxContinuation === null ? '—' : (100 * r.temoin.tauxContinuation).toFixed(1) + ' %').padStart(10)}`
+        + `${(e ? (e.points >= 0 ? '+' : '') + e.points.toFixed(2) : '—').padStart(10)}`
+        + `${(e?.z === null || !e ? '—' : e.z.toFixed(2)).padStart(9)}`);
+    }
+    console.log('\nLA LIGNE AU PLUS GRAND z N’EST PAS UN RÉSULTAT. Retenir le meilleur de');
+    console.log('six seuils, c’est choisir parmi six tirages : le meilleur paraîtra');
+    console.log('significatif par arithmétique, même sur des données sans structure.');
+    console.log('DEC-025 a vu ainsi un effet de 21,8 points s’évaporer à −0,2.');
+    console.log('\nCe qu’on regarde ici est la STABILITÉ. Un écart qui n’existe qu’à un');
+    console.log('seuil est un accident. Un écart qui tient sur toute la plage mérite');
+    console.log('d’être gelé, puis éprouvé sur des données jamais regardées.');
   }
 
   console.log('');
