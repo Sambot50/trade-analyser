@@ -22,6 +22,7 @@ import { pathToFileURL } from 'node:url';
 
 import { analyser as analyserCsv, agreger } from '../src/lib/marche/csv.js';
 import { serieAleatoire } from '../src/lib/marche/aleatoire.js';
+import { tirages } from '../src/lib/marche/bootstrap.js';
 import { detecterRanges, issueDeLaSortie, statistiques, FENETRE, SEUIL_COMPRESSION } from '../src/lib/marche/range.js';
 import { intervalleWilson } from '../src/lib/marche/statistiques.js';
 import { parseArgs } from './backtest.mjs';
@@ -64,6 +65,30 @@ export function temoin(options, { graines = 12, minutes = 220_000, sigma = 0.4, 
     parGraine.push(m.stats);
   }
   return { issues: tout, stats: statistiques(tout), parGraine, unite: unite ?? '1m' };
+}
+
+/**
+ * Le témoin bâti à partir des données elles-mêmes.
+ *
+ * Préféré à la marche aléatoire dès qu'un CSV est fourni, et pour une raison
+ * mesurée : au même seuil, le GC réel contenait sept fois plus de ranges que
+ * la marche. Un marché alterne des périodes calmes et agitées, une marche à
+ * sigma fixe non — les ranges comparés n'étaient donc pas les mêmes objets.
+ *
+ * Le rééchantillonnage par blocs garde la forme des bougies et le regroupement
+ * de volatilité, et détruit la dépendance au-delà d'un bloc. Si l'effet
+ * survit à ce témoin-là, il ne vient ni de la volatilité ni de la forme des
+ * bougies : il vient de l'ordre dans lequel elles arrivent.
+ */
+export function temoinParBlocs(bougies, options, { tirages: n = 12, longueurBloc = 24 } = {}) {
+  const tout = [];
+  const parTirage = [];
+  for (const serie of tirages(bougies, { nombre: n, longueurBloc })) {
+    const m = mesurer(serie, options);
+    tout.push(...m.issues);
+    parTirage.push(m.stats);
+  }
+  return { issues: tout, stats: statistiques(tout), parTirage, longueurBloc };
 }
 
 /**
@@ -209,6 +234,15 @@ async function principal() {
 
   const t = temoin(options, { graines: Number(args.graines ?? 12), unite });
   console.log(rendre(`marche aléatoire (${t.unite})`, t.stats));
+
+  // Le témoin par blocs est le seul qui partage la volatilité du réel. Il
+  // n'existe que s'il y a un réel dont le tirer.
+  let tb = null;
+  if (bougies) {
+    const longueurBloc = Number(args.bloc ?? 24);
+    tb = temoinParBlocs(bougies, options, { tirages: Number(args.tirages ?? 12), longueurBloc });
+    console.log(rendre(`rééchantillonné (blocs de ${longueurBloc})`, tb.stats));
+  }
   if (t.unite !== unite) {
     console.log(`\nATTENTION : le témoin est en ${t.unite} et le réel en ${unite}.`);
     console.log('Le taux dépend de l’unité — les comparer n’a aucun sens.');
@@ -228,7 +262,11 @@ async function principal() {
       else console.log('réel : série trop courte pour être découpée en blocs utilisables.');
     }
     const d = facteurDeDispersion(t.parGraine);
-    if (d) lignes.push(['témoin, par graines', d, t.parGraine]);
+    if (d) lignes.push(['marche, par graines', d, t.parGraine]);
+    if (tb) {
+      const db = facteurDeDispersion(tb.parTirage);
+      if (db) lignes.push(['blocs, par tirages', db, tb.parTirage]);
+    }
 
     for (const [nom, x] of lignes) {
       console.log(`${nom.padEnd(22)}${String(x.groupes).padStart(7)}`

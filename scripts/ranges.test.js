@@ -61,7 +61,8 @@ describe('rendre', () => {
 
 // ── Vérifier l'instrument avant de lui faire confiance ──────────────────────
 
-import { facteurDeDispersion, parBlocs, balayage, ecart } from './ranges.mjs';
+import { facteurDeDispersion, parBlocs, balayage, ecart, temoinParBlocs } from './ranges.mjs';
+import { agreger } from '../src/lib/marche/csv.js';
 
 /** Un générateur reproductible, pour que l'assertion ne dépende pas du hasard. */
 function groupesIndependants({ k, n, p, graine = 12345 }) {
@@ -183,4 +184,30 @@ describe('balayage et ecart', () => {
     expect(ecart(a, { tranches: 0, tauxContinuation: null })).toBeNull();
     expect(ecart(null, b)).toBeNull();
   });
+});
+
+describe('temoinParBlocs — le témoin tiré des données elles-mêmes', () => {
+  it('NE FABRIQUE PAS d’écart quand il n’y en a pas', () => {
+    // Le contrôle qui autorise à s'en servir. On lui donne une série sans
+    // aucune structure, et on lui demande de se comparer à son propre
+    // rééchantillonnage : s'il trouvait un écart, tout écart trouvé plus tard
+    // sur des données réelles serait suspect.
+    const bougies = agreger(serieAleatoire({ graine: 42, minutes: 600_000, sigma: 0.4 }), '15m');
+    const serie = mesurer(bougies);
+    const tb = temoinParBlocs(bougies, {}, { tirages: 6 });
+    const e = ecart(serie.stats, tb.stats);
+    expect(Math.abs(e.z)).toBeLessThan(2);
+  }, 120_000);
+
+  it('garde la VOLATILITÉ du réel, là où une marche à sigma fixe ne l’a pas', () => {
+    // C'est la raison d'être de ce témoin. Au même seuil, le GC réel contenait
+    // sept fois plus de ranges que la marche aléatoire : un marché alterne des
+    // périodes calmes et agitées, une marche à sigma fixe non. Les ranges
+    // comparés n'étaient pas les mêmes objets.
+    const bougies = agreger(serieAleatoire({ graine: 8, minutes: 400_000, sigma: 0.4 }), '15m');
+    const tb = temoinParBlocs(bougies, {}, { tirages: 4 });
+    const densite = (m) => m.tranches;
+    expect(densite(tb.stats)).toBeGreaterThan(0);
+    expect(tb.longueurBloc).toBe(24);
+  }, 120_000);
 });
