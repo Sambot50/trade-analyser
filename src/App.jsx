@@ -16,7 +16,7 @@ import { enregistrerAnalyse, enregistrerMesure, dossierMemorise, resoudreEnAtten
 import FileDAttente from './FileDAttente.jsx';
 import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines, rrVerdict, breakEvenRate, FRICTION_PAR_DEFAUT } from './lib/analysis.js';
 import { lireGraphique } from './lib/vision/lecture.js';
-import { pixelsDepuisDataUrl, enCanvas } from './lib/vision/navigateur.js';
+import { pixelsDepuisDataUrl, enCanvas, enDataUrl } from './lib/vision/navigateur.js';
 import { rectanglesDesTrouvailles, etiquetteDuRectangle } from './lib/vision/trace.js';
 import { confronter, ECART_PREOCCUPANT } from './lib/vision/confrontation.js';
 
@@ -333,6 +333,7 @@ export default function App() {
         facteur: 4,
         cheminLangue: '/tesseract',
         enImage: enCanvas,
+        enApercu: enDataUrl,
         echelleManuelle,
       });
       setLecture(r);
@@ -1077,6 +1078,30 @@ function LectureCard({ lecture }) {
           <p className="text-[11px] text-slate-600 font-mono">
             lu sur l’axe : {lecture.etiquettes.map((e) => e.texte).join(' · ')}
           </p>
+        )}
+
+        {/* La bande EXACTE envoyée au moteur. « Aucune graduation lue » ne dit
+            pas laquelle des trois pannes on a — une bande découpée au mauvais
+            endroit, une bande trop petite, ou un moteur qui échoue sur une
+            bande correcte — et les trois demandent des gestes opposés. */}
+        {lecture.apercu?.image && (
+          <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-3">
+            <p className="text-[11px] text-slate-400">
+              Ce que l’application a découpé et envoyé au moteur
+              <span className="text-slate-600 font-mono">
+                {' '}· {lecture.bande?.x1 - lecture.bande?.x0}×{lecture.bande?.y1 - lecture.bande?.y0} px,
+                agrandi ×{lecture.apercu.facteur}
+              </span>
+            </p>
+            <div className="max-h-64 overflow-auto bg-white rounded-lg border border-slate-700">
+              <img src={lecture.apercu.image} alt="bande d’axe découpée" className="w-full" />
+            </div>
+            <p className="text-[11px] text-slate-600 leading-relaxed">
+              Si les chiffres n’y sont pas, c’est le découpage. S’ils y sont mais sont flous
+              ou minuscules, c’est la résolution — agrandis la capture. S’ils y sont nets,
+              c’est le moteur, et c’est à moi de le corriger.
+            </p>
+          </div>
         )}
       </div>
     );

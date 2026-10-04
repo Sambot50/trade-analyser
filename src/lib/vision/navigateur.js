@@ -42,3 +42,16 @@ export function enCanvas({ données, largeur, hauteur }) {
   ctx.putImageData(new ImageData(new Uint8ClampedArray(données), largeur, hauteur), 0, 0);
   return canvas;
 }
+
+/**
+ * La même image, mais affichable dans un `<img>`.
+ *
+ * `enCanvas` sert au moteur de lecture, qui accepte un canvas. L'écran, lui,
+ * veut une URL. Les deux viennent du même pixel : c'est ce qui garantit que
+ * l'image montrée est bien celle qui a été lue, et non une reconstruction qui
+ * pourrait différer sans qu'on le sache.
+ */
+export async function enDataUrl(img) {
+  const canvas = await enCanvas(img);
+  return canvas?.toDataURL ? canvas.toDataURL('image/png') : null;
+}

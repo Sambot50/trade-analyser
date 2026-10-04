@@ -209,3 +209,64 @@ describe('ce qui n’est pas une échelle est ignoré', () => {
     expect(r.probleme).toMatch(/haut au-dessus du bas/);
   });
 });
+
+describe('montrer la bande qu’on a lue', () => {
+  // « Aucune graduation lue » ne dit pas laquelle des trois pannes on a : une
+  // bande découpée au mauvais endroit, une bande trop petite pour être lue, ou
+  // un moteur qui échoue sur une bande correcte. Les trois demandent des
+  // gestes opposés, et sans voir la bande on les distingue par allers-retours.
+  const { données, largeur, hauteur } = rendre(serie(40));
+
+  it('rend l’aperçu ET les bornes quand l’axe ne se lit pas', async () => {
+    const r = await lireGraphique(données, largeur, hauteur, {
+      etiquettes: [],
+      enApercu: async (prete) => `data:image/png;base64,FAUX-${prete.largeur}x${prete.hauteur}`,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.etape).toBe('echelle');
+    expect(r.apercu.image).toMatch(/^data:image\/png/);
+    expect(r.apercu.facteur).toBeGreaterThan(0);
+    expect(r.bande.x1).toBeGreaterThan(r.bande.x0);
+    expect(r.bande.y1).toBeGreaterThan(r.bande.y0);
+  });
+
+  it('montre la bande EXACTE envoyée au moteur, pas une reconstruction', async () => {
+    // Si l'aperçu venait d'un autre calcul, il pourrait différer de ce qui a
+    // été lu sans que personne ne le sache — et le diagnostic porterait sur
+    // une image qui n'a jamais servi.
+    const vues = [];
+    await lireGraphique(données, largeur, hauteur, {
+      etiquettes: [],
+      enApercu: async (p) => { vues.push(`${p.largeur}x${p.hauteur}`); return 'data:image/png;base64,X'; },
+    });
+    const r2 = await lireGraphique(données, largeur, hauteur, {
+      etiquettes: [],
+      enApercu: async (p) => { vues.push(`${p.largeur}x${p.hauteur}`); return 'data:image/png;base64,X'; },
+    });
+    expect(r2.ok).toBe(false);
+    expect(new Set(vues).size).toBe(1);
+  });
+
+  it('n’empêche PAS la lecture quand l’aperçu échoue', async () => {
+    // Il n'existe que pour expliquer un échec. Qu'il en provoque un serait
+    // absurde.
+    const r = await lireGraphique(données, largeur, hauteur, {
+      etiquettes: [],
+      enApercu: async () => { throw new Error('canvas indisponible'); },
+    });
+    expect(r.etape).toBe('echelle');
+    expect(r.apercu).toBeNull();
+  });
+
+  it('ne fabrique pas d’aperçu quand l’échelle est saisie à la main', async () => {
+    // Aucune bande n'est envoyée au moteur dans ce cas : en montrer une
+    // laisserait croire qu'elle a servi.
+    const vues = [];
+    const r = await lireGraphique(données, largeur, hauteur, {
+      echelleManuelle: { prixHaut: 4500, prixBas: 4300 },
+      enApercu: async () => { vues.push(1); return 'x'; },
+    });
+    expect(r.ok).toBe(true);
+    expect(vues).toHaveLength(0);
+  });
+});

@@ -10,7 +10,7 @@
 
 import { detecterPalette, bougiesDepuisImage } from './extraction.js';
 import { zoneTrace, reperesDepuisEtiquettes } from './axe.js';
-import { lireBande } from './ocr.js';
+import { lireBande, preparerBande } from './ocr.js';
 import { lireTitre } from './titre.js';
 import { pivots, cassures } from '../marche/structure.js';
 import { detecterEnDetail } from '../marche/orderblocks.js';
@@ -106,17 +106,37 @@ export async function lireGraphique(données, largeur, hauteur, options = {}) {
     lu = { convention: 'manuelle', reperes: [{ prix: prixHaut, y: zone.y0 }, { prix: prixBas, y: zone.y1 }],
       echelle: { a, b, n: 2, pireEcart: 0, prixDeY: (y) => a * y + b, yDePrix: (prix) => (prix - b) / a } };
   } else {
+    const bande = { x0: zone.axeX0, x1: zone.axeX1, y0: zone.y0, y1: zone.y1 };
+
+    // L'image EXACTE qu'on envoie au moteur, gardée pour pouvoir la montrer.
+    //
+    // Quand la lecture d'axe échoue, « aucune graduation lue » ne dit pas
+    // laquelle des trois pannes on a : une bande découpée au mauvais endroit,
+    // une bande trop petite pour être lue, ou un moteur qui échoue sur une
+    // bande pourtant correcte. Les trois demandent des gestes opposés, et sans
+    // la voir on les distingue par allers-retours successifs. On en a fait
+    // quatre sur cette seule question.
+    let apercu = null;
+    try {
+      const prete = preparerBande(données, largeur, hauteur, bande, {
+        facteur: reste.facteur ?? 3, coteMax: reste.coteMax,
+      });
+      // `enApercu` et non `enImage` : le moteur accepte un canvas, l'écran
+      // veut une URL. Les deux viennent du MÊME pixel, ce qui garantit que
+      // l'image montrée est bien celle qui a été lue.
+      if (prete && reste.enApercu) apercu = { facteur: prete.facteur, largeur: prete.largeur, hauteur: prete.hauteur, image: await reste.enApercu(prete) };
+    } catch {
+      // Un aperçu qui échoue ne doit surtout pas empêcher la lecture : il
+      // n'existe que pour expliquer un échec, pas pour en provoquer un.
+    }
+
     let lues = null;
     try {
-      lues = etiquettes ?? await lireBande(
-        données, largeur, hauteur,
-        { x0: zone.axeX0, x1: zone.axeX1, y0: zone.y0, y1: zone.y1 },
-        reste,
-      );
+      lues = etiquettes ?? await lireBande(données, largeur, hauteur, bande, reste);
     } catch (err) {
       // Un moteur qui n'aboutit pas ne doit pas laisser l'écran figé : on rend
       // l'échec avec sa raison, et la saisie manuelle reste ouverte.
-      return echec('echelle', `${err.message} Tu peux saisir les deux prix extrêmes de l’axe à la main.`, { palette, zone, etiquettes: [] });
+      return echec('echelle', `${err.message} Tu peux saisir les deux prix extrêmes de l’axe à la main.`, { palette, zone, etiquettes: [], bande, apercu });
     }
 
     if (!lues || lues.length < 3) {
@@ -129,12 +149,12 @@ export async function lireGraphique(données, largeur, hauteur, options = {}) {
           + 'à droite du graphique ? Une capture rognée sur le tracé seul ne contient aucune échelle.'
         : `Seulement ${lues.length} graduation${lues.length > 1 ? 's' : ''} lue${lues.length > 1 ? 's' : ''} sur l’axe, il en faut trois. `
           + 'Agrandis la capture, ou saisis les deux prix extrêmes à la main.';
-      return echec('echelle', message, { palette, zone, etiquettes: lues ?? [] });
+      return echec('echelle', message, { palette, zone, etiquettes: lues ?? [], bande, apercu });
     }
 
     lu = reperesDepuisEtiquettes(lues);
     if (!lu) {
-      return echec('echelle', 'Les graduations lues ne forment pas une droite : l’une est mal reconnue, ou l’axe est logarithmique.', { palette, zone, etiquettes: lues });
+      return echec('echelle', 'Les graduations lues ne forment pas une droite : l’une est mal reconnue, ou l’axe est logarithmique.', { palette, zone, etiquettes: lues, bande, apercu });
     }
   }
 
