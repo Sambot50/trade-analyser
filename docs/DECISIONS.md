@@ -2863,3 +2863,120 @@ sont inchangées.
 
 Les statistiques du journal (`report.js`) ne sont pas touchées : elles
 comptent des taux de réussite, jamais des R.
+
+### DEC-036 — Résultat, 2026-10-05
+
+**PASSE, d'un millième.** Rejeu exécuté une fois sur le Legion, `GC_2023_2024.csv`
+(SHA-256 `2b8f10ca18c6…`), `qwen3.8:27b`, 100 plans cohérents sur les 100
+premiers jours de la liste, **aucun rejet**.
+
+| | |
+|---|---|
+| Réel, moyenne sur 100 plans | **+0,110 R** |
+| Témoin, médiane des 1 000 tirages | −0,138 R [−0,501 … +0,289] |
+| **p** | **0,049** (48/1000) |
+| Sensibilité, ambigus gagnants | +0,144 R contre −0,130 R, p = 0,035 |
+
+Issues : 29 objectifs atteints, 55 stops, 13 jamais déclenchés, 2 horizons
+dépassés, 1 ambigu. Un objectif atteint vaut en moyenne 2,3 R : c'est ce qui
+rend un taux d'un tiers positif.
+
+**Le modèle a vendu 99 fois sur 100.** Il n'apporte donc aucune information de
+direction. Ce que le test crédite, ce sont ses niveaux, posés ce jour-là
+plutôt qu'un autre.
+
+#### Quatre réserves, écrites le même jour que le résultat
+
+1. **La marge est de l'ordre du bruit de calcul.** À 1 000 tirages, p porte
+   lui-même ±0,007. Une autre graine aurait pu rendre 0,055. Le verdict tient
+   parce que la graine était fixée d'avance, mais c'est le profil exact de
+   HYP-001 (p = 0,0486), dont l'effet a fondu à chaque mesure suivante.
+2. **Frais déduits, il ne reste presque rien.** À 0,08 R par trade (DEC-034),
+   +0,110 R brut fait environ +0,03 R net. Réel ou non, ce n'est pas un système
+   rentable en l'état.
+3. **Le témoin est toujours antérieur au plan.** Si la volatilité de l'or a
+   dérivé pendant la période, les deux bras ne voient pas tout à fait le même
+   marché. Le sens de ce biais est inconnu.
+4. **Ce n'est pas le sens qui est crédité**, puisqu'il est constant.
+
+#### Application de la règle
+
+p < 0,05 : la règle prévoyait de pré-enregistrer la confirmation en direct.
+Elle est **précédée d'une réplication en rejeu**, DEC-037 : même protocole,
+données jamais montrées au modèle, quelques heures au lieu de cinq mois. Le
+direct ne vient qu'ensuite, et seulement si elle tient. Ce choix ne modifie
+rien au résultat ci-dessus. Il ajoute une épreuve avant d'en tirer quoi que ce
+soit.
+
+---
+
+## DEC-037 — Pré-enregistrement : la réplication sur GC 2025-2026
+
+**2026-10-05 · Gelée avant tout appel au modèle sur ces données**
+
+### La question
+
+La même que DEC-036, sur une autre période : **les plans du modèle, posés à
+15 h 30 Paris, rapportent-ils plus que la même géométrie posée à 15 h 30
+d'autres jours ?**
+
+### Les données
+
+`GC_2025_2026.csv`, Databento `GLBX.MDP3`, `ohlcv-1m`, `GC.v.0`,
+2025-01-01 → 2026-08-31. Elles ont servi à HYP-001, une question sur le
+volume, **jamais au modèle**. Le modèle n'a vu aucun graphique de cette
+période.
+
+`GC_2020_2022.csv` reste en réserve, et 2017-2019 vierge (DEC-033).
+
+### Le protocole
+
+**Identique à DEC-036, réglage par réglage** : `rejouer.mjs` sans aucun
+changement de tirage, de graphique, de déguisement, de modèle ni d'invite (SHA-256
+`6bc70e39…`), la même graine 20261005 pour les jours et les facteurs. Seule
+différence : `--protocole DEC-037`, écrit dans `rejeu.json`.
+
+```
+node scripts/rejouer.mjs --csv GC_2025_2026.csv --symbole GC --sortie rejeu-gc-2025 --protocole DEC-037
+node scripts/temoin.mjs --journal rejeu-gc-2025 --symbole GC --csv GC_2025_2026.csv
+```
+
+**Le nombre de jours éligibles n'est pas connu d'avance.** La période fait
+20 mois contre 24 pour DEC-036, qui en avait 114. Il pourrait y en avoir
+moins de 100. Dans ce cas, la liste est épuisée et le témoin porte sur tous
+les plans obtenus, comme DEC-036 le prévoyait déjà. La puissance baisse d'autant,
+et le compte rendu le dit.
+
+### La lecture, seule chose qui change
+
+| | DEC-036 | DEC-037 |
+|---|---|---|
+| Tirages du témoin | 1 000 | **10 000** |
+| Bruit propre de p, autour de 0,05 | ±0,007 | ±0,002 |
+| Ventilation par trimestre | non | **oui, descriptive** |
+
+Les 10 000 tirages corrigent la réserve n°1 de DEC-036 : la marge ne doit plus
+tenir au bruit du calcul. La ventilation par trimestre répond à la réserve n°3
+sans rien décider : elle montre si l'écart réel − témoin se répartit sur la
+période ou tient à quelques mois.
+
+`temoin.mjs` lit le protocole dans `rejeu.json`, applique sa lecture sans
+option, vérifie que le fichier est bien celui du rejeu (SHA-256), et affiche
+la règle.
+
+### La règle de décision, écrite avant
+
+- **p < 0,05** : l'effet se réplique sur une période que le modèle n'a jamais
+  vue. Le direct est alors pré-enregistré : 15 h 30 Paris, captures
+  TradingView XAUUSD, bougies MT5 Vantage, frais réels comptés.
+- **p ≥ 0,05** : l'effet de DEC-036 ne se réplique pas. Il est classé comme
+  probable fluctuation, au même titre que HYP-001, et **on cesse de faire
+  trader ce modèle sur cette invite**. Pas de direct.
+- Dans les deux cas : sensibilité, répartition achat/vente, taux de rejet et
+  trimestres sont rapportés, jamais décisifs.
+
+### Ce qui est interdit
+
+Les mêmes interdits que DEC-036. Ni relance dans un autre dossier, ni autre
+graine, ni regroupement des deux rejeux en un seul test après coup. Un
+regroupement se pré-enregistre, et il ne l'est pas ici.

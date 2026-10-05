@@ -308,8 +308,13 @@ export function controlerParTemoinGroupes(groupes, reglages) {
     moyennes.push(moyenne(rs));
   }
 
+  // L'espérance du témoin, plan par plan : la moyenne sur TOUS ses instants
+  // candidats. Descriptive — elle sert à ventiler l'écart (par trimestre, par
+  // contrat), jamais au test, qui ne lit que `p`.
+  const temoinMoyen = retenus.map((e, k) => moyenne(e.candidats.map((i) => rendementA(k, i))));
+
   return {
-    retenus: retenus.map(sortie),
+    retenus: retenus.map((e, k) => ({ ...sortie(e), temoinMoyen: temoinMoyen[k] })),
     exclus,
     reel: reelMoyen,
     temoin: resumeDistribution(moyennes),

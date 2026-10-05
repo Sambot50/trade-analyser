@@ -50,6 +50,17 @@ export const GEL = Object.freeze({
   essaisParJour: 3,
 });
 
+/**
+ * Les protocoles qu'un rejeu peut servir. Le rejeu lui-même est identique de
+ * l'un à l'autre ; seul change le fichier, et donc la question. Le nom du
+ * protocole est écrit dans `rejeu.json` : c'est lui qui dit au témoin quels
+ * réglages de lecture appliquer.
+ *
+ *   DEC-036 — GC 2023-2024, l'épreuve.
+ *   DEC-037 — GC 2025-2026, la réplication, sur des jours jamais montrés.
+ */
+export const PROTOCOLES = Object.freeze(['DEC-036', 'DEC-037']);
+
 const empreinte = (texte) => createHash('sha256').update(texte).digest('hex');
 
 export function validerOptions(args) {
@@ -77,8 +88,11 @@ export function validerOptions(args) {
   }
   o.baseUrl = typeof args.baseUrl === 'string' ? args.baseUrl : undefined;
 
+  o.protocole = args.protocole ?? 'DEC-036';
+  if (!PROTOCOLES.includes(o.protocole)) erreurs.push(`--protocole "${o.protocole}" inconnu (${PROTOCOLES.join(', ')})`);
+
   for (const interdit of ['modele', 'graine', 'heure', 'nombre', 'bougies', 'ut', 'fuseau']) {
-    if (args[interdit] !== undefined) erreurs.push(`--${interdit} n’existe pas : ce réglage est figé par DEC-036.`);
+    if (args[interdit] !== undefined) erreurs.push(`--${interdit} n’existe pas : ce réglage est figé par DEC-036 et DEC-037.`);
   }
 
   return erreurs.length ? { erreurs } : o;
@@ -87,7 +101,7 @@ export function validerOptions(args) {
 /** Ce qui identifie un rejeu. Deux rejeux qui diffèrent ici ne se mélangent pas. */
 export function signature({ contenuCsv, o }) {
   return {
-    protocole: 'DEC-036',
+    protocole: o.protocole,
     fichier: basename(o.csv),
     sha256Fichier: empreinte(contenuCsv),
     sha256Invite: empreinte(ANALYSIS_PROMPT),
@@ -172,7 +186,7 @@ async function main() {
   const faits = new Set([...index.map((l) => l.id), ...rejets.map((l) => l.id)]);
   let plans = index.length;
 
-  console.log(`\nRejeu DEC-036 — ${basename(o.csv)} · ${sig.sha256Fichier.slice(0, 12)}…`);
+  console.log(`\nRejeu ${o.protocole} — ${basename(o.csv)} · ${sig.sha256Fichier.slice(0, 12)}…`);
   console.log(`  ${jours.length} jours éligibles tirés · ${plans} plans et ${rejets.length} rejets déjà faits · objectif ${GEL.nombre} plans`);
   console.log(`  modèle ${GEL.modele} · invite ${sig.sha256Invite.slice(0, 12)}… · ${GEL.heure} ${GEL.fuseau}\n`);
 
@@ -237,7 +251,7 @@ async function main() {
     console.log(`  Objectif atteint. Le témoin se lance UNE fois :`);
     console.log(`    node scripts/temoin.mjs --journal ${o.sortie} --symbole ${o.symbole} --csv ${o.csv}\n`);
   } else if (o.limite === undefined) {
-    console.log(`  ⚠  Liste épuisée avant ${GEL.nombre} plans : DEC-036 prévoit de tester ce qui a été obtenu, en le disant.\n`);
+    console.log(`  ⚠  Liste épuisée avant ${GEL.nombre} plans : ${o.protocole} prévoit de tester ce qui a été obtenu, en le disant.\n`);
   } else {
     console.log('  Arrêt sur --limite. Relance sans --limite pour continuer la même liste.\n');
   }

@@ -18,6 +18,7 @@
 // l'appel réseau n'a jamais pu être éprouvé depuis l'environnement d'écriture.
 // La source fichier est testée de bout en bout.
 
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -42,6 +43,51 @@ export const GEL = Object.freeze({
 });
 
 const JOUR = 86_400_000;
+
+/**
+ * Les lectures pré-enregistrées. Un journal produit par `rejouer.mjs` porte
+ * son protocole dans `rejeu.json` ; le témoin applique alors CELUI-LÀ, sans
+ * option pour en changer.
+ *
+ *   DEC-036 — 1 000 tirages : le réglage sous lequel le résultat a été lu.
+ *   DEC-037 — 10 000 tirages : à 1 000, p porte lui-même ±0,007 de bruit, de
+ *             la taille de la marge de DEC-036. Plus une ventilation par
+ *             trimestre, descriptive.
+ */
+export const LECTURES = Object.freeze({
+  'DEC-036': Object.freeze({ tirages: 1000, seuil: 0.05, trimestres: false }),
+  'DEC-037': Object.freeze({ tirages: 10_000, seuil: 0.05, trimestres: true }),
+});
+
+/** La lecture à appliquer à un journal, d'après sa signature de rejeu. */
+export function lectureDuJournal(signature) {
+  if (!signature) return null;
+  const lecture = LECTURES[signature.protocole];
+  if (!lecture) throw new Error(`Protocole inconnu dans rejeu.json : "${signature.protocole}".`);
+  return { protocole: signature.protocole, ...lecture };
+}
+
+/**
+ * L'écart réel − témoin, trimestre par trimestre. Descriptif seulement : il dit
+ * si l'écart se répartit sur la période ou tient à quelques mois — par exemple
+ * à un changement de volatilité que la fenêtre du témoin, toujours ANTÉRIEURE
+ * au plan, ne verrait pas de la même façon.
+ */
+export function parTrimestre(retenus) {
+  const groupes = new Map();
+  for (const e of retenus) {
+    const d = new Date(e.instantMs);
+    const cle = `${d.getUTCFullYear()}-T${Math.floor(d.getUTCMonth() / 3) + 1}`;
+    if (!groupes.has(cle)) groupes.set(cle, []);
+    groupes.get(cle).push(e);
+  }
+  const moyenne = (xs) => xs.reduce((a, x) => a + x, 0) / xs.length;
+  return [...groupes.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([trimestre, es]) => ({
+    trimestre, n: es.length,
+    reel: moyenne(es.map((e) => e.r)),
+    temoin: moyenne(es.map((e) => e.temoinMoyen)),
+  }));
+}
 
 const normaliserSymbole = (s) => String(s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
@@ -183,9 +229,26 @@ async function main() {
   const journal = plansDuJournal(texte, o.symbole);
   if (journal.erreur) { console.error(`\n${journal.erreur}\n`); process.exit(2); }
 
-  console.log(`\nTémoin — ${o.symbole}, règle de sortie ${journal.objectif}, réglages figés par DEC-035`);
+  // Un journal de rejeu dit sous quel protocole il doit être lu, et sur quel
+  // fichier exactement : un autre fichier jugerait des plans qu'il n'a pas vus
+  // naître.
+  let signature = null;
+  try { signature = JSON.parse(await readFile(join(o.journal, 'rejeu.json'), 'utf8')); } catch { /* journal ordinaire */ }
+  let lecture;
+  try { lecture = lectureDuJournal(signature); } catch (err) { console.error(`\n${err.message}\n`); process.exit(2); }
+  if (signature && o.csv) {
+    const sha = createHash('sha256').update(await readFile(o.csv, 'utf8')).digest('hex');
+    if (sha !== signature.sha256Fichier) {
+      console.error(`\nCe fichier n'est pas celui du rejeu (${signature.fichier}, ${signature.sha256Fichier.slice(0, 12)}…). Refusé.\n`);
+      process.exit(2);
+    }
+  }
+  const tirages = lecture?.tirages ?? GEL.tirages;
+
+  console.log(`\nTémoin — ${o.symbole}, règle de sortie ${journal.objectif}, ` +
+    (lecture ? `lecture pré-enregistrée ${lecture.protocole}` : 'réglages figés par DEC-035'));
   console.log(`  fenêtre ${GEL.fenetreJours} j avant chaque analyse · horizon ${GEL.horizonMinutes / 60} h · ` +
-    `remplissage ${GEL.remplissage} · ambigu ${GEL.ambigu} · ${GEL.tirages} tirages · graine ${GEL.graine}`);
+    `remplissage ${GEL.remplissage} · ambigu ${GEL.ambigu} · ${tirages} tirages · graine ${GEL.graine}`);
   console.log(`  ${journal.entrees.length} plan(s) pour ${o.symbole} · ${journal.ignorees.autresSymboles} d’autres instruments` +
     (journal.ignorees.illisibles ? ` · ⚠  ${journal.ignorees.illisibles} ligne(s) d’index illisible(s)` : ''));
 
@@ -200,7 +263,7 @@ async function main() {
   const reglages = {
     horizonBougies: Math.round((GEL.horizonMinutes * 60_000) / uniteMs),
     objectif: journal.objectif, remplissage: GEL.remplissage,
-    fenetreMs: GEL.fenetreJours * JOUR, tirages: GEL.tirages, graine: GEL.graine,
+    fenetreMs: GEL.fenetreJours * JOUR, tirages, graine: GEL.graine,
   };
   const { groupes, horsSerie } = grouperParContrat(bougies, journal.entrees);
   if (groupes.length > 1 || groupes[0]?.symbole) {
@@ -225,9 +288,22 @@ async function main() {
   console.log(`  p                                 ${res.p.p}   (${res.p.auMoinsAussiBons}/${res.p.tirages} tirages font au moins aussi bien ; plancher ${res.p.plancher})`);
   console.log(`  sensibilité, ambigus gagnants     réel ${r(sens.reel)} · médiane témoin ${r(sens.temoin.mediane)} · p ${sens.p.p}`);
 
-  console.log('\n  Ce chiffre ne décide rien tant que l’effectif et le seuil ne sont pas');
-  console.log('  pré-enregistrés (docs/ETAT.md, étape 2). Lu en cours de route, il ne sert');
-  console.log('  qu’à vérifier que la chaîne tourne.\n');
+  if (lecture?.trimestres) {
+    console.log('\n=== Par trimestre — descriptif, ne décide rien ===\n');
+    for (const q of parTrimestre(res.retenus)) {
+      console.log(`  ${q.trimestre}   n ${String(q.n).padStart(3)}   réel ${r(q.reel).padStart(9)}   témoin ${r(q.temoin).padStart(9)}   écart ${r(q.reel - q.temoin).padStart(9)}`);
+    }
+  }
+
+  if (lecture) {
+    const passe = res.p.p < lecture.seuil;
+    console.log(`\n  Règle de ${lecture.protocole}, écrite d'avance : p < ${lecture.seuil} → ${passe ? 'PASSE' : 'NE PASSE PAS'}.`);
+    console.log('  À appliquer telle quelle. Relancer ce témoin ou ce rejeu ne produit pas un second essai.\n');
+  } else {
+    console.log('\n  Ce chiffre ne décide rien sans pré-enregistrement de l’effectif et du seuil');
+    console.log('  (voir DEC-036 pour un exemple). Lu en cours de route, il ne sert qu’à');
+    console.log('  vérifier que la chaîne tourne.\n');
+  }
 }
 
 if (import.meta.url === (await import('node:url')).pathToFileURL(process.argv[1] || '').href) {

@@ -25,6 +25,12 @@ describe('validerOptions', () => {
     expect(erreurs).toEqual([expect.stringMatching(/--modele n’existe pas/), expect.stringMatching(/--graine n’existe pas/)]);
   });
 
+  it('connaît DEC-036 par défaut et DEC-037, rien d’autre', () => {
+    expect(validerOptions({ csv: 'a', symbole: 'GC', sortie: 's' }).protocole).toBe('DEC-036');
+    expect(validerOptions({ csv: 'a', symbole: 'GC', sortie: 's', protocole: 'DEC-037' }).protocole).toBe('DEC-037');
+    expect(validerOptions({ csv: 'a', symbole: 'GC', sortie: 's', protocole: 'DEC-999' }).erreurs[0]).toMatch(/inconnu/);
+  });
+
   it('refuse une autre unité que la minute', () => {
     expect(validerOptions({ csv: 'a', symbole: 'GC', sortie: 's', utCsv: '15m' }).erreurs[0]).toMatch(/1m/);
   });

@@ -296,6 +296,19 @@ describe('controlerParTemoin — ce qu’il écarte', () => {
     expect(r.exclus).toEqual([]);
   });
 
+  it('donne pour chaque plan l’espérance de son témoin, sur tous ses instants', () => {
+    const bs = serie(14);
+    const entrees = plansSur(bs, () => 'SELL').slice(0, 3);
+    const r = controlerParTemoin(entrees, bs, { ...VALIDATION, tirages: 20 });
+    for (const e of r.retenus) {
+      expect(Number.isFinite(e.temoinMoyen)).toBe(true);
+      expect(e.temoinMoyen).toBeGreaterThanOrEqual(-1);
+    }
+    // Calculée après les tirages, elle ne consomme aucun nombre aléatoire :
+    // même graine, même p.
+    expect(controlerParTemoin(entrees, bs, { ...VALIDATION, tirages: 20 }).p).toEqual(r.p);
+  });
+
   it('rend le même résultat pour la même graine', () => {
     const bs = serie(11);
     const entrees = plansSur(bs, (i) => (i % 800 ? 'BUY' : 'SELL'));

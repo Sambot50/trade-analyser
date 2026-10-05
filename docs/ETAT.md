@@ -19,9 +19,11 @@ qui paie ses frais.
 
 **La question d'origine — les plans d'un modèle de vision valent-ils mieux
 que le hasard ? — n'a toujours reçu aucune mesure.** Son témoin est construit
-et éprouvé depuis le 2026-10-05 (DEC-035). **Le pré-enregistrement est écrit
-(DEC-036)** : cent jours de GC 2023-2024 rejoués à 15 h 30 Paris, prix
-déguisés. Il ne manque que le lancement, sur le Legion.
+et éprouvé (DEC-035). **Première réponse, 2026-10-05 (DEC-036)** : cent jours
+de GC 2023-2024 rejoués à 15 h 30 Paris, prix déguisés. Le modèle fait
+**+0,110 R contre −0,138 R** pour le témoin, **p = 0,049**. Le test passe, d'un
+millième, avec quatre réserves écrites le même jour. Le modèle a vendu 99 fois
+sur 100. **Réplication pré-enregistrée sur GC 2025-2026 (DEC-037)**, à lancer.
 
 **Une seconde question est née de DEC-031 et DEC-034 :** la lecture de
 direction de l'opérateur franchit-elle la barre de 0,08 R de frais par trade ?
@@ -32,7 +34,7 @@ dépôt : le nombre de trades qu'il contient ne se voit pas d'ici.
 
 | Quoi | Comment | Résultat |
 |---|---|---|
-| Logique pure | 1 175 tests, 62 fichiers (2026-10-05) | tous passent |
+| Logique pure | 1 183 tests, 62 fichiers (2026-10-05) | tous passent |
 | Build de production | `npm run build` (2026-10-05) | 293 kB JS (96 kB gzip) |
 | Lecture géométrique sur capture TradingView réelle | `capture-reelle.test.js`, OCR réel, fixture 1790×822 thème clair | échelle à moins de 0,2 %, 214 bougies, aucune graduation rejetée, aucun order block au-delà d'un cinquième du graphique |
 | Projection prix → pixel | lecture des pixels du canvas en navigateur | écart max **1,1 px** sur 4 niveaux |
@@ -60,7 +62,7 @@ dépôt : le nombre de trades qu'il contient ne se voit pas d'ici.
 | **Le biais de mesure résiduel** | +0,074 à +0,167 R au lieu de 0 sur données sans structure, sur données réelles mélangées. Non expliqué. C'est le verrou actuel. | Mesurer séparément : entrée remplie à la clôture plutôt qu'à la mèche, puis issues ambiguës comptées en pertes. |
 | **Justesse des bougies lues par la géométrie** | Le test sur capture réelle borne des distributions (amplitudes, zones) ; il ne compare pas chaque bougie aux prix vrais. Une seule capture, thème clair, sans panneau de volume ni bandeau. | Exporter les bougies de la même période depuis la source et les confronter une à une. Puis d'autres thèmes, unités et actifs. |
 | **L'export CSV de TradingView** | Lu d'après un fichier construit sur la description du format (en-tête `time,open,high,low,close`, heure ISO avec décalage ou Unix, colonnes d'indicateurs). Aucun export réel n'a été lu. La dernière bougie est écartée d'office comme provisoire. | Exporter un graphique réel, le lancer dans `resoudre-plan.mjs --csv`, puis l'ajouter à `fixtures/`. |
-| **Le rejeu face au vrai modèle** | Jamais lancé contre `qwen3.8:27b` : Ollama ne tourne pas dans l'environnement d'écriture. | `node scripts/rejouer.mjs --csv GC_2023_2024.csv --symbole GC --sortie rejeu-gc --limite 3` sur le Legion, puis regarder les trois `graphique.png` et `reponse.json`. |
+| **Le rejeu face au vrai modèle** | ~~Jamais lancé~~ — **lancé le 2026-10-05** sur le Legion : 100 plans, 0 rejet, ~30 s par analyse. Un plan relu à la main : axe lu à moins d'un point de pourcentage, niveaux dans le cadre. | — |
 | **Le carnet de trades réels** | Le script est testé (ajout seul, anomalies rapportées). Ce qu'il contient est hors dépôt, et le bilan refuse de conclure sous trente trades. | `node scripts/carnet.mjs --bilan` sur la machine locale. |
 | **Le spread réellement payé chez Vantage** | La valeur passée à `--spread` est fournie par l'utilisateur, jamais mesurée. | Relever le spread affiché sur XAUUSD à plusieurs heures de la journée — il s'élargit à l'ouverture et à la clôture. |
 
@@ -556,9 +558,11 @@ soit** — sinon on collectera vingt analyses qu'on ne saura pas lire.
 2. ~~**Pré-enregistrer**~~ — **fait le 2026-10-05**, DEC-036 : 100 plans,
    p < 0,05, lecture unique. Par **rejeu** sur GC 2023-2024 plutôt qu'en
    direct : quelques heures au lieu de cinq mois.
-3. **Lancer le rejeu** sur le Legion (`scripts/rejouer.mjs`) jusqu'à 100 plans.
-4. **Lire le résultat**, une fois (`scripts/temoin.mjs`), et l'appliquer.
-5. Si p < 0,05 seulement : pré-enregistrer la **confirmation en direct**,
+3. ~~**Lancer le rejeu**~~ — fait, 100 plans, 0 rejet.
+4. ~~**Lire le résultat**~~ — **p = 0,049, passe d'un millième** (DEC-036).
+5. **Réplication sur GC 2025-2026** (DEC-037), même protocole, 10 000 tirages.
+   À lancer sur le Legion.
+6. Si elle passe seulement : pré-enregistrer la **confirmation en direct**,
    15 h 30 Paris, captures TradingView XAUUSD, bougies MT5 Vantage.
 
 ### Ce qui attend derrière

@@ -14,8 +14,9 @@ une seule capture TradingView réelle. La **qualité des plans de trade**
 produits n'est pas établie — un seul essai réel, qui a donné un ratio
 risque/rendement de 0,87 et un raisonnement contredisant ses propres niveaux.
 Le journal existe précisément pour trancher cette question, pas pour la
-supposer résolue ; son témoin existe (DEC-035) et le rejeu qui doit la
-trancher est pré-enregistré (DEC-036), pas encore lancé.
+supposer résolue. Premier rejeu (DEC-036) : +0,110 R contre −0,138 R au
+témoin, p = 0,049, soit un passage d'un millième, avec un modèle qui vend 99 fois
+sur 100. Réplication pré-enregistrée (DEC-037), pas encore lancée.
 
 Côté mesure, rien n'a encore payé ses frais : la règle des order blocks est
 close (DEC-025, DEC-029), le volume prédit l'amplitude et jamais la direction
@@ -77,7 +78,7 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 1 175 tests (2026-10-05)
+npm test                         # 1 183 tests (2026-10-05)
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 
@@ -97,6 +98,9 @@ node scripts/resoudre-plan.mjs --csv "OANDA_XAUUSD, 1.csv" --le 2026-09-22T18:48
 # Ne jamais relancer dans un autre dossier pour obtenir un autre p.
 node scripts/rejouer.mjs --csv GC_2023_2024.csv --symbole GC --sortie rejeu-gc
 node scripts/temoin.mjs --journal rejeu-gc --symbole GC --csv GC_2023_2024.csv
+# Réplication (DEC-037), sur des jours jamais montrés au modèle
+node scripts/rejouer.mjs --csv GC_2025_2026.csv --symbole GC --sortie rejeu-gc-2025 --protocole DEC-037
+node scripts/temoin.mjs --journal rejeu-gc-2025 --symbole GC --csv GC_2025_2026.csv
 
 # Témoin des plans du journal : le modèle choisit-il mieux ses moments que le hasard ?
 # Réglages figés par DEC-035 et DEC-036, aucune option pour les changer.
