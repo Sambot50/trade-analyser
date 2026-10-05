@@ -8,12 +8,18 @@ Une application locale qui lit une capture de graphique de trading, en extrait
 un plan de trade via un modèle de vision, reprojette les niveaux sur l'image,
 et journalise le tout pour mesurer si ces plans valent quelque chose.
 
-**État honnête au 2026-09-22 :** la lecture de graphique fonctionne et a été
-vérifiée sur une capture TradingView réelle. La **qualité des plans de trade**
+**État honnête au 2026-10-05 :** la lecture de graphique fonctionne, par le
+modèle de vision comme par la géométrie seule, et chacune a été vérifiée sur
+une seule capture TradingView réelle. La **qualité des plans de trade**
 produits n'est pas établie — un seul essai réel, qui a donné un ratio
 risque/rendement de 0,87 et un raisonnement contredisant ses propres niveaux.
 Le journal existe précisément pour trancher cette question, pas pour la
-supposer résolue.
+supposer résolue ; le témoin qui permettrait de la lire n'est pas construit.
+
+Côté mesure, rien n'a encore payé ses frais : la règle des order blocks est
+close (DEC-025, DEC-029), le volume prédit l'amplitude et jamais la direction
+(DEC-031), et l'effet des métaux (HYP-001, HYP-002) rétrécit à chaque mesure
+plus juste (DEC-033). La friction vaut 0,08 R par trade (DEC-034).
 
 Ne jamais présenter cet outil comme validé. Il sait lire un axe de prix. Il ne
 sait pas encore raisonner dessus.
@@ -70,7 +76,7 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 354 tests
+npm test                         # 1 086 tests (2026-10-05)
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 
@@ -86,6 +92,19 @@ node scripts/analyser-export.mjs cas.jsonl 200
 
 # Confirmer UNE hypothèse pré-enregistrée, sur données jamais regardées
 node scripts/tester-hypothese.mjs cas.jsonl zoneSurAtr 1.1915
+
+# Contrats à terme (CSV Databento) — volume, résolution, fiche
+node scripts/dimensionner.mjs --csv GC_2023_2024.csv --taille-contrat 100
+node scripts/resolution.mjs --csv GC_2023_2024.csv
+node scripts/plan.mjs --csv GC_2023_2024.csv
+
+# Carnet de trades réels, en ajout seul — hors dépôt (*.jsonl)
+node scripts/carnet.mjs --ouvrir --marche GC --tranche 2.4 --sens achat \
+                        --entree 4320.5 --stop 14.6 --objectif 16.8
+node scripts/carnet.mjs --fermer 7 --sortie 4305.9 --issue stop --frais 0.4
+node scripts/carnet.mjs --bilan
+
+npm run assets:ocr               # rapatrie les fichiers Tesseract (aussi en postinstall)
 npm run samples                  # régénère les graphiques de référence
 ```
 
@@ -103,8 +122,9 @@ npm run samples                  # régénère les graphiques de référence
 ## Mémoire et documentation
 
 Ce dépôt contient la **documentation du projet** : `docs/DECISIONS.md` pour
-les choix d'architecture et leur motif, `docs/ETAT.md` pour ce qui est vérifié
-et ce qui ne l'est pas, `docs/PISTES.md` pour ce qu'on a rencontré sans
+les choix d'architecture et leur motif — ainsi que les hypothèses gelées
+(HYP-xxx) et les errata —, `docs/ETAT.md` pour ce qui est vérifié et ce qui ne
+l'est pas, `docs/PISTES.md` pour ce qu'on a rencontré sans
 l'éprouver et `docs/DONNEES.md` pour les sources de bougies.
 
 `PISTES.md` est une **file d'attente, pas un menu** : une piste en sort quand
@@ -123,6 +143,10 @@ finit par diverger, et c'est documenté dans BLK-016.
   qui exploite les bougies est testé exhaustivement ; la récupération ne l'est
   pas. Elle échoue bruyamment.
 - **La robustesse de la lecture d'axe** sur d'autres styles de graphique,
-  unités de temps et actifs. Un seul essai réel à ce jour.
+  unités de temps et actifs. Un seul essai réel à ce jour, pour chacune des
+  deux lectures.
+- **La justesse des bougies lues par la géométrie.** Le test sur capture
+  réelle borne des distributions ; il ne compare pas chaque bougie aux prix
+  vrais.
 
 Voir `docs/ETAT.md` pour le détail.

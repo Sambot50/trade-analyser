@@ -1,17 +1,38 @@
 # État du projet
 
-Mis à jour le 2026-09-24.
+Mis à jour le 2026-10-05.
 
 Ce fichier sépare ce qui est **mesuré** de ce qui est **supposé**. Il n'a
 d'intérêt que s'il reste honnête : une ligne qui passe de « non vérifié » à
 « vérifié » doit s'appuyer sur une exécution, pas sur une impression.
 
+## Où en est le projet — 2026-10-05
+
+Trois fils ont été tirés depuis le 2026-09-24. Aucun n'a produit un avantage
+qui paie ses frais.
+
+| Fil | Période | Où il en est |
+|---|---|---|
+| Order blocks, règle mécanique | jusqu'au 2026-09-24 | **clos** — cinq jeux crypto et l'or COMEX, rien ne bat le hasard (DEC-025, DEC-029) |
+| Volume sur contrats à terme | 2026-09-25 → 09-30 | **un effet petit, qui rétrécit à chaque mesure, sans mécanisme connu** — détail ci-dessous (HYP-001 à 003, DEC-030 à 034) |
+| Lecture géométrique d'une capture | 2026-10-03 → 10-04 | **construite**, vérifiée sur une seule capture réelle |
+
+**La question d'origine — les plans d'un modèle de vision valent-ils mieux
+que le hasard ? — n'a toujours reçu aucune mesure.** Le témoin qu'elle exige
+n'est pas construit (voir « Prochaines étapes »).
+
+**Une seconde question est née de DEC-031 et DEC-034 :** la lecture de
+direction de l'opérateur franchit-elle la barre de 0,08 R de frais par trade ?
+`scripts/carnet.mjs` est fait pour y répondre. Le carnet est local et exclu du
+dépôt : le nombre de trades qu'il contient ne se voit pas d'ici.
+
 ## Vérifié
 
 | Quoi | Comment | Résultat |
 |---|---|---|
-| Logique pure | 315 tests unitaires | tous passent |
-| Build de production | `npm run build` | 221 kB JS (71 kB gzip) |
+| Logique pure | 1 086 tests, 57 fichiers (2026-10-05) | tous passent |
+| Build de production | `npm run build` (2026-10-05) | 293 kB JS (96 kB gzip) |
+| Lecture géométrique sur capture TradingView réelle | `capture-reelle.test.js`, OCR réel, fixture 1790×822 thème clair | échelle à moins de 0,2 %, 214 bougies, aucune graduation rejetée, aucun order block au-delà d'un cinquième du graphique |
 | Projection prix → pixel | lecture des pixels du canvas en navigateur | écart max **1,1 px** sur 4 niveaux |
 | Lecture d'axe sur graphique synthétique | banc d'essai, échelle connue | `qwen3.8:27b` à **2,3 px** |
 | Lecture d'axe sur capture TradingView réelle | comparaison manuelle des graduations | graduations extrêmes exactes, échelle juste à ~1,7 % (limite de mesure) |
@@ -30,6 +51,8 @@ d'intérêt que s'il reste honnête : une ligne qui passe de « non vérifié »
 | **Robustesse de la lecture d'axe** | Un seul essai réel, sur un graphique BTC 5 min sans indicateur. | Accumuler des analyses sur d'autres actifs, unités de temps et styles de graphique. Le journal est fait pour ça. |
 | **L'import CSV sur un vrai fichier** | Éprouvé sur des fixtures et sur un fichier synthétique de 92 000 lignes. Aucun fichier HistData ou MetaTrader réel n'a été lu : ils ne se téléchargent pas depuis cet environnement. | Lancer `--csv` sur un export réel et vérifier les bornes de période et le taux de couverture annoncés. |
 | **Le biais de mesure résiduel** | +0,074 à +0,167 R au lieu de 0 sur données sans structure, sur données réelles mélangées. Non expliqué. C'est le verrou actuel. | Mesurer séparément : entrée remplie à la clôture plutôt qu'à la mèche, puis issues ambiguës comptées en pertes. |
+| **Justesse des bougies lues par la géométrie** | Le test sur capture réelle borne des distributions (amplitudes, zones) ; il ne compare pas chaque bougie aux prix vrais. Une seule capture, thème clair, sans panneau de volume ni bandeau. | Exporter les bougies de la même période depuis la source et les confronter une à une. Puis d'autres thèmes, unités et actifs. |
+| **Le carnet de trades réels** | Le script est testé (ajout seul, anomalies rapportées). Ce qu'il contient est hors dépôt, et le bilan refuse de conclure sous trente trades. | `node scripts/carnet.mjs --bilan` sur la machine locale. |
 | **Le spread réellement payé chez Vantage** | La valeur passée à `--spread` est fournie par l'utilisateur, jamais mesurée. | Relever le spread affiché sur XAUUSD à plusieurs heures de la journée — il s'élargit à l'ouverture et à la clôture. |
 
 ## Le contre-essai qui change la lecture
@@ -464,6 +487,13 @@ Constatées pendant l'écriture, utiles à connaître avant de les reproduire :
 **Changement de cap acté le 2026-09-24 :** la règle mécanique est close
 (DEC-025). Le projet revient à sa question d'origine, jamais mesurée.
 
+**Constat au 2026-10-05 :** ce retour n'a pas eu lieu. Les dix jours suivants
+ont porté sur le volume des contrats à terme (section en fin de fichier), puis
+sur la lecture géométrique. L'ordre ci-dessous reste valable pour la question
+du modèle de vision, et aucune de ses quatre étapes n'est commencée. Il n'est
+pas arbitré, dans ce dépôt, entre cette question, le carnet de trades réels et
+l'épreuve 2017-2019 du volume.
+
 ### La question qui reste
 
 **Un modèle de vision, à qui l'on montre une capture de graphique, produit-il
@@ -481,6 +511,7 @@ Rien de ce qui a été mesuré ne s'y applique.
 | Brique | État |
 |---|---|
 | Lecture de graphique par Ollama local | fonctionne, écart d'axe mesuré à 2,3 px |
+| Lecture géométrique, sans modèle | bougies, axe et bandeau mesurés sur les pixels ; `confrontation.js` mesure l'écart d'axe entre les deux lectures |
 | Rejet des plans incohérents | actif, jamais corrigé en silence |
 | Journal, format v2 | écrit, avec la règle de sortie explicite |
 | Résolution automatique des issues | le même code que le backtest |
@@ -669,3 +700,47 @@ l'or, le premier quartile tombe à 0,38×.
 
 C'est mesuré, c'est reproductible, et c'est l'inverse de ce qu'annonce la
 littérature SMC. Ce fait ne dépend d'aucune hypothèse réfutée.
+
+
+---
+
+## Le volume sur les contrats à terme — 2026-09-25 → 09-30
+
+Six marchés COMEX/CME (GC, SI, PL, HG, CL, ES), découpés contrat par contrat.
+Le détail et les chiffres complets sont dans DECISIONS.md ; ce qui suit est ce
+qui reste vrai après les corrections.
+
+### Ce qui est établi
+
+| Fait | Source |
+|---|---|
+| Le sens déduit de la couleur de bougie est faux une fois sur trois en 15 min, pire qu'à pile ou face en 1 h. Le champ s'appelle désormais `sensApparent`. | DEC-030, 71 826 transactions avec côté de l'agresseur |
+| Le volume prédit l'**amplitude** (Spearman +0,479 à 15 min, +0,430 à 1 h) et **rien de la direction** (+0,013). Mort à 24 h. | DEC-031, 424 821 bougies, 5 marchés |
+| L'erreur type d'un taux isolé est sous-estimée d'un facteur ~3,7 (positions qui se chevauchent). Celle d'une différence contemporaine détectées − témoin ne l'est pas. | DEC-032 |
+| La mesure de HYP-001 et HYP-002 était symétrique, 3R/3R, et non 3R/1R comme annoncé. | ERRATUM-001 |
+| La fiche de dimensionnement, jouée comme règle sur GC 2023-2024, perd : 11 cases sur 12 négatives nettes. **La friction vaut 0,08 R par trade.** | DEC-034 |
+
+### L'effet des métaux, et pourquoi il ne suffit pas
+
+HYP-001 (or, 2025-2026) et HYP-002 (cinq marchés) ont passé leur épreuve
+gelée : +5,11 puis +1,26 point au regroupement, `p` = 0,0076. HYP-003, la même
+règle en 3R/1R frais compris, est **non rentable** sur quatre métaux 2020-2022 :
+−0,105 R, `z` = −4,85.
+
+Puis DEC-033 a montré que le dénominateur était creux d'un seul côté : 27 % des
+positions détectées n'atteignent aucune barrière en 24 h, contre 2 % au témoin.
+Une fois comptées, l'avantage tombe de +0,331 à **+0,198 R, `z` = 1,94**, sur
+des données déjà regardées.
+
+**L'effet rétrécit à chaque mesure plus juste, et aucun mécanisme ne
+l'explique** : règle directionnelle, horizon de 24 h où le volume ne dit plus
+rien, indicateur sans contenu directionnel. Conclure exige une épreuve gelée
+sur 2017-2019, dernière période jamais ouverte, avec l'espérance complète pour
+critère. Elle n'est pas écrite.
+
+### Ce que ça laisse
+
+Le volume sert à **dimensionner**, pas à choisir le sens : il dit de combien de
+place le prix a besoin et ce que cette place coûte. La direction doit venir
+d'ailleurs — d'où le carnet de trades réels, qui mesure celle de l'opérateur
+face à la barre de 0,08 R.
