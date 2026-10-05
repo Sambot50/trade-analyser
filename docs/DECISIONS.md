@@ -2649,3 +2649,75 @@ de toute mesure de ce type.
 
 Rien ici n'est pré-enregistré. Ce diagnostic dit ce que la fiche **aurait**
 rendu, jamais ce qu'elle rendra.
+
+---
+
+## DEC-035 — Le témoin des plans : même géométrie, instant tiré au sort
+
+**2026-10-05 · Retenue · figée avant toute lecture d'analyse**
+
+La question d'origine du projet — *les plans d'un modèle de vision valent-ils
+mieux que le hasard ?* — n'a jamais reçu de mesure, faute de témoin. Un taux de
+réussite brut ne la tranche pas : sur des bougies sans structure, la chaîne
+affichait +0,407 R (DEC-014). Ce témoin est construit et éprouvé **avant**
+qu'aucune analyse réelle ne soit passée dedans. Ses réglages sont figés ici, et
+`scripts/temoin.mjs` n'offre aucune option pour les changer.
+
+### Le principe
+
+Chaque plan du journal est réduit à sa **géométrie** : sens, écart de l'entrée
+au prix du moment, écarts du stop et des objectifs à l'entrée, tous en
+proportion du prix. Cette géométrie est rejouée à des instants tirés au sort,
+sur les mêmes bougies, avec le même résolveur. Ce qui distingue le réel du
+témoin est alors **le choix du moment** — rien d'autre.
+
+### Les réglages, et pourquoi
+
+| Réglage | Valeur | Motif |
+|---|---|---|
+| Prix du moment | clôture de la dernière bougie **fermée** avant l'analyse | garde-fou 4 : la bougie en cours n'est pas encore connue |
+| Géométrie | en proportion du prix | l'ATR ajouterait un réglage — sa période — donc un degré de liberté |
+| Fenêtre de tirage | 30 jours avant l'analyse, **couverts en entier** | volatilité comparable ; un plan au début des données est écarté plutôt que témoigné sur trois jours |
+| Non-chevauchement | l'horizon de chaque instant se referme avant l'analyse | aucune bougie de résolution partagée avec le réel (DEC-032) |
+| Règle de sortie | celle du journal, `2r` ; règles mêlées refusées | une seule règle par plan, choisie avant (DEC-015) |
+| Remplissage, horizon | mèche, 24 h — ceux du journal | le témoin juge ce que le journal juge |
+| Jamais déclenché | 0 R | aucun trade |
+| Horizon dépassé | valorisé à la dernière clôture de l'horizon, en R | ce qu'un compte encaisserait ; l'écarter d'un côté fabrique un avantage (DEC-033) |
+| Ambigu | perte ; « gain » rendu comme sensibilité, jamais comme verdict | le choix défavorable |
+| Statistique | moyenne des R sur tous les plans retenus | une seule statistique, un seul test |
+| Tirages | 1 000, graine 1 | rejouable ; plancher de p à 0,001 |
+
+Le journal écarte de ses statistiques les ambigus et les horizons dépassés ; le
+témoin les compte. Les deux bras subissent la même règle, et elle est plus
+stricte.
+
+### Ce que le témoin a montré de lui-même
+
+Éprouvé sur des marches aléatoires, trente plans de 0,15 % de stop, horizon de
+quatre heures, 300 tirages (`temoin.test.js`) :
+
+| Épreuve | Réel | Médiane du témoin | p | Attendu |
+|---|---|---|---|---|
+| Plans au hasard, 20 séries | — | — | 2 sur 20 sous 0,05 | ~1 sur 20 |
+| Oracle : connaît le sens à 4 h | **+0,751 R** | −0,020 R | **0,0033** (plancher) | détecté |
+| Achats sur un marché en pente | **+0,452 R** | +0,389 R | **0,36** | **non crédité** |
+
+La troisième ligne est la raison d'être du témoin. Des achats sur un marché qui
+monte affichent +0,452 R ; un taux de réussite brut les créditerait au modèle.
+Le témoin, posé sur la même pente, fait presque aussi bien, et refuse.
+
+### Ce qu'il ne fait pas
+
+- **Il ne juge pas la direction seule.** Le témoin n°2 — même moment, sens
+  inversé — le ferait. Il n'est pas construit : deux tests sur les mêmes
+  analyses, c'est le problème des essais multiples (garde-fou 7). S'il doit
+  exister, il sera annoncé d'avance comme test secondaire.
+- **Il ne compte pas les frais.** À géométrie proportionnelle et prix voisins,
+  le coût en R est le même dans les deux bras ; il ne change pas l'écart.
+- **Il ne décide rien seul.** L'effectif et le seuil restent à pré-enregistrer
+  (`ETAT.md`, étape 2). Le script le rappelle à chaque lancement.
+
+### Non vérifié
+
+La source Binance du script passe par `journal/market.js`, jamais éprouvé
+depuis l'environnement d'écriture. La source fichier est testée de bout en bout.

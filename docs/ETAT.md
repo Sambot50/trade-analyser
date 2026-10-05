@@ -18,8 +18,9 @@ qui paie ses frais.
 | Lecture géométrique d'une capture | 2026-10-03 → 10-04 | **construite**, vérifiée sur une seule capture réelle |
 
 **La question d'origine — les plans d'un modèle de vision valent-ils mieux
-que le hasard ? — n'a toujours reçu aucune mesure.** Le témoin qu'elle exige
-n'est pas construit (voir « Prochaines étapes »).
+que le hasard ? — n'a toujours reçu aucune mesure.** Son témoin est construit
+et éprouvé depuis le 2026-10-05 (DEC-035) ; il manque le pré-enregistrement et
+les analyses (voir « Prochaines étapes »).
 
 **Une seconde question est née de DEC-031 et DEC-034 :** la lecture de
 direction de l'opérateur franchit-elle la barre de 0,08 R de frais par trade ?
@@ -30,7 +31,7 @@ dépôt : le nombre de trades qu'il contient ne se voit pas d'ici.
 
 | Quoi | Comment | Résultat |
 |---|---|---|
-| Logique pure | 1 110 tests, 58 fichiers (2026-10-05) | tous passent |
+| Logique pure | 1 142 tests, 60 fichiers (2026-10-05) | tous passent |
 | Build de production | `npm run build` (2026-10-05) | 293 kB JS (96 kB gzip) |
 | Lecture géométrique sur capture TradingView réelle | `capture-reelle.test.js`, OCR réel, fixture 1790×822 thème clair | échelle à moins de 0,2 %, 214 bougies, aucune graduation rejetée, aucun order block au-delà d'un cinquième du graphique |
 | Projection prix → pixel | lecture des pixels du canvas en navigateur | écart max **1,1 px** sur 4 niveaux |
@@ -43,6 +44,7 @@ dépôt : le nombre de trades qu'il contient ne se voit pas d'ici.
 | Échec réseau du journal | API bloquée volontairement | annoncé, état non corrompu |
 | Unité déclarée d'un CSV | espacement dominant des lignes comparé à `--ut-csv` | un fichier 15 min déclaré 1 min est refusé ; week-ends et pauses tolérés |
 | Décalage horaire sur un horodatage absolu | `Z`, `±hh:mm`, Unix avec `--decalage-heures` | refusé, plutôt qu'appliqué une seconde fois |
+| Témoin des plans (DEC-035) | marches aléatoires, oracle, marché en pente | hasard : 2 p sur 20 sous 0,05 ; oracle détecté à p = 0,0033 ; pente **non créditée**, p = 0,36 |
 | Résolution d'un plan depuis un fichier | `resoudre-plan.mjs --csv`, lancé pour de vrai dans les tests | issue tranchée sur les bougies du fichier ; fichier qui ne couvre pas l'analyse refusé |
 
 ## Non vérifié
@@ -523,7 +525,7 @@ Rien de ce qui a été mesuré ne s'y applique.
 
 **La chaîne est complète. Ce qui manque, ce sont les analyses.**
 
-### Ce qui n'est pas construit, et qui est le vrai problème
+### Ce qui n'était pas construit — fait depuis, voir DEC-035
 
 **Le témoin.** On ne peut pas mélanger le raisonnement d'un modèle comme on
 mélange des bougies. Sans témoin, un taux de réussite de 55 % sur vingt
@@ -546,8 +548,8 @@ soit** — sinon on collectera vingt analyses qu'on ne saura pas lire.
 
 ### L'ordre
 
-1. **Construire le témoin** — plan du modèle rejoué à un instant tiré au sort,
-   n fois, comme le contrôle par permutation du backtest.
+1. ~~**Construire le témoin**~~ — **fait le 2026-10-05**, DEC-035,
+   `scripts/temoin.mjs`. Éprouvé dans les trois sens sur données synthétiques.
 2. **Pré-enregistrer** le nombre d'analyses et le seuil, avant d'en produire
    une seule. Même protocole que DEC-018 : on ne regarde pas en accumulant.
 3. **Accumuler les analyses** sur des captures réelles, jusqu'au nombre fixé.

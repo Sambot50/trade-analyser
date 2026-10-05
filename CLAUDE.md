@@ -14,7 +14,7 @@ une seule capture TradingView réelle. La **qualité des plans de trade**
 produits n'est pas établie — un seul essai réel, qui a donné un ratio
 risque/rendement de 0,87 et un raisonnement contredisant ses propres niveaux.
 Le journal existe précisément pour trancher cette question, pas pour la
-supposer résolue ; le témoin qui permettrait de la lire n'est pas construit.
+supposer résolue ; son témoin existe (DEC-035), les analyses pas encore.
 
 Côté mesure, rien n'a encore payé ses frais : la règle des order blocks est
 close (DEC-025, DEC-029), le volume prédit l'amplitude et jamais la direction
@@ -76,7 +76,7 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 1 110 tests (2026-10-05)
+npm test                         # 1 142 tests (2026-10-05)
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 
@@ -91,6 +91,10 @@ node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100
 # Résoudre UN plan — sur Binance, ou sur l'export TradingView du graphique analysé
 node scripts/resoudre-plan.mjs --csv "OANDA_XAUUSD, 1.csv" --le 2026-09-22T18:48:55Z \
   --direction BUY --entree 2650 --stop 2645 --tp1 2655 --tp2 2660
+
+# Témoin des plans du journal : le modèle choisit-il mieux ses moments que le hasard ?
+# Réglages figés par DEC-035, aucune option pour les changer.
+node scripts/temoin.mjs --journal <dossier du journal> --symbole XAUUSD --csv XAUUSD_M1.csv
 
 # Croiser les qualificatifs avec l'issue, corrigé pour la recherche elle-même
 node scripts/analyser-export.mjs cas.jsonl 200
