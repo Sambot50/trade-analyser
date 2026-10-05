@@ -74,10 +74,26 @@ describe('rendementComplet — rien n’est écarté', () => {
     expect(rendementComplet({ plan: vente, bougies: bs, ...REGLAGES }).r).toBeCloseTo(-0.5);
   });
 
+  it('crédite un objectif à sa vraie distance, pas à la valeur nominale de la règle', () => {
+    // Le plan du rejeu qui a révélé le défaut : vente à 3055, stop 3072, TP2 3025.
+    const vente = { direction: 'SELL', prixEntree: 3055, prixStopLoss: 3072, prixTp1: 3040, prixTp2: 3025 };
+    const bs = [plate(0, 3055), bougie(1, 3055, 3060, 3020, 3022)];
+    const { statut, r } = rendementComplet({ plan: vente, bougies: bs, ...REGLAGES });
+    expect(statut).toBe('tp2');
+    expect(r).toBeCloseTo(30 / 17); // 1,76 R, et non 2
+  });
+
+  it('garde la valeur nominale sous remplissage à la clôture, où les objectifs sont redérivés', () => {
+    const vente = { direction: 'SELL', prixEntree: 3055, prixStopLoss: 3072, prixTp1: 3040, prixTp2: 3025 };
+    const bs = [bougie(0, 3058, 3060, 3054, 3055), bougie(1, 3055, 3056, 3010, 3012)];
+    expect(rendementComplet({ plan: vente, bougies: bs, ...REGLAGES, remplissage: 'cloture' }).r).toBe(2);
+  });
+
   it('compte l’ambigu en perte par défaut, en gain sur demande — jamais écarté', () => {
     const bs = [plate(0, 100), bougie(1, 100, 102.5, 98.5, 100)];
     expect(rendementComplet({ plan: ACHAT, bougies: bs, ...REGLAGES }).r).toBe(-1);
-    expect(rendementComplet({ plan: ACHAT, bougies: bs, ...REGLAGES, ambigu: 'gagnant' }).r).toBe(2);
+    // ACHAT a son TP2 à 2 R exactement : la vraie distance vaut la nominale.
+    expect(rendementComplet({ plan: ACHAT, bougies: bs, ...REGLAGES, ambigu: 'gagnant' }).r).toBeCloseTo(2);
     expect(() => rendementComplet({ plan: ACHAT, bougies: bs, ...REGLAGES, ambigu: 'exclu' })).toThrow(/compte tout/);
   });
 

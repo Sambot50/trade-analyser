@@ -78,7 +78,8 @@ export function planDepuisGeometrie(g, prixDuMoment) {
  * DEC-033 : écarter une issue du dénominateur d'un seul côté fabrique un
  * avantage. Ici rien n'est écarté une fois l'horizon couvert.
  *
- *   - objectif ou stop      : la règle de sortie, via `gainEnR`
+ *   - stop                  : −1 R
+ *   - objectif              : sa distance réelle à l'entrée, en R
  *   - ambigu                : selon `ambigu` — perdant par défaut, le choix
  *                             défavorable ; « gagnant » sert de sensibilité
  *   - jamais déclenché      : 0 R. Aucun trade, aucun gain, aucune perte.
@@ -107,7 +108,17 @@ export function rendementComplet({ plan, bougies, horizonBougies, objectif, remp
     return { statut, r: (sens * (derniere.cloture - entree)) / risque };
   }
 
-  return { statut, r: gainEnR(statut, objectif, ambigu) };
+  // Un objectif atteint vaut sa VRAIE distance, en R. `gainEnR` crédite 2 R
+  // à tout TP2 touché : juste pour les plans du backtest, dont le TP2 est posé
+  // à 2 R exactement, faux pour un modèle qui pose le sien où il veut — un TP2
+  // à 1,76 R était compté +2. Sous remplissage à la clôture, les objectifs sont
+  // redérivés à 1 R et 2 R du prix obtenu : la valeur nominale y est exacte.
+  const gagne = gainEnR(statut, objectif, ambigu);
+  if (gagne > 0 && remplissage === 'meche') {
+    const { champ } = reglageObjectif(objectif);
+    return { statut, r: Math.abs(plan[champ] - plan.prixEntree) / Math.abs(plan.prixEntree - plan.prixStopLoss) };
+  }
+  return { statut, r: gagne };
 }
 
 /** Fuseau des heures de séance : celui où l'analyse est faite. */

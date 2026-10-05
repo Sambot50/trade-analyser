@@ -2842,3 +2842,24 @@ sur séries de 20) :
 Le rejeu n'a jamais parlé à un vrai modèle : tout est éprouvé contre un faux
 serveur Ollama. Le premier lancement sur le Legion est aussi la première
 rencontre avec `qwen3.8:27b` sur ces images.
+
+### Amendement du 2026-10-05, soir — un objectif vaut sa vraie distance
+
+Le premier plan du rejeu, relu avant toute issue, vend à 3 055 avec un stop à
+3 072 et un TP2 à 3 025 : **1,76 R**. Le témoin lui aurait crédité **+2 R**.
+`gainEnR` donne à tout TP2 touché la valeur nominale de la règle `2r`, ce qui
+est juste pour les plans du backtest, dont le TP2 est posé à 2 R exactement, et
+faux pour un modèle qui pose le sien où il veut.
+
+Le test restait valable, puisque la même erreur touchait les deux bras, mais
+les R affichés auraient été faux, et un plan à TP2 proche aurait pesé plus que
+son dû. **Corrigé : un objectif atteint vaut sa distance réelle à l'entrée, en
+R.** Sous remplissage à la clôture, où les objectifs sont redérivés à 1 R et
+2 R, la valeur nominale reste exacte.
+
+Aucune issue n'avait été calculée, ni par le rejeu (qui n'en produit pas) ni
+par le témoin. Les épreuves de validation, faites sur des plans à 2 R exacts,
+sont inchangées.
+
+Les statistiques du journal (`report.js`) ne sont pas touchées : elles
+comptent des taux de réussite, jamais des R.
