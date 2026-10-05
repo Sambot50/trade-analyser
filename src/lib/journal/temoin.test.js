@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 
 import {
   prixDeReference, geometrieDe, planDepuisGeometrie, rendementComplet,
-  instantsCandidats, evaluerReel, controlerParTemoin,
+  instantsCandidats, evaluerReel, controlerParTemoin, controlerParTemoinGroupes, memeHeureLocale,
 } from './temoin.js';
 import { serieAleatoire } from '../marche/aleatoire.js';
 import { generateurAleatoire } from '../marche/controle.js';
@@ -86,21 +86,49 @@ describe('rendementComplet — rien n’est écarté', () => {
   });
 });
 
+describe('memeHeureLocale', () => {
+  it('garde 15 h 30 à Paris à travers le passage à l’heure d’hiver', () => {
+    // 2026-10-26 15:30 Paris = 14:30 UTC (hiver) ; la veille, 13:30 UTC (été).
+    const lundi = Date.parse('2026-10-26T14:30:00Z');
+    expect(new Date(memeHeureLocale(lundi, 1)).toISOString()).toBe('2026-10-25T14:30:00.000Z');
+    expect(new Date(memeHeureLocale(lundi, 2)).toISOString()).toBe('2026-10-24T13:30:00.000Z');
+  });
+});
+
 describe('instantsCandidats', () => {
-  const bs = Array.from({ length: 100 }, (_, i) => plate(i, 100));
+  // Dix jours de bougies d'une heure, 24 h sur 24.
+  const H = 3_600_000;
+  const bs = Array.from({ length: 240 }, (_, i) => ({
+    ouvertureMs: T0 + i * H, fermetureMs: T0 + (i + 1) * H - 1,
+    ouverture: 100, plusHaut: 100.1, plusBas: 99.9, cloture: 100,
+  }));
+  const instant = T0 + 9 * 24 * H + 14 * H; // jour 9, 14 h UTC = 15 h Paris (hiver)
+
+  it('ne prend que la même heure locale, les jours précédents', () => {
+    const c = instantsCandidats(bs, instant, { fenetreMs: 9 * 24 * H, horizonBougies: 24 });
+    expect(c.map((i) => (bs[i].fermetureMs + 1 - T0) / H % 24)).toEqual(Array(c.length).fill(14));
+  });
 
   it('referme l’horizon de chaque candidat AVANT l’analyse : aucune bougie partagée avec le réel', () => {
-    const instant = T0 + 80 * MIN;
-    const c = instantsCandidats(bs, instant, { fenetreMs: 60 * MIN, horizonBougies: 10 });
-    for (const i of c) expect(bs[i + 10].ouvertureMs).toBeLessThan(instant);
-    // La dernière bougie de résolution du dernier candidat est la 79, ouverte avant 80.
-    expect(c.at(-1)).toBe(69);
+    const c = instantsCandidats(bs, instant, { fenetreMs: 9 * 24 * H, horizonBougies: 24 });
+    for (const i of c) expect(bs[i + 24].ouvertureMs).toBeLessThan(instant);
+    // La veille est permise : son horizon se referme une milliseconde avant
+    // l'analyse, sans aucune bougie commune.
+    expect(bs[c.at(-1)].fermetureMs + 1).toBe(instant - 24 * H);
+    // Avec un horizon d'une bougie de plus, elle déborderait : exclue.
+    const plusLong = instantsCandidats(bs, instant, { fenetreMs: 9 * 24 * H, horizonBougies: 25 });
+    expect(bs[plusLong.at(-1)].fermetureMs + 1).toBe(instant - 2 * 24 * H);
   });
 
   it('reste dans la fenêtre qui précède l’analyse', () => {
-    const instant = T0 + 80 * MIN;
-    const c = instantsCandidats(bs, instant, { fenetreMs: 30 * MIN, horizonBougies: 10 });
-    expect(bs[c[0]].fermetureMs).toBeGreaterThanOrEqual(instant - 30 * MIN);
+    const c = instantsCandidats(bs, instant, { fenetreMs: 4 * 24 * H, horizonBougies: 24 });
+    expect(c).toHaveLength(4); // J-1 à J-4
+  });
+
+  it('saute un jour sans marché à cette heure', () => {
+    const troue = bs.filter((b) => !(b.ouvertureMs >= instant - 4 * 24 * H - 3 * H && b.ouvertureMs < instant - 4 * 24 * H + H));
+    const c = instantsCandidats(troue, instant, { fenetreMs: 6 * 24 * H, horizonBougies: 24 });
+    expect(c).toHaveLength(5); // J-1 à J-6, sauf J-4 : dernière clôture trois heures plus tôt
   });
 });
 
@@ -132,7 +160,7 @@ describe('evaluerReel', () => {
 const HORIZON = 240; // 4 heures de bougies 1 minute
 const VALIDATION = {
   horizonBougies: HORIZON, objectif: '2r', remplissage: 'meche', ambigu: 'perdant',
-  fenetreMs: 5 * 24 * 60 * MIN, tirages: 300, graine: 7,
+  fenetreMs: 9 * 24 * 60 * MIN, tirages: 300, graine: 7,
 };
 
 /**
@@ -200,7 +228,7 @@ describe('controlerParTemoin — ce qu’il écarte', () => {
     const bs = serie(9);
     const entrees = plansSur(bs, () => 'BUY');
     // Analyse au tout début : aucune fenêtre de témoin derrière elle.
-    // Analyse au début des données : sa fenêtre de cinq jours n'est pas
+    // Analyse au début des données : sa fenêtre de neuf jours n'est pas
     // couverte, même si quelques instants de témoin existeraient.
     const p0 = bs[HORIZON - 1].cloture;
     entrees.push({ id: 'trop-tot', instantMs: bs[HORIZON].ouvertureMs,
@@ -216,6 +244,40 @@ describe('controlerParTemoin — ce qu’il écarte', () => {
       { id: 'trop-tot', raison: expect.stringMatching(/fenêtre de témoin incomplète/) },
       { id: 'trop-tard', raison: expect.stringMatching(/pas encore tranchée/) },
     ]);
+  });
+
+  it('écarte un plan dont l’horizon chevauche celui du précédent retenu', () => {
+    const bs = serie(9);
+    const entrees = plansSur(bs, () => 'BUY');
+    const i = 10 * 24 * 60 + 100; // 100 minutes après plan-0, dans son horizon de 240
+    const p = bs[i - 1].cloture;
+    entrees.push({ id: 'chevauche', instantMs: bs[i].ouvertureMs,
+      plan: { direction: 'BUY', prixEntree: p, prixStopLoss: p - 5, prixTp1: p + 5, prixTp2: p + 10 } });
+    const r = controlerParTemoin(entrees, bs, { ...VALIDATION, tirages: 10 });
+    expect(r.retenus).toHaveLength(30);
+    expect(r.exclus).toEqual([{ id: 'chevauche', raison: expect.stringMatching(/chevauchant/) }]);
+  });
+
+  it('écarte un plan posé marché fermé', () => {
+    const bs = serie(9);
+    const [plan] = plansSur(bs, () => 'BUY');
+    const sansLaVeille = bs.filter((b) => b.ouvertureMs < plan.instantMs - 60 * MIN || b.ouvertureMs >= plan.instantMs);
+    const r = controlerParTemoin([plan], sansLaVeille, { ...VALIDATION, tirages: 10 });
+    expect(r.exclus).toEqual([{ id: 'plan-0', raison: expect.stringMatching(/marché fermé/) }]);
+  });
+
+  it('juge et témoigne chaque plan dans sa propre série — deux contrats ne se recollent pas', () => {
+    const a = serie(12);
+    // Un second « contrat », 3 % plus cher : le recoller créerait un saut.
+    const b = serie(13).map((x) => ({ ...x, ouverture: x.ouverture * 1.03, plusHaut: x.plusHaut * 1.03, plusBas: x.plusBas * 1.03, cloture: x.cloture * 1.03 }));
+    const alea = generateurAleatoire(3);
+    const sens = () => (alea() < 0.5 ? 'BUY' : 'SELL');
+    const r = controlerParTemoinGroupes([
+      { bougies: a, entrees: plansSur(a, sens).map((e) => ({ ...e, id: `a-${e.id}` })) },
+      { bougies: b, entrees: plansSur(b, sens).map((e) => ({ ...e, id: `b-${e.id}` })) },
+    ], { ...VALIDATION, tirages: 50 });
+    expect(r.retenus).toHaveLength(60);
+    expect(r.exclus).toEqual([]);
   });
 
   it('rend le même résultat pour la même graine', () => {

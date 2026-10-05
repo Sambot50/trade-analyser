@@ -110,26 +110,73 @@ export function rendementComplet({ plan, bougies, horizonBougies, objectif, remp
   return { statut, r: gainEnR(statut, objectif, ambigu) };
 }
 
+/** Fuseau des heures de séance : celui où l'analyse est faite. */
+export const FUSEAU_PAR_DEFAUT = 'Europe/Paris';
+
+/**
+ * Écart maximal entre l'instant et la clôture de la bougie qui donne son prix.
+ * Au-delà, le marché était fermé : il n'y avait pas de prix du moment.
+ */
+export const FRAICHEUR_MAX_MS = 15 * 60_000;
+
+/** Décalage du fuseau à un instant donné, en ms (UTC + décalage = heure locale). */
+export function decalageFuseau(ms, fuseau) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: fuseau, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
+  const local = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+  return local - Math.floor(ms / 1000) * 1000;
+}
+
+/**
+ * Le même instant d'horloge locale, `jours` jours de calendrier plus tôt.
+ *
+ * À l'heure locale et non à 24 h près : 15 h 30 à Paris tombe à 13 h 30 UTC
+ * l'été et 14 h 30 l'hiver. Reculer de 24 h en UTC à travers un changement
+ * d'heure décalerait le témoin d'une heure de séance.
+ */
+export function memeHeureLocale(ms, jours, fuseau = FUSEAU_PAR_DEFAUT) {
+  const local = ms + decalageFuseau(ms, fuseau) - jours * 86_400_000;
+  // Deux passes : le décalage à la date cible peut différer de celui d'origine.
+  let utc = local - decalageFuseau(local, fuseau);
+  utc = local - decalageFuseau(utc, fuseau);
+  return utc;
+}
+
 /**
  * Les instants où la géométrie d'un plan peut être rejouée : des indices de
  * bougies dont la clôture sert de prix du moment.
  *
+ * **À la même heure locale, les jours précédents.** Un plan posé à 15 h 30
+ * Paris démarre avec l'ouverture de New York ; rejoué à 3 h du matin, il
+ * démarrerait dans la séance la plus calme du jour. L'écart mesuré dirait
+ * alors quelque chose de l'heure, rien du modèle.
+ *
  * Un candidat doit :
- *   - fermer dans la fenêtre qui PRÉCÈDE l'analyse ;
- *   - avoir derrière lui un horizon complet de bougies ;
- *   - voir cet horizon se refermer AVANT l'analyse. Le témoin ne partage donc
- *     aucune bougie de résolution avec le plan réel : sans cela, un même
- *     mouvement de marché pousserait les deux bras dans le même sens, et
- *     l'écart mesuré serait écrasé (DEC-032).
+ *   - tomber dans la fenêtre qui précède l'analyse ;
+ *   - avoir un prix frais : la bougie qui le précède a fermé moins de
+ *     `FRAICHEUR_MAX_MS` avant lui — marché fermé, pas de candidat ;
+ *   - avoir derrière lui un horizon complet de bougies, qui se referme AVANT
+ *     l'analyse. Le témoin ne partage donc aucune bougie de résolution avec le
+ *     plan réel : sans cela, un même mouvement de marché pousserait les deux
+ *     bras dans le même sens (DEC-032).
  */
-export function instantsCandidats(bougies, instantMs, { fenetreMs, horizonBougies }) {
+export function instantsCandidats(bougies, instantMs, { fenetreMs, horizonBougies, fuseau = FUSEAU_PAR_DEFAUT }) {
   const candidats = [];
-  for (let i = 0; i < bougies.length - horizonBougies; i++) {
-    if (bougies[i].fermetureMs < instantMs - fenetreMs) continue;
-    if (bougies[i + horizonBougies].ouvertureMs >= instantMs) break;
+  for (let jours = 1; ; jours++) {
+    const t = memeHeureLocale(instantMs, jours, fuseau);
+    if (t < instantMs - fenetreMs) break;
+
+    const reference = prixDeReference(bougies, t);
+    if (!reference) break;
+    const i = reference.indice;
+    if (t - bougies[i].fermetureMs > FRAICHEUR_MAX_MS) continue;
+    if (i + horizonBougies >= bougies.length) continue;
+    if (bougies[i + horizonBougies].ouvertureMs >= instantMs) continue;
     candidats.push(i);
   }
-  return candidats;
+  return candidats.reverse();
 }
 
 /**
@@ -142,59 +189,87 @@ export function evaluerReel(entree, bougies, reglages) {
   const { plan, instantMs } = entree;
   const reference = prixDeReference(bougies, instantMs);
   if (!reference) return { exclu: 'aucune bougie fermée avant l’analyse' };
+  // Même règle que pour le témoin : sans prix frais, le marché était fermé.
+  if (instantMs - bougies[reference.indice].fermetureMs > FRAICHEUR_MAX_MS) {
+    return { exclu: 'marché fermé à l’instant de l’analyse : pas de prix du moment' };
+  }
 
-  const suite = bougies.filter((b) => b.ouvertureMs >= instantMs);
+  // Pas `reference.indice + 1` : une bougie EN COURS à l'instant de l'analyse
+  // s'est ouverte avant lui, et ses extrêmes mêlent des prix antérieurs au plan.
+  const suite = bougies.filter((b) => b.ouvertureMs >= instantMs).slice(0, reglages.horizonBougies);
   const { statut, r } = rendementComplet({ plan, bougies: suite, ...reglages });
   if (r === null) return { exclu: 'issue pas encore tranchée : horizon non couvert par les bougies', statut };
 
-  return { statut, r, geometrie: geometrieDe(plan, reference.prix) };
+  // Fin de l'horizon : sert à écarter un plan suivant qui le chevaucherait.
+  return { statut, r, geometrie: geometrieDe(plan, reference.prix), finHorizonMs: suite.at(-1).fermetureMs };
 }
 
 /**
- * Le contrôle complet.
+ * Le contrôle complet, sur une ou plusieurs séries.
+ *
+ * **Plusieurs séries, parce qu'un fichier de contrats à terme n'est pas une
+ * série.** Deux contrats successifs ne se recollent pas (DEC-027) : chaque plan
+ * est jugé, et témoigné, dans la série du contrat coté à son instant.
+ *
+ * **Deux plans réels dont les horizons se chevauchent subissent le même
+ * mouvement de marché**, alors que le témoin tire leurs instants séparément :
+ * il les croirait indépendants et se montrerait trop étroit, donc trop
+ * indulgent. Dans chaque série, un plan qui démarre avant la fin de l'horizon du
+ * précédent RETENU est écarté. La règle ne regarde que les horaires, jamais
+ * les issues.
  *
  * Statistique : la moyenne des R sur l'ensemble des plans. Le réel en donne
  * une ; chaque tirage en donne une autre, en rejouant CHAQUE plan à un instant
- * candidat tiré au sort. `p` est la part des tirages qui font au moins aussi
- * bien que le réel, corrigée du +1 (voir `valeurP`).
+ * candidat de sa série, tiré au sort. `p` est la part des tirages qui font au
+ * moins aussi bien que le réel, corrigée du +1 (voir `valeurP`).
  *
- * @param entrees  [{ id, plan, instantMs }]
- * @param bougies  série unique, triée, d'un seul instrument, avec `fermetureMs`
+ * @param groupes  [{ bougies, entrees: [{ id, plan, instantMs }] }]
  * @param reglages { horizonBougies, objectif, remplissage, ambigu, fenetreMs,
- *                   tirages, graine }
+ *                   tirages, graine, fuseau? }
  */
-export function controlerParTemoin(entrees, bougies, reglages) {
-  const { fenetreMs, tirages, graine, ...resolution } = reglages;
+export function controlerParTemoinGroupes(groupes, reglages) {
+  const { fenetreMs, tirages, graine, fuseau = FUSEAU_PAR_DEFAUT, ...resolution } = reglages;
   reglageObjectif(resolution.objectif); // échoue tôt si la règle de sortie manque
   if (!(tirages >= 1)) throw new Error('Il faut au moins un tirage.');
-  if (!bougies.length) throw new Error('Aucune bougie : rien sur quoi rejouer les plans.');
 
   const retenus = [];
   const exclus = [];
 
-  for (const entree of entrees) {
-    const reel = evaluerReel(entree, bougies, resolution);
-    if (reel.exclu) { exclus.push({ id: entree.id, raison: reel.exclu }); continue; }
+  for (const { bougies, entrees } of groupes) {
+    if (!bougies.length) throw new Error('Aucune bougie : rien sur quoi rejouer les plans.');
+    let finPrecedent = -Infinity;
 
-    // La fenêtre doit être couverte en entier. Sinon le témoin d'un plan pris
-    // au début des données serait tiré sur quelques jours au lieu de trente :
-    // un autre régime de marché que celui des autres plans, et des tirages
-    // concentrés sur quelques instants. Les trous à l'intérieur — week-ends,
-    // pauses de séance — restent permis : ce sont des heures sans marché.
-    if (bougies[0].ouvertureMs > entree.instantMs - fenetreMs) {
-      exclus.push({ id: entree.id, raison: 'fenêtre de témoin incomplète : les bougies commencent après son début' });
-      continue;
-    }
+    for (const entree of [...entrees].sort((a, b) => a.instantMs - b.instantMs)) {
+      if (entree.instantMs < finPrecedent) {
+        exclus.push({ id: entree.id, raison: 'horizon chevauchant celui du plan précédent : même mouvement de marché' });
+        continue;
+      }
 
-    const candidats = instantsCandidats(bougies, entree.instantMs, { fenetreMs, horizonBougies: resolution.horizonBougies });
-    if (!candidats.length) {
-      exclus.push({ id: entree.id, raison: 'aucun instant de témoin : les bougies ne couvrent pas la fenêtre qui précède l’analyse' });
-      continue;
+      const reel = evaluerReel(entree, bougies, resolution);
+      if (reel.exclu) { exclus.push({ id: entree.id, raison: reel.exclu }); continue; }
+
+      // La fenêtre doit être couverte en entier. Sinon le témoin d'un plan pris
+      // au début des données serait tiré sur quelques jours au lieu de trente.
+      if (bougies[0].ouvertureMs > entree.instantMs - fenetreMs) {
+        exclus.push({ id: entree.id, raison: 'fenêtre de témoin incomplète : les bougies commencent après son début' });
+        continue;
+      }
+
+      const candidats = instantsCandidats(bougies, entree.instantMs, { fenetreMs, horizonBougies: resolution.horizonBougies, fuseau });
+      if (!candidats.length) {
+        exclus.push({ id: entree.id, raison: 'aucun instant de témoin : aucun jour de la fenêtre n’a de marché ouvert à cette heure' });
+        continue;
+      }
+      retenus.push({ ...entree, ...reel, candidats, bougies });
+      finPrecedent = reel.finHorizonMs;
     }
-    retenus.push({ ...entree, ...reel, candidats });
   }
 
-  if (!retenus.length) return { retenus, exclus, reel: null, temoin: null, p: null };
+  const sortie = (e) => {
+    const { candidats, bougies, finHorizonMs, ...reste } = e;
+    return { ...reste, candidats: candidats.length };
+  };
+  if (!retenus.length) return { retenus: [], exclus, reel: null, temoin: null, p: null };
 
   const moyenne = (xs) => xs.reduce((a, x) => a + x, 0) / xs.length;
   const reelMoyen = moyenne(retenus.map((e) => e.r));
@@ -205,7 +280,8 @@ export function controlerParTemoin(entrees, bougies, reglages) {
   const rendementA = (k, i) => {
     let r = caches[k].get(i);
     if (r === undefined) {
-      const plan = planDepuisGeometrie(retenus[k].geometrie, bougies[i].cloture);
+      const { bougies, geometrie } = retenus[k];
+      const plan = planDepuisGeometrie(geometrie, bougies[i].cloture);
       ({ r } = rendementComplet({
         plan, bougies: bougies.slice(i + 1, i + 1 + resolution.horizonBougies), ...resolution,
       }));
@@ -222,10 +298,15 @@ export function controlerParTemoin(entrees, bougies, reglages) {
   }
 
   return {
-    retenus: retenus.map(({ candidats, ...e }) => ({ ...e, candidats: candidats.length })),
+    retenus: retenus.map(sortie),
     exclus,
     reel: reelMoyen,
     temoin: resumeDistribution(moyennes),
     p: valeurP(reelMoyen, moyennes),
   };
+}
+
+/** Le contrôle sur une seule série — Binance, un CSV de CFD. */
+export function controlerParTemoin(entrees, bougies, reglages) {
+  return controlerParTemoinGroupes([{ bougies, entrees }], reglages);
 }

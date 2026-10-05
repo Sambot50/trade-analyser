@@ -22,7 +22,8 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { parseArgs } from './backtest.mjs';
-import { controlerParTemoin } from '../src/lib/journal/temoin.js';
+import { controlerParTemoinGroupes } from '../src/lib/journal/temoin.js';
+import { decouperParContrat } from '../src/lib/marche/contrats.js';
 import { reduireIndex, HORIZON_RESOLUTION_MINUTES, OBJECTIF_JOURNAL } from '../src/lib/journal/schema.js';
 import { OBJECTIFS } from '../src/lib/journal/resolve.js';
 import { recupererBougiesPaginees, versPaireBinance, MINUTES_PAR_BOUGIE } from '../src/lib/journal/market.js';
@@ -143,6 +144,25 @@ async function chargerBougies(o, entrees) {
   return { bougies, uniteMs: MINUTES_PAR_BOUGIE * 60_000 };
 }
 
+/**
+ * Range chaque plan dans la série du contrat coté à son instant.
+ *
+ * Un fichier de contrats à terme en enchaîne une douzaine ; les recoller
+ * créerait un saut de prix à chaque roulement (DEC-027). Une série sans
+ * étiquette de contrat — Binance, CFD — reste une série unique.
+ */
+export function grouperParContrat(bougies, entrees) {
+  const { segments } = decouperParContrat(bougies);
+  const groupes = segments.map((s) => ({ symbole: s.symbole, bougies: s.bougies, entrees: [] }));
+  const horsSerie = [];
+  for (const e of entrees) {
+    const g = groupes.find((x) => x.bougies[0].ouvertureMs <= e.instantMs && e.instantMs <= x.bougies.at(-1).fermetureMs);
+    if (g) g.entrees.push(e);
+    else horsSerie.push({ id: e.id, raison: 'aucune bougie du fichier ne couvre l’instant de l’analyse' });
+  }
+  return { groupes: groupes.filter((g) => g.entrees.length), horsSerie };
+}
+
 const r = (x) => (x === null || x === undefined ? '—' : `${x >= 0 ? '+' : ''}${x.toFixed(3)} R`);
 
 async function main() {
@@ -182,8 +202,13 @@ async function main() {
     objectif: journal.objectif, remplissage: GEL.remplissage,
     fenetreMs: GEL.fenetreJours * JOUR, tirages: GEL.tirages, graine: GEL.graine,
   };
-  const res = controlerParTemoin(journal.entrees, bougies, { ...reglages, ambigu: GEL.ambigu });
-  const sens = controlerParTemoin(journal.entrees, bougies, { ...reglages, ambigu: GEL.ambiguSensibilite });
+  const { groupes, horsSerie } = grouperParContrat(bougies, journal.entrees);
+  if (groupes.length > 1 || groupes[0]?.symbole) {
+    console.log(`  ${groupes.length} contrat(s) concerné(s) : ${groupes.map((g) => `${g.symbole} (${g.entrees.length})`).join(', ')}`);
+  }
+  const res = controlerParTemoinGroupes(groupes, { ...reglages, ambigu: GEL.ambigu });
+  const sens = controlerParTemoinGroupes(groupes, { ...reglages, ambigu: GEL.ambiguSensibilite });
+  res.exclus.push(...horsSerie);
 
   console.log('\n=== Plans ===\n');
   for (const e of res.retenus) {
