@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { analyser, agreger, decrire, detecterSeparateur, lireHorodatage, repererColonnes, contratDe } from './csv.js';
+import { analyser, agreger, decrire, detecterSeparateur, lireHorodatage, repererColonnes, contratDe, estExportTradingView, espacementDominant } from './csv.js';
 import { dureeUnite } from './bougies.js';
 import { cassures } from './structure.js';
 
@@ -310,5 +310,121 @@ describe("lecture par nom de colonne — l'export Databento", () => {
     expect(bougies[0].ouverture).toBe(2062.51);
     expect(bougies[0].cloture).toBe(2062.65);
     expect(bougies[0].symbole).toBeNull();
+  });
+});
+
+// ─── Export TradingView ──────────────────────────────────────────────────────
+//
+// CES FICHIERS SONT CONSTRUITS d'après la description de l'export TradingView,
+// pas copiés d'un export réel. Ils vérifient que le lecteur fait ce qu'on
+// attend de lui ; ils ne prouvent pas que TradingView écrit exactement ceci.
+// Un export réel ajouté en fixture lèvera la réserve.
+
+const TV_ISO = [
+  'time,open,high,low,close,Basis,Upper,Lower,Volume,Volume MA',
+  '2026-09-21T09:30:00-04:00,2650.1,2651.0,2649.8,2650.5,NaN,NaN,NaN,1203,NaN',
+  '2026-09-21T09:31:00-04:00,2650.5,2652.0,2650.2,2651.7,2650.9,2652.1,2649.7,980,NaN',
+  '2026-09-21T09:32:00-04:00,2651.7,2653.4,2651.0,2653.0,2651.2,2652.8,2649.9,1544,1242',
+  '2026-09-21T09:33:00-04:00,2653.0,2653.1,2652.6,2652.9,2651.5,2653.0,2650.0,212,979',
+].join('\n');
+
+// Les mêmes bougies, l'heure exportée en secondes Unix.
+const TV_UNIX = [
+  'time,open,high,low,close,Volume',
+  '1789997400,2650.1,2651.0,2649.8,2650.5,1203',
+  '1789997460,2650.5,2652.0,2650.2,2651.7,980',
+  '1789997520,2651.7,2653.4,2651.0,2653.0,1544',
+  '1789997580,2653.0,2653.1,2652.6,2652.9,212',
+].join('\n');
+
+describe('export TradingView', () => {
+  it('est reconnu à ses cinq premières colonnes, et seulement à elles', () => {
+    expect(estExportTradingView(['time', 'open', 'high', 'low', 'close', 'Volume'])).toBe(true);
+    expect(estExportTradingView(['time', 'open', 'high', 'low', 'close'])).toBe(true);
+    expect(estExportTradingView(['ts_event', 'open', 'high', 'low', 'close'])).toBe(false);
+    expect(estExportTradingView(['<DATE>', '<TIME>', '<OPEN>', '<HIGH>', '<LOW>'])).toBe(false);
+    expect(estExportTradingView(null)).toBe(false);
+  });
+
+  it('ramène une heure ISO avec décalage en UTC, et ignore les colonnes d’indicateurs', () => {
+    const r = analyser(TV_ISO, { unite: '1m', exclureDerniere: false });
+    expect(r.format).toBe('tradingview');
+    expect(new Date(r.bougies[0].ouvertureMs).toISOString()).toBe('2026-09-21T13:30:00.000Z');
+    expect(r.bougies[0]).toMatchObject({ ouverture: 2650.1, plusHaut: 2651.0, plusBas: 2649.8, cloture: 2650.5 });
+    // `Volume` et non `Volume MA`, qui est une moyenne.
+    expect(r.bougies.map((b) => b.volume)).toEqual([1203, 980, 1544, 212]);
+  });
+
+  it('lit les secondes Unix comme les mêmes instants que l’ISO', () => {
+    const iso = analyser(TV_ISO, { unite: '1m' }).bougies;
+    const unix = analyser(TV_UNIX, { unite: '1m' }).bougies;
+    expect(unix.map((b) => b.ouvertureMs)).toEqual(iso.map((b) => b.ouvertureMs));
+    expect(unix.map((b) => b.cloture)).toEqual(iso.map((b) => b.cloture));
+  });
+
+  it('écarte par défaut la dernière bougie, encore en cours au moment de l’export, et la rend', () => {
+    const r = analyser(TV_UNIX, { unite: '1m' });
+    expect(r.bougies).toHaveLength(3);
+    expect(r.derniereExclue).toMatchObject({ ouvertureMs: 1789997580000, cloture: 2652.9 });
+    expect(analyser(TV_UNIX, { unite: '1m', exclureDerniere: false }).bougies).toHaveLength(4);
+  });
+
+  it('ne touche pas à la dernière bougie des autres formats, sauf demande', () => {
+    expect(analyser(HISTDATA, { unite: '1m' }).derniereExclue).toBeNull();
+    expect(analyser(HISTDATA, { unite: '1m' }).bougies).toHaveLength(3);
+    expect(analyser(HISTDATA, { unite: '1m', exclureDerniere: true }).bougies).toHaveLength(2);
+  });
+});
+
+describe('unité déclarée contre espacement réel', () => {
+  const ligne = (ms, prix) => `${new Date(ms).toISOString()},${prix},${prix + 1},${prix - 1},${prix},10`;
+  const serie = (pasMs, n, depuis = Date.UTC(2026, 0, 5)) =>
+    Array.from({ length: n }, (_, i) => ligne(depuis + i * pasMs, 100 + i)).join('\n');
+
+  it('refuse un fichier 15 minutes déclaré en 1 minute — la fermeture serait datée trop tôt', () => {
+    expect(() => analyser(serie(900_000, 10), { unite: '1m' })).toThrow(/espacées de 15m/);
+  });
+
+  it('refuse aussi l’inverse : un fichier 1 minute déclaré en 15 minutes', () => {
+    expect(() => analyser(serie(60_000, 10), { unite: '15m' })).toThrow(/espacées de 1m/);
+  });
+
+  it('tolère les trous : un week-end ou une pause de séance ne change pas l’unité', () => {
+    const vendredi = Date.UTC(2026, 0, 9, 21, 0);
+    const lignes = [
+      ...Array.from({ length: 5 }, (_, i) => ligne(vendredi + i * 60_000, 100)),
+      ...Array.from({ length: 5 }, (_, i) => ligne(vendredi + 2 * 86_400_000 + i * 60_000, 101)),
+    ];
+    expect(analyser(lignes.join('\n'), { unite: '1m' }).bougies).toHaveLength(10);
+  });
+
+  it('ignore les écarts nuls de deux contrats cotés à la même minute', () => {
+    const t = Date.UTC(2026, 0, 5);
+    const bougies = [0, 0, 1, 1, 2, 2].map((k) => ({ ouvertureMs: t + k * 60_000 }));
+    expect(espacementDominant(bougies)).toBe(60_000);
+  });
+
+  it('ne juge rien sur une seule bougie', () => {
+    expect(espacementDominant([{ ouvertureMs: 0 }])).toBeNull();
+    expect(analyser(serie(60_000, 1), { unite: '15m' }).bougies).toHaveLength(1);
+  });
+});
+
+describe('décalage horaire sur un horodatage qui porte déjà son fuseau', () => {
+  it('refuse le décalage sur Z, sur un décalage explicite et sur les secondes Unix', () => {
+    for (const h of ['2026-09-21T13:30:00Z', '2026-09-21T09:30:00-04:00', '2026-09-21T15:30:00+0200', '1789997400', '1789997400000']) {
+      expect(() => lireHorodatage([h], -5), h).toThrow(/porte déjà son fuseau/);
+    }
+  });
+
+  it('le refuse sur tout le fichier, pas seulement sur une ligne', () => {
+    expect(() => analyser(TV_UNIX, { unite: '1m', decalageHeures: -5 })).toThrow(/porte déjà son fuseau/);
+  });
+
+  it('le permet sur un horodatage sans fuseau, et le signale comme tel', () => {
+    const sans = lireHorodatage(['2026-09-21 09:30:00'], -5);
+    expect(new Date(sans.ms).toISOString()).toBe('2026-09-21T14:30:00.000Z');
+    expect(sans.fuseauExplicite).toBeUndefined();
+    expect(lireHorodatage(['2026-09-21T13:30:00Z']).fuseauExplicite).toBe(true);
   });
 });

@@ -8,9 +8,22 @@
 //   node scripts/resoudre-plan.mjs \
 //     --symbole BTCUSDT --le 2026-09-22T18:48:55Z \
 //     --direction SELL --entree 86523.27 --stop 86780 --tp1 86300 --tp2 86100
+//
+// Ou depuis un fichier de bougies — un export TradingView du graphique même
+// qui a été analysé, pour résoudre sur le flux de la capture et non sur celui
+// d'une autre place :
+//
+//   node scripts/resoudre-plan.mjs --csv "OANDA_XAUUSD, 1.csv" \
+//     --le 2026-09-22T18:48:55Z --direction BUY \
+//     --entree 2650 --stop 2645 --tp1 2655 --tp2 2660
+
+import { readFile } from 'node:fs/promises';
+import { basename } from 'node:path';
 
 import { resoudreIssue, OBJECTIFS, REMPLISSAGES } from '../src/lib/journal/resolve.js';
 import { recupererBougiesPaginees, symboleResolvable, MINUTES_PAR_BOUGIE, INTERVALLE_RESOLUTION } from '../src/lib/journal/market.js';
+import { analyser as analyserCsv, avertissementsLecture } from '../src/lib/marche/csv.js';
+import { UNITES, dureeUnite } from '../src/lib/marche/bougies.js';
 import { calculerExcursions, enUnitesDeRisque } from '../src/lib/journal/excursion.js';
 import { computeRR, rrVerdict, breakEvenRate } from '../src/lib/analysis.js';
 
@@ -24,10 +37,15 @@ const LIBELLE = {
   en_cours: 'Trop tôt — pas assez de bougies pour trancher',
 };
 
+// Une option suivie d'une autre option, ou de rien, est un drapeau : sans
+// cela `--garder-derniere --le …` avalerait `--le` comme valeur.
 export function parseArgs(argv) {
   const out = {};
-  for (let i = 0; i < argv.length; i += 2) {
-    if (argv[i]?.startsWith('--')) out[camel(argv[i].slice(2))] = argv[i + 1];
+  for (let i = 0; i < argv.length; i++) {
+    if (!argv[i]?.startsWith('--')) continue;
+    const suivant = argv[i + 1];
+    if (suivant === undefined || suivant.startsWith('--')) out[camel(argv[i].slice(2))] = true;
+    else { out[camel(argv[i].slice(2))] = suivant; i++; }
   }
   return out;
 }
@@ -42,10 +60,31 @@ function camel(nom) {
 export function construirePlan(args) {
   const erreurs = [];
 
-  const symbole = args.symbole;
-  if (!symbole) erreurs.push('--symbole manquant');
-  else if (!symboleResolvable(symbole)) {
-    erreurs.push(`--symbole "${symbole}" n’est pas une paire résolvable automatiquement (crypto cotée sur Binance).`);
+  // Deux sources, exclusives : Binance par le symbole, ou un fichier.
+  const csv = typeof args.csv === 'string' ? args.csv : undefined;
+  if (args.csv === true) erreurs.push('--csv attend un chemin de fichier');
+  if (csv && args.baseUrl) erreurs.push('--csv et --base-url désignent deux sources : choisis-en une.');
+
+  // Avec un fichier, le symbole ne sert qu'à l'affichage : les bougies sont
+  // celles du fichier, quel que soit le nom qu'on leur donne.
+  const symbole = typeof args.symbole === 'string' ? args.symbole : (csv ? basename(csv).replace(/\.[^.]+$/, '') : undefined);
+  if (!csv) {
+    if (!symbole) erreurs.push('--symbole manquant (ou --csv pour lire un fichier)');
+    else if (!symboleResolvable(symbole)) {
+      erreurs.push(`--symbole "${symbole}" n’est pas une paire résolvable automatiquement (crypto cotée sur Binance). Pour un autre marché : --csv.`);
+    }
+  }
+
+  const utCsv = args.utCsv ?? '1m';
+  if (csv && !UNITES[utCsv]) erreurs.push(`--ut-csv "${utCsv}" inconnue (${Object.keys(UNITES).join(', ')})`);
+
+  let decalageHeures = 0;
+  if (args.decalageHeures !== undefined) {
+    decalageHeures = Number(args.decalageHeures);
+    if (!csv) erreurs.push('--decalage-heures ne s’applique qu’à un fichier (--csv)');
+    else if (!Number.isFinite(decalageHeures) || Math.abs(decalageHeures) > 14) {
+      erreurs.push('--decalage-heures doit être un nombre d’heures entre -14 et 14');
+    }
   }
 
   const depuisMs = Date.parse(args.le ?? '');
@@ -100,22 +139,78 @@ export function construirePlan(args) {
     return { erreurs: [`--remplissage "${remplissage}" inconnu (${REMPLISSAGES.join(', ')})`] };
   }
 
-  return { plan, symbole, depuisMs, horizonHeures, objectif, remplissage, baseUrl: args.baseUrl };
+  return {
+    plan, symbole, depuisMs, horizonHeures, objectif, remplissage, baseUrl: args.baseUrl,
+    csv, utCsv, decalageHeures, garderDerniere: args.garderDerniere === true,
+  };
+}
+
+/**
+ * Les bougies d'un fichier qui servent à résoudre un plan daté `depuisMs`.
+ *
+ * Même convention que Binance avec `startTime` : on part de la première bougie
+ * qui s'OUVRE à l'instant de l'analyse ou après. Celle qui était en cours à cet
+ * instant avait déjà commencé à bouger ; la compter ferait jouer au plan des
+ * prix antérieurs à sa propre existence.
+ *
+ * Un fichier qui commence après l'analyse, ou finit avant, ne peut rien dire
+ * de ce plan. Refusé plutôt que résolu sur ce qui reste.
+ */
+export function bougiesDepuis(bougies, depuisMs, unite) {
+  if (!bougies.length) return { erreur: 'Le fichier ne contient aucune bougie.' };
+  const debut = bougies[0].ouvertureMs;
+  const fin = bougies.at(-1).ouvertureMs;
+  const iso = (ms) => new Date(ms).toISOString();
+
+  if (debut > depuisMs) {
+    return { erreur: `Le fichier commence le ${iso(debut)}, après l'analyse (${iso(depuisMs)}) : exporte une période qui la couvre.` };
+  }
+  if (fin < depuisMs) {
+    return { erreur: `Le fichier s'arrête le ${iso(fin)}, avant l'analyse (${iso(depuisMs)}).` };
+  }
+
+  const retenues = bougies.filter((b) => b.ouvertureMs >= depuisMs);
+  // Un écart entre l'analyse et la première bougie est normal marché fermé ;
+  // il est rendu pour être affiché, parce qu'il peut aussi trahir un trou.
+  const attenteMs = retenues.length ? retenues[0].ouvertureMs - depuisMs : null;
+  return { bougies: retenues, attenteMs, trou: attenteMs !== null && attenteMs >= dureeUnite(unite) };
+}
+
+async function chargerCsv({ csv, utCsv, decalageHeures, garderDerniere, depuisMs }) {
+  const lecture = analyserCsv(await readFile(csv, 'utf8'), {
+    unite: utCsv, decalageHeures, exclureDerniere: garderDerniere ? false : 'auto',
+  });
+  console.log(`Lecture de ${basename(csv)} : ${lecture.bougies.length} bougies ${utCsv}`);
+  for (const ligne of avertissementsLecture(lecture)) console.log(`  ⚠  ${ligne}`);
+
+  const { erreur, bougies, attenteMs, trou } = bougiesDepuis(lecture.bougies, depuisMs, utCsv);
+  if (erreur) throw new Error(erreur);
+  if (trou) {
+    console.log(`  ⚠  première bougie ${Math.round(attenteMs / 60_000)} min après l'analyse : marché fermé, ou trou dans le fichier`);
+  }
+  if (utCsv !== '1m') {
+    console.log(`  ⚠  résolution en ${utCsv} : une bougie qui touche stop et objectif reste ambiguë, plus souvent qu'en 1m`);
+  }
+  return bougies;
 }
 
 async function main() {
-  const { erreurs, plan, symbole, depuisMs, horizonHeures, objectif, remplissage, baseUrl } = construirePlan(parseArgs(process.argv.slice(2)));
+  const options = construirePlan(parseArgs(process.argv.slice(2)));
+  const { erreurs, plan, symbole, depuisMs, horizonHeures, objectif, remplissage, baseUrl, csv, utCsv } = options;
 
   if (erreurs) {
     console.error('\nArguments invalides :');
     for (const e of erreurs) console.error('  - ' + e);
     console.error('\nExemple :');
     console.error('  node scripts/resoudre-plan.mjs --symbole BTCUSDT --le 2026-09-22T18:48:55Z \\');
-    console.error('    --direction SELL --entree 86523.27 --stop 86780 --tp1 86300 --tp2 86100\n');
+    console.error('    --direction SELL --entree 86523.27 --stop 86780 --tp1 86300 --tp2 86100');
+    console.error('  node scripts/resoudre-plan.mjs --csv "OANDA_XAUUSD, 1.csv" --le 2026-09-22T18:48:55Z \\');
+    console.error('    --direction BUY --entree 2650 --stop 2645 --tp1 2655 --tp2 2660\n');
     process.exit(1);
   }
 
-  const horizonBougies = Math.round((horizonHeures * 60) / MINUTES_PAR_BOUGIE);
+  const minutesParBougie = csv ? dureeUnite(utCsv) / 60_000 : MINUTES_PAR_BOUGIE;
+  const horizonBougies = Math.round((horizonHeures * 60) / minutesParBougie);
   const rr = computeRR(plan.prixEntree, plan.prixStopLoss, plan.prixTp1);
   const risque = Math.abs(plan.prixEntree - plan.prixStopLoss);
 
@@ -125,17 +220,20 @@ async function main() {
   console.log(`  il faudrait ${pourcent(breakEvenRate(rr))} de réussite pour être à l'équilibre`);
   console.log(`  sortie ${objectif === '1r' ? 'ferme à 1 R' : "tenue jusqu'à 2 R"} — un objectif intermédiaire frôlé ne rapporte rien\n`);
 
-  console.log(`Récupération des bougies ${INTERVALLE_RESOLUTION} sur ${horizonHeures} h…`);
-
   let bougies;
   try {
-    bougies = await recupererBougiesPaginees({ symbole, depuisMs, nombre: horizonBougies, baseUrl });
+    if (csv) {
+      bougies = await chargerCsv({ ...options });
+    } else {
+      console.log(`Récupération des bougies ${INTERVALLE_RESOLUTION} sur ${horizonHeures} h…`);
+      bougies = await recupererBougiesPaginees({ symbole, depuisMs, nombre: horizonBougies, baseUrl });
+    }
   } catch (err) {
     console.error(`\nÉchec : ${err.message}\n`);
     process.exit(2);
   }
 
-  console.log(`  ${bougies.length} bougies reçues sur ${horizonBougies} demandées\n`);
+  console.log(`  ${Math.min(bougies.length, horizonBougies)} bougies disponibles sur ${horizonBougies} pour l'horizon\n`);
 
   if (!bougies.length) {
     console.error('Aucune bougie : vérifie le symbole et la date.\n');

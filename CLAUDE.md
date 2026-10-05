@@ -76,16 +76,21 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 1 086 tests (2026-10-05)
+npm test                         # 1 110 tests (2026-10-05)
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 
 # Backtest — deux sources, une chaîne
 node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01
 node scripts/backtest.mjs --csv XAUUSD_M1_2025.csv --decalage-heures -5 --spread 0.25
+node scripts/backtest.mjs --csv "OANDA_XAUUSD, 1.csv" --spread 0.25   # export TradingView
 
 # Contrôle par permutation : la règle bat-elle le hasard sur ces données ?
 node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100
+
+# Résoudre UN plan — sur Binance, ou sur l'export TradingView du graphique analysé
+node scripts/resoudre-plan.mjs --csv "OANDA_XAUUSD, 1.csv" --le 2026-09-22T18:48:55Z \
+  --direction BUY --entree 2650 --stop 2645 --tp1 2655 --tp2 2660
 
 # Croiser les qualificatifs avec l'issue, corrigé pour la recherche elle-même
 node scripts/analyser-export.mjs cas.jsonl 200
@@ -145,6 +150,8 @@ finit par diverger, et c'est documenté dans BLK-016.
 - **La robustesse de la lecture d'axe** sur d'autres styles de graphique,
   unités de temps et actifs. Un seul essai réel à ce jour, pour chacune des
   deux lectures.
+- **L'export CSV de TradingView.** Reconnu d'après un fichier construit sur
+  la description du format ; aucun export réel n'a encore été lu.
 - **La justesse des bougies lues par la géométrie.** Le test sur capture
   réelle borne des distributions ; il ne compare pas chaque bougie aux prix
   vrais.

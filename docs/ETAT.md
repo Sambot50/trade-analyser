@@ -30,7 +30,7 @@ dépôt : le nombre de trades qu'il contient ne se voit pas d'ici.
 
 | Quoi | Comment | Résultat |
 |---|---|---|
-| Logique pure | 1 086 tests, 57 fichiers (2026-10-05) | tous passent |
+| Logique pure | 1 110 tests, 58 fichiers (2026-10-05) | tous passent |
 | Build de production | `npm run build` (2026-10-05) | 293 kB JS (96 kB gzip) |
 | Lecture géométrique sur capture TradingView réelle | `capture-reelle.test.js`, OCR réel, fixture 1790×822 thème clair | échelle à moins de 0,2 %, 214 bougies, aucune graduation rejetée, aucun order block au-delà d'un cinquième du graphique |
 | Projection prix → pixel | lecture des pixels du canvas en navigateur | écart max **1,1 px** sur 4 niveaux |
@@ -41,6 +41,9 @@ dépôt : le nombre de trades qu'il contient ne se voit pas d'ici.
 | Résolution des issues | jeux de bougies fabriqués, tous les cas | entrée jamais atteinte, stop avant objectif, objectif avant stop, bougie ambiguë dès le déclenchement, horizon dépassé |
 | Journal en navigateur | parcours complet Playwright | enregistrement automatique, blobs concordants, saisie manuelle, statistiques, persistance au rechargement |
 | Échec réseau du journal | API bloquée volontairement | annoncé, état non corrompu |
+| Unité déclarée d'un CSV | espacement dominant des lignes comparé à `--ut-csv` | un fichier 15 min déclaré 1 min est refusé ; week-ends et pauses tolérés |
+| Décalage horaire sur un horodatage absolu | `Z`, `±hh:mm`, Unix avec `--decalage-heures` | refusé, plutôt qu'appliqué une seconde fois |
+| Résolution d'un plan depuis un fichier | `resoudre-plan.mjs --csv`, lancé pour de vrai dans les tests | issue tranchée sur les bougies du fichier ; fichier qui ne couvre pas l'analyse refusé |
 
 ## Non vérifié
 
@@ -52,6 +55,7 @@ dépôt : le nombre de trades qu'il contient ne se voit pas d'ici.
 | **L'import CSV sur un vrai fichier** | Éprouvé sur des fixtures et sur un fichier synthétique de 92 000 lignes. Aucun fichier HistData ou MetaTrader réel n'a été lu : ils ne se téléchargent pas depuis cet environnement. | Lancer `--csv` sur un export réel et vérifier les bornes de période et le taux de couverture annoncés. |
 | **Le biais de mesure résiduel** | +0,074 à +0,167 R au lieu de 0 sur données sans structure, sur données réelles mélangées. Non expliqué. C'est le verrou actuel. | Mesurer séparément : entrée remplie à la clôture plutôt qu'à la mèche, puis issues ambiguës comptées en pertes. |
 | **Justesse des bougies lues par la géométrie** | Le test sur capture réelle borne des distributions (amplitudes, zones) ; il ne compare pas chaque bougie aux prix vrais. Une seule capture, thème clair, sans panneau de volume ni bandeau. | Exporter les bougies de la même période depuis la source et les confronter une à une. Puis d'autres thèmes, unités et actifs. |
+| **L'export CSV de TradingView** | Lu d'après un fichier construit sur la description du format (en-tête `time,open,high,low,close`, heure ISO avec décalage ou Unix, colonnes d'indicateurs). Aucun export réel n'a été lu. La dernière bougie est écartée d'office comme provisoire. | Exporter un graphique réel, le lancer dans `resoudre-plan.mjs --csv`, puis l'ajouter à `fixtures/`. |
 | **Le carnet de trades réels** | Le script est testé (ajout seul, anomalies rapportées). Ce qu'il contient est hors dépôt, et le bilan refuse de conclure sous trente trades. | `node scripts/carnet.mjs --bilan` sur la machine locale. |
 | **Le spread réellement payé chez Vantage** | La valeur passée à `--spread` est fournie par l'utilisateur, jamais mesurée. | Relever le spread affiché sur XAUUSD à plusieurs heures de la journée — il s'élargit à l'ouverture et à la clôture. |
 
