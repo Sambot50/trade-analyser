@@ -34,7 +34,7 @@ dépôt : le nombre de trades qu'il contient ne se voit pas d'ici.
 
 | Quoi | Comment | Résultat |
 |---|---|---|
-| Logique pure | 1 215 tests JS, 66 fichiers, + 10 tests Python du pont MT5 (2026-10-06) | tous passent |
+| Logique pure | 1 220 tests JS, 67 fichiers, + 10 tests Python du pont MT5 (2026-10-06) | tous passent |
 | Build de production | `npm run build` (2026-10-05) | 293 kB JS (96 kB gzip) |
 | Lecture géométrique sur capture TradingView réelle | `capture-reelle.test.js`, OCR réel, fixture 1790×822 thème clair | échelle à moins de 0,2 %, 214 bougies, aucune graduation rejetée, aucun order block au-delà d'un cinquième du graphique |
 | Projection prix → pixel | lecture des pixels du canvas en navigateur | écart max **1,1 px** sur 4 niveaux |

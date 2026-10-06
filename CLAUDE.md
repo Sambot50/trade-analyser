@@ -78,7 +78,7 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 1 215 tests (2026-10-06), dont le pont MT5 en Python
+npm test                         # 1 220 tests (2026-10-06), dont le pont MT5 en Python
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 
@@ -93,6 +93,9 @@ node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100
 # Résoudre UN plan — sur Binance, ou sur l'export TradingView du graphique analysé
 node scripts/resoudre-plan.mjs --csv "OANDA_XAUUSD, 1.csv" --le 2026-09-22T18:48:55Z \
   --direction BUY --entree 2650 --stop 2645 --tp1 2655 --tp2 2660
+
+# Windows : raccourcis bureau (analyseur, feuille de route) — à lancer une fois
+powershell -ExecutionPolicy Bypass -File outils\creer-raccourcis.ps1
 
 # Toutes les données locales vivent dans donnees/ (ignoré par git) — DEC-038
 npm run mt5:export               # historique du compte MT5 (Axi) → donnees/mt5, en UTC

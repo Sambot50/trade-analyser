@@ -24,11 +24,16 @@ renvoie.
 - **E2** : Claude (Anthropic) et tout fournisseur compatible OpenAI (OpenAI,
   Mistral, Groq, OpenRouter, LM Studio) ; une clé par fournisseur ; réglages
   généralisés.
-- Feuille de route et journal de bord créés.
+- Feuille de route et journal de bord créés, puis la feuille de route
+  passée **en cases à cocher**, avec la règle ⏸ « en attente de
+  l'opérateur » : une étape dont tout le développement est fait et qui
+  n'attend qu'une vérification de l'opérateur ne bloque pas la suivante.
+- Feuille de route affichée en permanence dans l'analyseur (onglet, avec
+  l'avancement par étape) ; lanceur et raccourcis bureau dans `outils/`.
 
 **Mesuré**
-- 1 215 tests JS + 10 tests Python en fin de journée ; écrans
-  Performances et Réglages vérifiés dans Chromium.
+- 1 220 tests JS + 10 tests Python en fin de journée ; écrans
+  Performances, Réglages et Feuille de route vérifiés dans Chromium.
 
 **Décidé**
 - Produit : aide à la décision + mesure des trades de l'opérateur, en
@@ -38,6 +43,10 @@ renvoie.
 **Bloqué**
 - Connexion MT5 Axi : E1 attend sa validation sur le vrai terminal.
 - Push des tags depuis l'environnement d'écriture.
+
+**Erreur reconnue**
+- Deux cases d'E0 cochées avant d'être faites. Corrigé dans la foulée :
+  construites, vérifiées, puis cochées.
 
 **Prochaine action**
 - **E3 — moteur multi-unités de temps.**

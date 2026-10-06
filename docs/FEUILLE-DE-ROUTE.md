@@ -119,43 +119,145 @@ soit l'implémentation branchée.
 
 ---
 
-## 5. Les étapes
+## 5. Les étapes, en cases à cocher
 
-Une étape est **finie** quand son critère est atteint, que les tests et le
-build passent, et que `ETAT.md` et le journal de bord sont à jour.
+**Légende.** `[x]` fait et vérifié · `[ ]` reste à faire · 🔵 étape en cours ·
+⏸ en attente de l'opérateur (tout le développement est fait, il ne reste
+qu'une vérification de son côté) · ⬜ pas commencée.
 
-| # | Étape | Livrable | Critère de fin | Statut |
-|---|---|---|---|---|
-| E0 | Remise à plat | `main` à jour, `donnees/`, commandes `npm run …` | une commande courte par action | ✅ 2026-10-06 |
-| E1 | Pont MT5 + journal de performances | `pont-mt5/`, `npm run journal`, onglet Performances | tes vrais trades affichés sans saisie | 🟡 code ✅ · **validation en attente : connexion MT5** |
-| E2 | IA interchangeables | Claude, compatible OpenAI, réglages généralisés | analyse lancée avec au moins deux fournisseurs différents | 🟡 code ✅ · essai réel à faire par l'opérateur |
-| **E3** | **Moteur multi-unités de temps** | tableau façon KTA MTF, biais pondéré, lecture ; points structurels nommés ; sessions | identique à TradingView sur 10 points de contrôle relevés par l'opérateur | **⬜ prochaine** |
-| E4 | Écran Décision | rapport au format de la référence, plan avec stop obligatoire, checklist de capture, notes, bouton « Je prends » | aucun chiffre du rapport ne vient de l'IA | ⬜ |
-| E5 | Sources Lego + direct MT5 | `src/lib/sources/`, flux MT5 en continu | les mêmes analyses sur fichier et en direct | ⬜ attend E1 validé |
-| E6 | Scanner multi-marchés | liste d'actifs, OB touchés, réactions, distances | une opportunité détectée en moins d'une minute | ⬜ |
-| E7 | Alertes Telegram | bot, catégories, lien vers l'écran Décision | message reçu en moins d'une minute | ⬜ |
-| E8 | Labo par signal | statistiques mesurées de chaque type de signal, avec témoin et frais | plus aucune note non mesurée à l'écran | ⬜ |
-| E9 | Coach | retour sur les trades réels : écarts au plan, erreurs récurrentes | fondé uniquement sur le journal mesuré | ⬜ |
-| E10 | Exécution assistée | ordre préparé, validé, envoyé | seulement pour un signal passé par le Labo | ⬜ |
+Une case ne se coche que quand le travail est **vérifié** (tests, build, ou
+essai réel quand la case le dit). Une case cochée à tort se décoche, et
+l'erreur s'écrit au journal.
+
+### Où on en est
+
+| Étape | Statut | Reste |
+|---|---|---|
+| E0 Remise à plat | ⏸ | tag à poser, ancienne copie à retirer (opérateur) |
+| E1 Pont MT5 + journal | ⏸ | validation sur le vrai terminal Axi (connexion à rétablir) |
+| E2 IA interchangeables | ⏸ | un essai réel avec deux IA différentes |
+| **E3 Moteur multi-unités de temps** | 🔵 | tout |
+| E4 → E10 | ⬜ | — |
+
+---
+
+### E0 — Remise à plat ⏸
+
+- [x] Branche de travail fusionnée dans `main` (#52)
+- [x] `donnees/` ignoré par git ; il ne quitte jamais la machine
+- [x] Commandes courtes : `npm run journal`, `mt5:export`, `rejeu:037`, `temoin:037`
+- [x] Feuille de route et journal de bord créés (DEC-039)
+- [x] Feuille de route affichée dans l'analyseur (onglet « Feuille de route »)
+- [x] Lanceur et script de raccourcis écrits (`outils/`) — Windows : non exécutables d'ici
+- [ ] **Opérateur** — lancer `outils/creer-raccourcis.ps1` et vérifier les deux raccourcis
+- [ ] **Opérateur** — poser le tag `v2026.10.06-journal-mt5` (le push de tags échoue d'ici)
+- [ ] **Opérateur** — retirer l'ancienne copie `Documents\trade-analyser` une fois les données déplacées
+
+### E1 — Pont MT5 + journal de performances ⏸
+
+- [x] Pont `pont-mt5/exporter.py` : transactions, ordres, compte, bougies
+- [x] Heure du serveur Axi convertie en UTC (New York + 7 h), vérifiée à chaque export
+- [x] Positions reconstituées depuis les transactions, R sur le stop d'ouverture
+- [x] Métriques : réussite et intervalle, profit factor, P&L, frais, gain et perte moyens, creux, durée, Sharpe
+- [x] Ventilations par heure, jour, setup, symbole, sens — sans « meilleur » désigné
+- [x] Commande `npm run journal` et onglet « Performances »
+- [x] Tests : 10 Python (faux terminal), JS de bout en bout
+- [ ] **Opérateur** — `pip install MetaTrader5`, MT5 ouvert, `npm run mt5:export`
+- [ ] **Opérateur** — la ligne « Heure du serveur » dit « confirmée » (marché ouvert)
+- [ ] **Opérateur** — trois trades du journal comparés à l'historique MT5 : identiques
+- [ ] Ajuster ce que le vrai terminal révèle (s'il révèle quelque chose)
+
+### E2 — IA interchangeables ⏸
+
+- [x] Contrat commun des fournisseurs (politique de clé, adresse, modèle)
+- [x] Claude (Anthropic) : sortie imposée par outil
+- [x] Compatible OpenAI : OpenAI, Mistral, Groq, OpenRouter, LM Studio
+- [x] Une clé par fournisseur, en mémoire seulement
+- [x] Réglages généralisés, vérifiés dans Chromium
+- [x] Toute réponse repasse par `validateAnalysis`, quelle que soit l'IA
+- [ ] **Opérateur** — une capture analysée avec deux IA différentes (ex. Ollama et Claude)
+- [ ] Corriger ce que les vrais appels révèlent (s'ils révèlent quelque chose)
+
+### E3 — Moteur multi-unités de temps 🔵
+
+- [ ] État final de la structure par unité de temps : tendance, dernier évènement (BOS / CHoCH), âge, niveau d'invalidation, distance
+- [ ] Tableau 5 min → Daily, calculé sur des bougies 1 min, **sans lecture du futur**
+- [ ] Biais pondéré sur 10, poids déclarés et visibles
+- [ ] Lecture en une phrase (alignement, repli dans la tendance de fond, conflit)
+- [ ] Points structurels nommés : HH, HL, LH, LL
+- [ ] Sessions : Asie, Londres, New York (plus hauts, plus bas)
+- [ ] Commande `npm run structure` sur un fichier de `donnees/`
+- [ ] Tests : chaque cas du tableau, et l'absence de lecture du futur
+- [ ] Contrat de la brique Multi-UT écrit au § 4, et respecté
+- [ ] **Opérateur** — 10 points de contrôle relevés sur TradingView, comparés : identiques
+
+### E4 — Écran Décision ⬜
+
+- [ ] Dépôt d'une capture + notes facultatives
+- [ ] Checklist « bonne capture » vérifiée automatiquement (unité, échelle, nombre de bougies)
+- [ ] Rapport : vue d'ensemble, structure, liquidité, zones, FVG, scénarios, niveaux, conclusion
+- [ ] Tous les niveaux viennent du moteur ; l'IA ne fait que rédiger
+- [ ] Plan avec **stop obligatoire**, R, taille de position, coût en R
+- [ ] Bouton « Je prends » relié au journal
+- [ ] Le même écran fonctionne avec chacune des IA branchées
+
+### E5 — Sources interchangeables + direct MT5 ⬜
+
+- [ ] Contrat Source : `bougies({ symbole, unite, depuisMs, jusquaMs })`
+- [ ] Sources fichier, Binance, MT5 (fichiers) derrière ce contrat
+- [ ] Source MT5 en continu (pont local)
+- [ ] Les mêmes analyses rendent les mêmes résultats sur fichier et en direct
+
+### E6 — Scanner multi-marchés ⬜
+
+- [ ] Liste d'actifs (Forex, métaux, indices, crypto) configurable
+- [ ] Détections : OB touché, réaction, entrée dans une zone, distance au prix
+- [ ] Opportunité détectée en moins d'une minute
+
+### E7 — Alertes Telegram ⬜
+
+- [ ] Contrat Notificateur : `envoyer(opportunite)`
+- [ ] Notificateurs console et Telegram, catégories par marché
+- [ ] Lien vers l'écran Décision dans chaque message
+- [ ] Message reçu en moins d'une minute
+
+### E8 — Labo par signal ⬜
+
+- [ ] Statistiques mesurées par type de signal, avec témoin et frais réels
+- [ ] Les « étoiles » et les probabilités remplacées par ces chiffres
+- [ ] Plus aucune note non mesurée à l'écran
+
+### E9 — Coach ⬜
+
+- [ ] Écarts entre le plan pris et l'exécution réelle
+- [ ] Erreurs récurrentes, établies sur le journal mesuré seulement
+
+### E10 — Exécution assistée ⬜
+
+- [ ] Ordre préparé depuis l'écran Décision
+- [ ] Validation obligatoire par l'opérateur avant envoi
+- [ ] Réservée aux signaux qui ont passé le Labo
 
 ### En parallèle, côté opérateur
 
-| Action | Pourquoi | Statut |
-|---|---|---|
-| Réplication DEC-037 : `npm run rejeu:037` puis `npm run temoin:037` | dit si l'IA garde un rôle de lecture, ou seulement de rédaction | ⬜ |
-| Connexion MT5 Axi, puis `npm run mt5:export` | débloque E1, E5, E6 | ⬜ problème de connexion |
-| Tag `v2026.10.06-journal-mt5` | le push de tags échoue depuis l'environnement d'écriture | ⬜ |
+- [ ] Réplication DEC-037 : `npm run rejeu:037`, puis `npm run temoin:037`
+- [ ] Connexion MT5 Axi rétablie
 
 ---
 
 ## 6. Règles de conduite
 
-1. **Une étape à la fois**, dans l'ordre. Une urgence réelle (bug, garde-fou
-   cassé) passe devant, et s'écrit au journal.
-2. **Une idée nouvelle va ici d'abord**, à sa place dans le tableau, avant
+1. **Une étape à la fois, dans l'ordre. On ne quitte jamais une étape dont il
+   reste du développement.** Seule exception : une étape dont tout le
+   développement est fait et qui n'attend qu'une vérification de l'opérateur
+   passe en ⏸, et ses cases restantes restent visibles jusqu'à leur
+   validation.
+2. **Ne rien précipiter.** Une case se coche quand elle est vérifiée, pas
+   quand elle est écrite.
+3. **Une idée nouvelle va ici d'abord**, à sa place dans les cases, avant
    toute ligne de code.
-3. **Fini veut dire vérifié** : tests, build, et le critère de l'étape. Ce qui
-   n'a pas pu être vérifié est écrit, dans le code et dans le commit.
-4. **Le journal de bord est tenu chaque jour de travail** : fait, mesuré,
-   décidé, bloqué, prochaine action.
-5. **Aucun chiffre affiché sans mesure**, aucun ordre envoyé sans validation.
+4. **Lego.** Chaque brique respecte son contrat (§ 4). Remplacer une
+   implémentation ne touche aucune autre brique ; si c'est impossible, le
+   contrat change, et ce changement s'écrit dans `DECISIONS.md`.
+5. **Le journal de bord est tenu chaque jour de travail.**
+6. **Aucun chiffre affiché sans mesure, aucun ordre envoyé sans validation.**
