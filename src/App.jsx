@@ -3,7 +3,7 @@ import {
   Upload, Sparkles, TrendingUp, TrendingDown,
   Target, RefreshCw, Key, CheckCircle2,
   Copy, Zap, ShieldAlert, AlertCircle, Layers,
-  BarChart2, ArrowUpRight, Eye, EyeOff, Cpu, Settings, Ruler, NotebookPen, LineChart, GitCompare, Hourglass, Wallet, ListChecks,
+  BarChart2, ArrowUpRight, Eye, EyeOff, Cpu, Settings, Ruler, NotebookPen, LineChart, GitCompare, Hourglass, Wallet,
 } from 'lucide-react';
 
 import { SAMPLES } from './samples.js';
@@ -15,7 +15,6 @@ import JournalView from './JournalView.jsx';
 import { enregistrerAnalyse, enregistrerMesure, dossierMemorise, resoudreEnAttente } from './lib/journal/index.js';
 import FileDAttente from './FileDAttente.jsx';
 import PerformancesView from './PerformancesView.jsx';
-import FeuilleDeRouteView from './FeuilleDeRouteView.jsx';
 import { validateAnalysis, validateScale, normalizeAnalysis, buildOverlayLines, rrVerdict, breakEvenRate, FRICTION_PAR_DEFAUT } from './lib/analysis.js';
 import { lireGraphique } from './lib/vision/lecture.js';
 import { pixelsDepuisDataUrl, enCanvas } from './lib/vision/navigateur.js';
@@ -52,11 +51,7 @@ export default function App() {
   const [prixHaut, setPrixHaut] = useState('');
   const [prixBas, setPrixBas] = useState('');
 
-  // L'onglet peut venir de l'adresse (#feuille-de-route) : c'est ce qu'ouvre
-  // le raccourci du bureau.
-  const [onglet, setOnglet] = useState(() => (
-    typeof window !== 'undefined' && window.location.hash === '#feuille-de-route' ? 'feuille' : 'analyse'
-  ));
+  const [onglet, setOnglet] = useState('analyse');
   const [dossierJournal, setDossierJournal] = useState(null);
   const [noteJournal, setNoteJournal] = useState('');
 
@@ -410,7 +405,6 @@ export default function App() {
               { id: 'journal', label: 'Journal', Icone: NotebookPen },
               { id: 'file', label: 'À juger', Icone: Hourglass },
               { id: 'performances', label: 'Performances', Icone: Wallet },
-              { id: 'feuille', label: 'Feuille de route', Icone: ListChecks },
             ].map(({ id, label, Icone }) => (
               <button
                 key={id}
@@ -448,10 +442,6 @@ export default function App() {
       {onglet === 'journal' ? (
         <main className="max-w-7xl mx-auto px-5 py-6">
           <JournalView racine={dossierJournal} setRacine={setDossierJournal} />
-        </main>
-      ) : onglet === 'feuille' ? (
-        <main className="max-w-7xl mx-auto px-5 py-6">
-          <FeuilleDeRouteView />
         </main>
       ) : onglet === 'performances' ? (
         <main className="max-w-7xl mx-auto px-5 py-6">

@@ -58,6 +58,20 @@ renvoie.
 - La fonction de fuseau horaire déplacée dans `src/lib/temps.js` : le moteur
   de marché ne dépend plus du module du témoin.
 
+**Fait, soirée — raccourci de la feuille de route**
+- Le raccourci « Feuille de route » relançait l'analyseur ; s'il tournait
+  déjà, rien ne s'ouvrait. Remplacé par une page claire autonome,
+  `docs/feuille-de-route.html` (`npm run feuille`), testée contre sa source
+  ([#55](https://github.com/Sambot50/trade-analyser/pull/55)). Raccourcis
+  vérifiés par l'opérateur : case E0 cochée.
+- Onglet « Feuille de route » retiré de l'analyseur, à la demande de
+  l'opérateur.
+
+**Erreur reconnue**
+- Lanceur modifié sans accord préalable de l'opérateur, contre sa règle.
+  Modification jamais envoyée, puis abandonnée. Désormais : décrire, attendre
+  le « ok », puis agir.
+
 **Prochaine action**
 - **Opérateur** : 10 points de contrôle E3 (procédure dans la feuille de route).
 - **E4 — écran Décision**, à la prochaine session de travail.
