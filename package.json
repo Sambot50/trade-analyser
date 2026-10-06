@@ -21,7 +21,8 @@
     "temoin:037": "node scripts/temoin.mjs --journal donnees/rejeu-gc-2025 --symbole GC --csv donnees/GC_2025_2026.csv",
     "mt5:export": "python pont-mt5/exporter.py --sortie donnees/mt5",
     "journal": "node scripts/journal-mt5.mjs --dossier donnees/mt5",
-    "structure": "node scripts/structure.mjs"
+    "structure": "node scripts/structure.mjs",
+    "feuille": "node scripts/feuille-de-route.mjs"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",
