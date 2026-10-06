@@ -48,8 +48,19 @@ renvoie.
 - Deux cases d'E0 cochées avant d'être faites. Corrigé dans la foulée :
   construites, vérifiées, puis cochées.
 
+**Fait, suite — E3, moteur multi-unités de temps (passé en ⏸)**
+- Bougies 4 h et Daily découpées sur la séance (17 h New York), DST compris.
+- État de la structure par unité : tendance, BOS / CHoCH, âge, invalidation,
+  distance ; points nommés HH, HL, LH, LL ; sessions Asie, Londres, New York.
+- Biais pondéré (poids 1-1-1-2-2-3) et lecture : ils reproduisent les deux
+  captures de référence (+2 / 10 et 0 / 10).
+- `npm run structure`. 1 250 tests.
+- La fonction de fuseau horaire déplacée dans `src/lib/temps.js` : le moteur
+  de marché ne dépend plus du module du témoin.
+
 **Prochaine action**
-- **E3 — moteur multi-unités de temps.**
+- **Opérateur** : 10 points de contrôle E3 (procédure dans la feuille de route).
+- **E4 — écran Décision**, à la prochaine session de travail.
 
 ---
 
