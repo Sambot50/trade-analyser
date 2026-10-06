@@ -1,5 +1,5 @@
-// Un lecteur de Markdown réduit, pour afficher la feuille de route dans
-// l'application sans ajouter de dépendance.
+// Un lecteur de Markdown réduit, pour produire la page de la feuille de route
+// (`feuille-html.js`) sans ajouter de dépendance.
 //
 // Il ne couvre que ce que nos documents emploient : titres, séparateurs,
 // paragraphes, listes (numérotées ou non), cases à cocher, tableaux, et en
