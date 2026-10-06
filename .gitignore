@@ -33,3 +33,7 @@ sortie-*.txt
 # tesseract.js décompresse son dictionnaire dans le répertoire courant
 # quand il tourne sous Node (les tests du moteur réel).
 *.traineddata
+
+# Bytecode Python, régénéré à chaque exécution.
+__pycache__/
+*.pyc
