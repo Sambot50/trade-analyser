@@ -5,6 +5,19 @@ soit sur XAUUSD, il faut un fichier. Ce document dit lequel, où, et quel piège
 évite de décaler toute la série de cinq heures sans qu'aucune erreur ne le
 signale.
 
+## Le dossier `donnees/`
+
+Toutes les commandes `npm run …` lisent et écrivent dans `donnees/`, à la
+racine du projet. Git l'ignore : il contient l'historique du compte et ne
+quitte jamais la machine.
+
+```
+donnees/
+  GC_2023_2024.csv  GC_2025_2026.csv    bougies Databento
+  rejeu-gc/  rejeu-gc-2025/             journaux de rejeu (DEC-036, DEC-037)
+  mt5/                                  export du pont MT5 (DEC-038)
+```
+
 ## Un seul fichier suffit
 
 Télécharge du **1 minute**, et rien d'autre. Le backtest en déduit les bougies
@@ -46,7 +59,20 @@ plutôt que de produire un chiffre.
 Si tu as MT4 ou MT5 chez Vantage, ses propres bougies valent mieux que celles
 d'un agrégateur : ce sont les prix auxquels tu aurais été exécuté.
 
-MT5 → Outils → Centre d'historique → XAUUSD → M1 → Exporter.
+**Le plus simple : le pont MT5** (DEC-038), terminal ouvert :
+
+```
+pip install MetaTrader5
+npm run mt5:export -- --bougies XAUUSD --depuis 2026-01-01
+```
+
+Il écrit `donnees/mt5/bougies/XAUUSD_M1.csv` **déjà converti en UTC**, au
+format que lisent tous les scripts : pas de `--decalage-heures` à passer. Il
+exporte aussi l'historique du compte, pour `npm run journal`.
+
+À la main, dans MT5 : Affichage → Symboles (Ctrl+U) → onglet Barres →
+symbole, M1, dates → Demander → Exporter les barres. *L'ancien chemin
+« Outils → Centre d'historique » est celui de MT4 : il n'existe pas dans MT5.*
 
 Le fichier sort en `<DATE>,<TIME>,<OPEN>,...`, avec un en-tête et un volume de
 ticks réel. Il est lu directement, sans option. Son horodatage est celui du

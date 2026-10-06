@@ -78,7 +78,7 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 1 183 tests (2026-10-05)
+npm test                         # 1 205 tests (2026-10-06), dont le pont MT5 en Python
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 
@@ -93,6 +93,12 @@ node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100
 # Résoudre UN plan — sur Binance, ou sur l'export TradingView du graphique analysé
 node scripts/resoudre-plan.mjs --csv "OANDA_XAUUSD, 1.csv" --le 2026-09-22T18:48:55Z \
   --direction BUY --entree 2650 --stop 2645 --tp1 2655 --tp2 2660
+
+# Toutes les données locales vivent dans donnees/ (ignoré par git) — DEC-038
+npm run mt5:export               # historique du compte MT5 (Axi) → donnees/mt5, en UTC
+npm run mt5:export -- --bougies XAUUSD --depuis 2026-01-01   # + bougies M1
+npm run journal                  # journal de performances depuis l'export MT5
+npm run rejeu:037                # réplication DEC-037 ; npm run temoin:037 ensuite
 
 # Rejeu pré-enregistré (DEC-036) : 100 jours de GC rejoués au modèle, puis le témoin, UNE fois.
 # Ne jamais relancer dans un autre dossier pour obtenir un autre p.
@@ -164,6 +170,9 @@ finit par diverger, et c'est documenté dans BLK-016.
 - **La robustesse de la lecture d'axe** sur d'autres styles de graphique,
   unités de temps et actifs. Un seul essai réel à ce jour, pour chacune des
   deux lectures.
+- **Le pont MT5 face au vrai terminal** (`pont-mt5/exporter.py`). Éprouvé
+  contre un faux module ; l'heure du serveur Axi (New York + 7 h) est vérifiée
+  à chaque export, mais n'a jamais été mesurée depuis l'environnement d'écriture.
 - **L'export CSV de TradingView.** Reconnu d'après un fichier construit sur
   la description du format ; aucun export réel n'a encore été lu.
 - **La justesse des bougies lues par la géométrie.** Le test sur capture

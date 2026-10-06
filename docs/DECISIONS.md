@@ -2980,3 +2980,73 @@ la règle.
 Les mêmes interdits que DEC-036. Ni relance dans un autre dossier, ni autre
 graine, ni regroupement des deux rejeux en un seul test après coup. Un
 regroupement se pré-enregistre, et il ne l'est pas ici.
+
+---
+
+## DEC-038 — On garde le moteur, on refait la carrosserie. La donnée vient de MT5.
+
+**2026-10-06 · Retenue**
+
+### Le cap
+
+L'objectif est fixé par l'opérateur : **un outil qui aide à décider et mesure
+ses propres trades.** Il ne s'agit pas d'un robot qui trade à sa place. Le
+produit de référence est celui d'un bootcamp : analyseur de capture, tableau
+de structure multi-unités de temps, scanner d'order blocks, alertes Telegram,
+journal de performances, robots MT5. On en reprend **l'ergonomie**, pas les
+performances affichées, qui ne sont pas mesurées : profit factor de 56 et
+Sharpe de 74 sur 31 trades, en « exécution idéale », avec des paramètres
+optimisés sur la période testée.
+
+### Pas de page blanche
+
+`src/lib/` est conservé tel quel. Ses 1 183 tests portent les garde-fous qui
+ont coûté le plus cher : la lecture du futur (DEC-013), la règle de sortie
+unique (DEC-015), les contrats non recollés (DEC-027) et le dénominateur creux
+(DEC-033). Repartir de zéro reviendrait à les réapprendre.
+
+**On refait** l'interface, découpée en écrans (Décision, Scanner, Journal,
+Labo), et la source de données. **On rétrograde** l'IA génératrice de plans :
+elle ne fera au mieux que rédiger, à partir de niveaux calculés par le moteur.
+DEC-037 dira si elle garde même ce rôle.
+
+### La donnée : le terminal MT5, par un pont local
+
+Le verrou du projet était la donnée en direct sur l'or et le Forex. Binance ne
+cote que la crypto, et l'export TradingView est payant. Le paquet Python
+`MetaTrader5`, gratuit et officiel, donne depuis le terminal ouvert les bougies
+et l'historique de tout ce que le courtier cote, l'historique des trades du
+compte, et l'envoi d'ordres. Un seul pont alimente donc le journal, puis le
+scanner, puis, plus tard et sous validation humaine, l'exécution.
+
+Le pont **exporte des fichiers** (`pont-mt5/exporter.py` → `donnees/mt5/`) et
+toute la logique vit en JavaScript, testée ici. Le Python reste minimal, parce
+qu'il ne peut pas être exécuté contre un vrai terminal depuis l'environnement
+d'écriture.
+
+### L'heure du serveur, piège principal
+
+MT5 date tout à l'heure du serveur, encodée comme si c'était de l'UTC. Chez
+Axi, l'heure du serveur vaut **l'heure de New York + 7 h**, soit UTC+2 l'hiver
+et UTC+3 pendant l'heure d'été **américaine**, qui ne coïncide pas avec
+l'européenne. Un décalage fixe serait faux plusieurs mois par an, sans aucune
+erreur visible, et toutes les « meilleures heures » du journal seraient
+décalées d'une heure. La règle est donc appliquée date par date, puis
+**confrontée au serveur réel** à chaque export ; si le décalage mesuré la
+contredit, l'export est refusé.
+
+### Le journal ne désigne aucun « meilleur » groupe
+
+La demande type d'un journal de trading (« quelle est ma meilleure heure, mon
+meilleur jour, mon setup favori ») est une machine à fausses découvertes.
+Comparer 24 heures garantit qu'une sortira gagnante par hasard (garde-fou 7).
+Chaque groupe porte donc son effectif et son intervalle, les groupes sont
+rendus dans l'ordre naturel et jamais triés par résultat, et un groupe de
+moins de 30 trades est marqué « trop peu ».
+
+### Le R du journal
+
+Le R se calcule sur le **stop de l'ordre d'ouverture**, et non sur un stop
+déplacé ensuite. Le risque en argent se déduit de ce que le trade a payé par
+unité de prix, ce qui rend inutile toute table de tailles de contrat. Un trade
+ouvert sans stop a un R **inconnu**, compté comme tel.
