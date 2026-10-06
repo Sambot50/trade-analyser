@@ -78,7 +78,7 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 1 205 tests (2026-10-06), dont le pont MT5 en Python
+npm test                         # 1 215 tests (2026-10-06), dont le pont MT5 en Python
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 
@@ -146,6 +146,12 @@ npm run samples                  # régénère les graphiques de référence
 
 ## Mémoire et documentation
 
+**La feuille de route se suit étape par étape** : `docs/FEUILLE-DE-ROUTE.md`
+fixe l'ordre, les livrables et le critère de fin de chaque étape, et l'étape en
+cours. Une idée qui n'y figure pas ne se code pas : elle s'y ajoute d'abord.
+**`docs/JOURNAL-DE-BORD.md` reçoit une entrée par jour de travail** (fait,
+mesuré, décidé, bloqué, prochaine action). Voir DEC-039.
+
 Ce dépôt contient la **documentation du projet** : `docs/DECISIONS.md` pour
 les choix d'architecture et leur motif — ainsi que les hypothèses gelées
 (HYP-xxx) et les errata —, `docs/ETAT.md` pour ce qui est vérifié et ce qui ne
@@ -170,6 +176,9 @@ finit par diverger, et c'est documenté dans BLK-016.
 - **La robustesse de la lecture d'axe** sur d'autres styles de graphique,
   unités de temps et actifs. Un seul essai réel à ce jour, pour chacune des
   deux lectures.
+- **Les appels réseau vers Claude et les fournisseurs compatibles OpenAI**
+  (`src/lib/providers/`). Requêtes et réponses testées contre des formes
+  construites d'après la documentation ; aucun appel réel depuis ici.
 - **Le pont MT5 face au vrai terminal** (`pont-mt5/exporter.py`). Éprouvé
   contre un faux module ; l'heure du serveur Axi (New York + 7 h) est vérifiée
   à chaque export, mais n'a jamais été mesurée depuis l'environnement d'écriture.

@@ -3050,3 +3050,52 @@ Le R se calcule sur le **stop de l'ordre d'ouverture**, et non sur un stop
 déplacé ensuite. Le risque en argent se déduit de ce que le trade a payé par
 unité de prix, ce qui rend inutile toute table de tailles de contrat. Un trade
 ouvert sans stop a un R **inconnu**, compté comme tel.
+
+---
+
+## DEC-039 — Des briques, n'importe quelle IA, et une feuille de route suivie pas à pas
+
+**2026-10-06 · Retenue**
+
+### Le besoin
+
+L'opérateur veut pouvoir **brancher n'importe quelle IA** sur l'analyseur et
+construire l'outil **comme un Lego** : des briques qui s'empilent et
+s'échangent, mises à jour une par une. Il y a deux usages : l'analyse d'une
+capture, et la surveillance des marchés en direct avec envoi des opportunités.
+
+### Ce qui est retenu
+
+**Une brique est un contrat**, pas une implémentation. Les contrats sont
+décrits dans `FEUILLE-DE-ROUTE.md` § 4 : Source, Moteur, Multi-UT, IA,
+Décision, Scanner, Notificateur, Journal, Labo, Exécution. Une
+implémentation nouvelle respecte le contrat existant. Si elle ne peut pas,
+c'est le contrat qui change, et ce changement s'écrit ici.
+
+**La brique IA ne porte aucun garde-fou.** Tout ce qu'un fournisseur rend
+repasse par `validateAnalysis` : cohérence, ratio recalculé. Le registre
+`src/lib/providers/index.js` décrit chaque fournisseur de la même façon
+(politique de clé, adresse, modèle) ; l'interface ne connaît que ce registre.
+Ajouter un fournisseur, c'est ajouter un fichier et une entrée.
+
+Deux connecteurs suffisent à couvrir le marché :
+- **Claude**, par l'API Messages, avec la sortie structurée imposée par un
+  outil dont le schéma est `ANALYSIS_SCHEMA` ;
+- **compatible OpenAI**, le protocole de fait d'OpenAI, Mistral, Groq,
+  OpenRouter, DeepSeek et des serveurs locaux (LM Studio, vLLM). Une adresse
+  et un modèle suffisent.
+
+**Une clé par fournisseur**, en mémoire seulement : passer de l'un à l'autre
+n'envoie jamais la clé du premier au second.
+
+### La gouvernance
+
+Après deux jours dispersés, `FEUILLE-DE-ROUTE.md` fixe l'ordre des étapes et
+leur critère de fin, et `JOURNAL-DE-BORD.md` consigne chaque jour de travail.
+Une idée qui n'y figure pas ne se code pas : elle s'y ajoute d'abord.
+
+### Non vérifié
+
+Les appels réseau vers Anthropic et vers les fournisseurs compatibles OpenAI.
+La forme des requêtes et la lecture des réponses sont testées contre des
+réponses construites ; le premier essai réel revient à l'opérateur.

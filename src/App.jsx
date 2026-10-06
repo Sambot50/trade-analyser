@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 import { SAMPLES } from './samples.js';
-import { PROVIDERS, analyzeChart, blockingReason, getProvider, listInstalledModels } from './lib/providers/index.js';
+import { PROVIDERS, analyzeChart, blockingReason, getProvider } from './lib/providers/index.js';
 import { loadSettings, saveSettings } from './lib/settings.js';
 import { chargerInstrument, enregistrerInstrument, resoudreInstrument } from './lib/instrument.js';
 import { toPngDataUrl } from './lib/image.js';
@@ -33,7 +33,11 @@ export default function App() {
 
   const [engine, setEngine] = useState(loadSettings);
   // La clé vit en mémoire seulement. Pré-remplie depuis .env.local si présente.
-  const [apiKey, setApiKey] = useState(import.meta.env.VITE_GEMINI_API_KEY || '');
+  // Une clé par fournisseur : passer de Gemini à Claude ne doit jamais envoyer
+  // la clé de l'un à l'autre. Jamais écrites sur disque (voir settings.js).
+  const [cles, setCles] = useState(() => Object.fromEntries(
+    Object.values(PROVIDERS).filter((p) => p.envKey).map((p) => [p.id, import.meta.env[p.envKey] || '']),
+  ));
   const [showSettings, setShowSettings] = useState(false);
   const [showKeyValue, setShowKeyValue] = useState(false);
 
@@ -58,6 +62,8 @@ export default function App() {
   const enAttenteJournal = useRef(null);
 
   const provider = getProvider(engine.provider);
+  const apiKey = cles[engine.provider] || '';
+  const setApiKey = (valeur) => setCles((c) => ({ ...c, [engine.provider]: valeur }));
   const config = { ...engine, apiKey };
   const blocked = blockingReason(engine.provider, config);
 
@@ -420,7 +426,7 @@ export default function App() {
                 : 'bg-slate-900 hover:bg-slate-800 border-slate-700/80 text-slate-300'
             }`}
           >
-            {provider.needsApiKey ? <Key className="w-3.5 h-3.5" /> : <Cpu className="w-3.5 h-3.5" />}
+            {provider.keyPolicy === 'requise' ? <Key className="w-3.5 h-3.5" /> : <Cpu className="w-3.5 h-3.5" />}
             <span>{provider.label}</span>
             <span className="text-slate-500 hidden sm:inline">· {engine.model}</span>
           </button>
@@ -716,17 +722,17 @@ function EngineSettings({ engine, setEngine, apiKey, setApiKey, showKeyValue, se
   // Sonde Ollama à l'ouverture : savoir tout de suite si le serveur répond et
   // quels modèles sont réellement installés évite un échec au moment du clic.
   useEffect(() => {
-    if (provider.needsApiKey) { setProbe(null); return; }
+    if (!provider.listModels) { setProbe(null); return; }
 
     let cancelled = false;
     setProbe({ state: 'checking' });
 
-    listInstalledModels(engine.baseUrl)
+    provider.listModels(engine.baseUrl)
       .then((models) => { if (!cancelled) setProbe({ state: 'ok', models }); })
       .catch((err) => { if (!cancelled) setProbe({ state: 'error', message: err.message }); });
 
     return () => { cancelled = true; };
-  }, [provider.needsApiKey, engine.baseUrl]);
+  }, [provider.listModels, engine.baseUrl]);
 
   const selectProvider = (id) => {
     const next = getProvider(id);
@@ -761,7 +767,7 @@ function EngineSettings({ engine, setEngine, apiKey, setApiKey, showKeyValue, se
               }`}
             >
               <span className="text-xs font-semibold flex items-center gap-1.5">
-                {p.needsApiKey ? <Key className="w-3 h-3" /> : <Cpu className="w-3 h-3" />}
+                {p.keyPolicy === 'requise' ? <Key className="w-3 h-3" /> : <Cpu className="w-3 h-3" />}
                 {p.label}
               </span>
               <span className="block text-[10px] text-slate-500 mt-1 leading-snug">{p.blurb}</span>
@@ -771,14 +777,33 @@ function EngineSettings({ engine, setEngine, apiKey, setApiKey, showKeyValue, se
 
         {provider.configurableEndpoint && (
           <label className="block mt-4">
-            <span className="text-[11px] text-slate-500">Adresse du serveur Ollama</span>
+            <span className="text-[11px] text-slate-500">{provider.endpoint}</span>
             <input
               value={engine.baseUrl}
               onChange={(e) => setEngine({ ...engine, baseUrl: e.target.value })}
-              placeholder="http://localhost:11434"
+              placeholder={provider.defaultBaseUrl}
               className="mt-1 w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition"
             />
           </label>
+        )}
+
+        {provider.presets && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {provider.presets.map((pr) => (
+              <button
+                key={pr.id}
+                onClick={() => setEngine({ ...engine, baseUrl: pr.baseUrl, model: pr.modele })}
+                title={pr.modele ? `Modèle : ${pr.modele}` : `Modèle à saisir : ${pr.aide}`}
+                className={`text-[10px] px-2 py-1 rounded-md border transition ${
+                  engine.baseUrl === pr.baseUrl
+                    ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                }`}
+              >
+                {pr.label}
+              </button>
+            ))}
+          </div>
         )}
 
         {probe && (
@@ -827,16 +852,16 @@ function EngineSettings({ engine, setEngine, apiKey, setApiKey, showKeyValue, se
           })}
         </div>
 
-        {provider.needsApiKey && (
+        {provider.keyPolicy !== 'aucune' && (
           <>
             <label className="block mt-4">
-              <span className="text-[11px] text-slate-500">Clé API</span>
+              <span className="text-[11px] text-slate-500">Clé API{provider.keyPolicy === 'optionnelle' ? ' (facultative)' : ''}</span>
               <div className="relative mt-1">
                 <input
                   type={showKeyValue ? 'text' : 'password'}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
-                  placeholder="AIza…"
+                  placeholder={provider.keyPlaceholder}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 pr-10 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 transition"
                 />
                 <button
@@ -852,7 +877,7 @@ function EngineSettings({ engine, setEngine, apiKey, setApiKey, showKeyValue, se
             <p className="text-[10px] text-slate-600 mt-1.5 leading-relaxed">
               Gardée en mémoire pour la session seulement, jamais écrite sur disque ni dans le
               navigateur. Pour éviter de la ressaisir, place-la dans <code>.env.local</code> sous
-              <code> VITE_GEMINI_API_KEY</code>.
+              <code> {provider.envKey}</code>.
             </p>
           </>
         )}
