@@ -20,7 +20,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 
 import { recuperer, dureeUnite, nombreDeRequetes, UNITES } from '../src/lib/marche/bougies.js';
-import { analyser as analyserCsv, agreger as agregerBougies, decrire } from '../src/lib/marche/csv.js';
+import { analyser as analyserCsv, agreger as agregerBougies, decrire, avertissementsLecture } from '../src/lib/marche/csv.js';
 import { coutEnRDuPlan, distributionDesStops, seuilDeRentabilite } from '../src/lib/marche/couts.js';
 import { generateurAleatoire, melangerBougies, valeurP, resumeDistribution } from '../src/lib/marche/controle.js';
 import { decouperParContrat, minimumPourResoudre } from '../src/lib/marche/contrats.js';
@@ -106,6 +106,11 @@ export function validerOptions(args) {
     if (!Number.isFinite(n) || Math.abs(n) > 14) erreurs.push('--decalage-heures doit être un nombre d’heures entre -14 et 14');
     else o.decalageHeures = n;
   }
+
+  // La dernière bougie d'un export TradingView est écartée par défaut : elle
+  // était en cours au moment de l'export. À garder si l'export a été fait
+  // marché fermé.
+  o.garderDerniere = args.garderDerniere === true;
 
   for (const [cle, option] of [['spread', '--spread'], ['commission', '--commission']]) {
     if (args[cle] === undefined) continue;
@@ -538,10 +543,13 @@ async function chargerFichier(o) {
   o.uniteFine = o.utCsv;
   process.stdout.write(`\n  lecture de ${basename(o.csv)}… `);
   const contenu = await readFile(o.csv, 'utf8');
-  const { bougies, volumeExploitable, separateur } = analyserCsv(contenu, {
+  const lecture = analyserCsv(contenu, {
     unite: o.utCsv, decalageHeures: o.decalageHeures,
+    exclureDerniere: o.garderDerniere ? false : 'auto',
   });
+  const { bougies, volumeExploitable, separateur } = lecture;
   console.log(`${bougies.length} bougies ${o.utCsv} (séparateur "${separateur === '\t' ? '\\t' : separateur}")`);
+  for (const ligne of avertissementsLecture(lecture)) console.log(`  ⚠  ${ligne}`);
 
   const retenues = bougies.filter((b) =>
     (o.depuisMs === undefined || b.ouvertureMs >= o.depuisMs)

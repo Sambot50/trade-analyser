@@ -8,12 +8,20 @@ Une application locale qui lit une capture de graphique de trading, en extrait
 un plan de trade via un modèle de vision, reprojette les niveaux sur l'image,
 et journalise le tout pour mesurer si ces plans valent quelque chose.
 
-**État honnête au 2026-09-22 :** la lecture de graphique fonctionne et a été
-vérifiée sur une capture TradingView réelle. La **qualité des plans de trade**
+**État honnête au 2026-10-05 :** la lecture de graphique fonctionne, par le
+modèle de vision comme par la géométrie seule, et chacune a été vérifiée sur
+une seule capture TradingView réelle. La **qualité des plans de trade**
 produits n'est pas établie — un seul essai réel, qui a donné un ratio
 risque/rendement de 0,87 et un raisonnement contredisant ses propres niveaux.
 Le journal existe précisément pour trancher cette question, pas pour la
-supposer résolue.
+supposer résolue. Premier rejeu (DEC-036) : +0,110 R contre −0,138 R au
+témoin, p = 0,049, soit un passage d'un millième, avec un modèle qui vend 99 fois
+sur 100. Réplication pré-enregistrée (DEC-037), pas encore lancée.
+
+Côté mesure, rien n'a encore payé ses frais : la règle des order blocks est
+close (DEC-025, DEC-029), le volume prédit l'amplitude et jamais la direction
+(DEC-031), et l'effet des métaux (HYP-001, HYP-002) rétrécit à chaque mesure
+plus juste (DEC-033). La friction vaut 0,08 R par trade (DEC-034).
 
 Ne jamais présenter cet outil comme validé. Il sait lire un axe de prix. Il ne
 sait pas encore raisonner dessus.
@@ -70,22 +78,58 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 354 tests
+npm test                         # 1 205 tests (2026-10-06), dont le pont MT5 en Python
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 
 # Backtest — deux sources, une chaîne
 node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01
 node scripts/backtest.mjs --csv XAUUSD_M1_2025.csv --decalage-heures -5 --spread 0.25
+node scripts/backtest.mjs --csv "OANDA_XAUUSD, 1.csv" --spread 0.25   # export TradingView
 
 # Contrôle par permutation : la règle bat-elle le hasard sur ces données ?
 node scripts/backtest.mjs --symbole BTCUSDT --depuis 2026-06-01 --controle 100
+
+# Résoudre UN plan — sur Binance, ou sur l'export TradingView du graphique analysé
+node scripts/resoudre-plan.mjs --csv "OANDA_XAUUSD, 1.csv" --le 2026-09-22T18:48:55Z \
+  --direction BUY --entree 2650 --stop 2645 --tp1 2655 --tp2 2660
+
+# Toutes les données locales vivent dans donnees/ (ignoré par git) — DEC-038
+npm run mt5:export               # historique du compte MT5 (Axi) → donnees/mt5, en UTC
+npm run mt5:export -- --bougies XAUUSD --depuis 2026-01-01   # + bougies M1
+npm run journal                  # journal de performances depuis l'export MT5
+npm run rejeu:037                # réplication DEC-037 ; npm run temoin:037 ensuite
+
+# Rejeu pré-enregistré (DEC-036) : 100 jours de GC rejoués au modèle, puis le témoin, UNE fois.
+# Ne jamais relancer dans un autre dossier pour obtenir un autre p.
+node scripts/rejouer.mjs --csv GC_2023_2024.csv --symbole GC --sortie rejeu-gc
+node scripts/temoin.mjs --journal rejeu-gc --symbole GC --csv GC_2023_2024.csv
+# Réplication (DEC-037), sur des jours jamais montrés au modèle
+node scripts/rejouer.mjs --csv GC_2025_2026.csv --symbole GC --sortie rejeu-gc-2025 --protocole DEC-037
+node scripts/temoin.mjs --journal rejeu-gc-2025 --symbole GC --csv GC_2025_2026.csv
+
+# Témoin des plans du journal : le modèle choisit-il mieux ses moments que le hasard ?
+# Réglages figés par DEC-035 et DEC-036, aucune option pour les changer.
+node scripts/temoin.mjs --journal <dossier du journal> --symbole XAUUSD --csv XAUUSD_M1.csv
 
 # Croiser les qualificatifs avec l'issue, corrigé pour la recherche elle-même
 node scripts/analyser-export.mjs cas.jsonl 200
 
 # Confirmer UNE hypothèse pré-enregistrée, sur données jamais regardées
 node scripts/tester-hypothese.mjs cas.jsonl zoneSurAtr 1.1915
+
+# Contrats à terme (CSV Databento) — volume, résolution, fiche
+node scripts/dimensionner.mjs --csv GC_2023_2024.csv --taille-contrat 100
+node scripts/resolution.mjs --csv GC_2023_2024.csv
+node scripts/plan.mjs --csv GC_2023_2024.csv
+
+# Carnet de trades réels, en ajout seul — hors dépôt (*.jsonl)
+node scripts/carnet.mjs --ouvrir --marche GC --tranche 2.4 --sens achat \
+                        --entree 4320.5 --stop 14.6 --objectif 16.8
+node scripts/carnet.mjs --fermer 7 --sortie 4305.9 --issue stop --frais 0.4
+node scripts/carnet.mjs --bilan
+
+npm run assets:ocr               # rapatrie les fichiers Tesseract (aussi en postinstall)
 npm run samples                  # régénère les graphiques de référence
 ```
 
@@ -103,8 +147,9 @@ npm run samples                  # régénère les graphiques de référence
 ## Mémoire et documentation
 
 Ce dépôt contient la **documentation du projet** : `docs/DECISIONS.md` pour
-les choix d'architecture et leur motif, `docs/ETAT.md` pour ce qui est vérifié
-et ce qui ne l'est pas, `docs/PISTES.md` pour ce qu'on a rencontré sans
+les choix d'architecture et leur motif — ainsi que les hypothèses gelées
+(HYP-xxx) et les errata —, `docs/ETAT.md` pour ce qui est vérifié et ce qui ne
+l'est pas, `docs/PISTES.md` pour ce qu'on a rencontré sans
 l'éprouver et `docs/DONNEES.md` pour les sources de bougies.
 
 `PISTES.md` est une **file d'attente, pas un menu** : une piste en sort quand
@@ -123,6 +168,15 @@ finit par diverger, et c'est documenté dans BLK-016.
   qui exploite les bougies est testé exhaustivement ; la récupération ne l'est
   pas. Elle échoue bruyamment.
 - **La robustesse de la lecture d'axe** sur d'autres styles de graphique,
-  unités de temps et actifs. Un seul essai réel à ce jour.
+  unités de temps et actifs. Un seul essai réel à ce jour, pour chacune des
+  deux lectures.
+- **Le pont MT5 face au vrai terminal** (`pont-mt5/exporter.py`). Éprouvé
+  contre un faux module ; l'heure du serveur Axi (New York + 7 h) est vérifiée
+  à chaque export, mais n'a jamais été mesurée depuis l'environnement d'écriture.
+- **L'export CSV de TradingView.** Reconnu d'après un fichier construit sur
+  la description du format ; aucun export réel n'a encore été lu.
+- **La justesse des bougies lues par la géométrie.** Le test sur capture
+  réelle borne des distributions ; il ne compare pas chaque bougie aux prix
+  vrais.
 
 Voir `docs/ETAT.md` pour le détail.

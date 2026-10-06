@@ -14,7 +14,13 @@
     "test:watch": "vitest",
     "samples": "node scripts/make-samples.mjs",
     "assets:ocr": "node scripts/assets-ocr.mjs",
-    "postinstall": "node scripts/assets-ocr.mjs"
+    "postinstall": "node scripts/assets-ocr.mjs",
+    "rejeu:036": "node scripts/rejouer.mjs --csv donnees/GC_2023_2024.csv --symbole GC --sortie donnees/rejeu-gc --protocole DEC-036",
+    "temoin:036": "node scripts/temoin.mjs --journal donnees/rejeu-gc --symbole GC --csv donnees/GC_2023_2024.csv",
+    "rejeu:037": "node scripts/rejouer.mjs --csv donnees/GC_2025_2026.csv --symbole GC --sortie donnees/rejeu-gc-2025 --protocole DEC-037",
+    "temoin:037": "node scripts/temoin.mjs --journal donnees/rejeu-gc-2025 --symbole GC --csv donnees/GC_2025_2026.csv",
+    "mt5:export": "python pont-mt5/exporter.py --sortie donnees/mt5",
+    "journal": "node scripts/journal-mt5.mjs --dossier donnees/mt5"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",

@@ -2649,3 +2649,404 @@ de toute mesure de ce type.
 
 Rien ici n'est pré-enregistré. Ce diagnostic dit ce que la fiche **aurait**
 rendu, jamais ce qu'elle rendra.
+
+---
+
+## DEC-035 — Le témoin des plans : même géométrie, instant tiré au sort
+
+**2026-10-05 · Retenue · figée avant toute lecture d'analyse**
+
+La question d'origine du projet — *les plans d'un modèle de vision valent-ils
+mieux que le hasard ?* — n'a jamais reçu de mesure, faute de témoin. Un taux de
+réussite brut ne la tranche pas : sur des bougies sans structure, la chaîne
+affichait +0,407 R (DEC-014). Ce témoin est construit et éprouvé **avant**
+qu'aucune analyse réelle ne soit passée dedans. Ses réglages sont figés ici, et
+`scripts/temoin.mjs` n'offre aucune option pour les changer.
+
+### Le principe
+
+Chaque plan du journal est réduit à sa **géométrie** : sens, écart de l'entrée
+au prix du moment, écarts du stop et des objectifs à l'entrée, tous en
+proportion du prix. Cette géométrie est rejouée à des instants tirés au sort,
+sur les mêmes bougies, avec le même résolveur. Ce qui distingue le réel du
+témoin est alors **le choix du moment** — rien d'autre.
+
+### Les réglages, et pourquoi
+
+| Réglage | Valeur | Motif |
+|---|---|---|
+| Prix du moment | clôture de la dernière bougie **fermée** avant l'analyse | garde-fou 4 : la bougie en cours n'est pas encore connue |
+| Géométrie | en proportion du prix | l'ATR ajouterait un réglage — sa période — donc un degré de liberté |
+| Fenêtre de tirage | 30 jours avant l'analyse, **couverts en entier** | volatilité comparable ; un plan au début des données est écarté plutôt que témoigné sur trois jours |
+| Non-chevauchement | l'horizon de chaque instant se referme avant l'analyse | aucune bougie de résolution partagée avec le réel (DEC-032) |
+| Règle de sortie | celle du journal, `2r` ; règles mêlées refusées | une seule règle par plan, choisie avant (DEC-015) |
+| Remplissage, horizon | mèche, 24 h — ceux du journal | le témoin juge ce que le journal juge |
+| Jamais déclenché | 0 R | aucun trade |
+| Horizon dépassé | valorisé à la dernière clôture de l'horizon, en R | ce qu'un compte encaisserait ; l'écarter d'un côté fabrique un avantage (DEC-033) |
+| Ambigu | perte ; « gain » rendu comme sensibilité, jamais comme verdict | le choix défavorable |
+| Statistique | moyenne des R sur tous les plans retenus | une seule statistique, un seul test |
+| Tirages | 1 000, graine 1 | rejouable ; plancher de p à 0,001 |
+
+Le journal écarte de ses statistiques les ambigus et les horizons dépassés ; le
+témoin les compte. Les deux bras subissent la même règle, et elle est plus
+stricte.
+
+### Ce que le témoin a montré de lui-même
+
+Éprouvé sur des marches aléatoires, trente plans de 0,15 % de stop, horizon de
+quatre heures, 300 tirages (`temoin.test.js`) :
+
+| Épreuve | Réel | Médiane du témoin | p | Attendu |
+|---|---|---|---|---|
+| Plans au hasard, 20 séries | — | — | 2 sur 20 sous 0,05 | ~1 sur 20 |
+| Oracle : connaît le sens à 4 h | **+0,751 R** | −0,020 R | **0,0033** (plancher) | détecté |
+| Achats sur un marché en pente | **+0,452 R** | +0,389 R | **0,36** | **non crédité** |
+
+La troisième ligne est la raison d'être du témoin. Des achats sur un marché qui
+monte affichent +0,452 R ; un taux de réussite brut les créditerait au modèle.
+Le témoin, posé sur la même pente, fait presque aussi bien, et refuse.
+
+### Ce qu'il ne fait pas
+
+- **Il ne juge pas la direction seule.** Le témoin n°2 — même moment, sens
+  inversé — le ferait. Il n'est pas construit : deux tests sur les mêmes
+  analyses, c'est le problème des essais multiples (garde-fou 7). S'il doit
+  exister, il sera annoncé d'avance comme test secondaire.
+- **Il ne compte pas les frais.** À géométrie proportionnelle et prix voisins,
+  le coût en R est le même dans les deux bras ; il ne change pas l'écart.
+- **Il ne décide rien seul.** L'effectif et le seuil restent à pré-enregistrer
+  (`ETAT.md`, étape 2). Le script le rappelle à chaque lancement.
+
+### Non vérifié
+
+La source Binance du script passe par `journal/market.js`, jamais éprouvé
+depuis l'environnement d'écriture. La source fichier est testée de bout en bout.
+
+---
+
+## DEC-036 — Pré-enregistrement : le modèle rejoué sur cent jours de GC 2023-2024
+
+**2026-10-05 · Gelée avant le premier appel au modèle**
+
+### La question, une seule
+
+**Les plans du modèle de vision, posés à 15 h 30 Paris sur un graphique 15
+minutes, rapportent-ils plus que la même géométrie posée à 15 h 30 d'autres
+jours ?** Statistique et témoin : ceux de DEC-035, amendés ci-dessous.
+
+### Pourquoi un rejeu plutôt que le direct
+
+Cent analyses en direct, une par jour de bourse, prendraient cinq mois. Les
+bougies existent déjà : `GC_2023_2024.csv`, Databento `GLBX.MDP3`,
+`ohlcv-1m`, `GC.v.0` (`DONNEES.md`). Le modèle peut analyser des graphiques
+passés **s'il ne peut pas savoir lesquels**. Le direct à 15 h 30 sur captures
+TradingView devient la **confirmation**, pré-enregistrée à part, et seulement
+si ce rejeu la justifie.
+
+Ce fichier a servi aux mesures de volume (DEC-031 à DEC-034), jamais à une
+question sur le modèle : il n'est pas brûlé pour celle-ci. **2017-2019 reste
+vierge**, réservé à l'épreuve du volume (DEC-033).
+
+### Le protocole, figé dans `scripts/rejouer.mjs`
+
+| Réglage | Valeur |
+|---|---|
+| Fichier | `GC_2023_2024.csv` ; son empreinte SHA-256 est écrite dans `rejeu.json` au premier lancement, et toute reprise la vérifie |
+| Jours | éligibles = 15 h 30 Paris, marché ouvert (une bougie fermée dans les 15 min), 30 jours d'historique et 24 h d'horizon **dans le même contrat** |
+| Tirage | éligibles mélangés par la graine **20261005**, puis retenus dans cet ordre en écartant tout jour dont l'horizon chevauche un jour déjà retenu |
+| Nombre | **100 plans cohérents**. La liste est parcourue dans l'ordre jusqu'à 100 ; les plans incohérents sont consignés dans `rejets.jsonl` et ne comptent pas |
+| Graphique | 150 bougies de 15 min, toutes fermées avant 15 h 30 ; sans volume, sans date ; libellé « INSTRUMENT · 15m » |
+| Déguisement | prix multipliés par un facteur log-uniforme entre 0,2 et 5, tiré par jour depuis la graine ; plan ramené à l'échelle réelle avant résolution |
+| Modèle | `qwen3.8:27b` par Ollama, température 0,2 (celle du fournisseur) |
+| Invite | `ANALYSIS_PROMPT`, SHA-256 `6bc70e39021ff3c4a7242e184aa996d6d5db562ab52492c21a835bbbd8bbe160` |
+| Règle de sortie, horizon, remplissage | `2r`, 24 h en bougies 1 minute, mèche — ceux du journal |
+| Témoin | DEC-035 amendé : même heure locale, 30 jours avant, 1 000 tirages, graine 1, ambigus perdants |
+
+`--limite` permet un essai de quelques jours : ses plans **comptent**, la
+reprise continue la même liste. Une panne du modèle arrête le rejeu au lieu
+de sauter le jour.
+
+### La règle de décision, écrite avant
+
+- Le témoin se lance **une fois**, quand le journal compte 100 plans, avec
+  `node scripts/temoin.mjs --journal <dossier> --symbole GC --csv GC_2023_2024.csv`.
+- **p < 0,05** : le modèle choisit ses moments mieux que le hasard sur ces
+  données. Le test en direct est alors pré-enregistré, et lui seul dira si ça
+  tient sur de vraies captures.
+- **p ≥ 0,05** : aucun avantage de 0,30 R ou plus n'est détectable. **On cesse
+  de faire trader ce modèle sur cette invite**, et le test en direct n'a pas
+  lieu. Un avantage plus petit n'est pas exclu ; il ne serait de toute façon
+  pas mesurable à un effectif tenable, ni rentable face à 0,08 R de frais
+  (DEC-034).
+- La sensibilité (ambigus gagnants), le taux de rejet et la confiance
+  déclarée sont **rapportés, jamais décisifs**.
+- Si la liste s'épuise avant 100 plans, le témoin porte sur ce qui a été
+  obtenu, et le compte rendu le dit.
+
+### Ce qui est interdit, et pourquoi
+
+**Relancer le rejeu dans un nouveau dossier.** À température 0,2, le modèle ne
+répond pas deux fois la même chose : relancer jusqu'à un meilleur p serait
+exactement la pêche que le garde-fou 7 interdit. Le premier dossier complet est
+le résultat. Toute autre exécution est un nouvel essai, et se compte.
+
+**Changer de modèle ou d'invite en cours.** Le script refuse de reprendre un
+dossier dont la signature diffère.
+
+### Puissance, mesurée avant
+
+Par simulation (200 répétitions par case, avantage planté de taille connue,
+`--controle` du témoin) : l'écart type d'un plan vaut environ 1,2 R. À 100
+plans, un avantage de **0,30 R** est détecté huit fois sur dix ; un de 0,10 R
+une fois sur quatre. Le test sait distinguer un modèle franchement bon d'un
+modèle inutile, pas un modèle tout juste rentable.
+
+### Amendements à DEC-035, faits avant toute donnée réelle
+
+En préparant ce protocole, trois défauts du témoin sont apparus. Aucun plan
+réel n'était encore passé dedans ; les corriger maintenant n'ajuste rien sur
+un résultat.
+
+1. **L'heure.** Les instants du témoin étaient tirés à toute heure. Un plan
+   posé à 15 h 30, ouverture de New York, aurait été comparé à des plans posés
+   à 3 h du matin, dans la séance la plus calme : l'écart aurait mesuré
+   l'heure, pas le modèle. **Le témoin tire désormais la même heure locale, les
+   jours précédents**, en heure de Paris à travers les changements d'heure.
+2. **Les contrats.** `temoin.mjs` passait un fichier GC entier comme une seule
+   série : il aurait recollé les contrats (DEC-027). **Chaque plan est jugé et
+   témoigné dans la série de son contrat.**
+3. **Le chevauchement.** Deux plans réels dont les horizons se recouvrent
+   subissent le même mouvement de marché ; le témoin les croyait indépendants.
+   **Un plan qui démarre avant la fin de l'horizon du précédent retenu est
+   écarté**, sur les seuls horaires. S'y ajoute la règle symétrique du marché
+   fermé : sans bougie dans les 15 minutes, pas de prix du moment, ni pour le
+   réel ni pour le témoin.
+
+Les trois épreuves de DEC-035, refaites après amendement (fenêtre de 9 jours
+sur séries de 20) :
+
+| Épreuve | Réel | Médiane du témoin | p |
+|---|---|---|---|
+| Plans au hasard, 20 séries | — | — | 2 sur 20 sous 0,05 |
+| Oracle | +0,751 R | +0,008 R | 0,0033 (plancher) |
+| Achats sur marché en pente | +0,452 R | +0,364 R | 0,31 — non crédité |
+
+### Ce que ce rejeu ne dira pas
+
+- Comment le modèle lit une **capture TradingView** : il voit nos tracés.
+- Ce que rapporte un compte : les frais ne sont pas dans la statistique.
+- Si un avantage tient **après 2024** : c'est le rôle du direct.
+
+### Non vérifié
+
+Le rejeu n'a jamais parlé à un vrai modèle : tout est éprouvé contre un faux
+serveur Ollama. Le premier lancement sur le Legion est aussi la première
+rencontre avec `qwen3.8:27b` sur ces images.
+
+### Amendement du 2026-10-05, soir — un objectif vaut sa vraie distance
+
+Le premier plan du rejeu, relu avant toute issue, vend à 3 055 avec un stop à
+3 072 et un TP2 à 3 025 : **1,76 R**. Le témoin lui aurait crédité **+2 R**.
+`gainEnR` donne à tout TP2 touché la valeur nominale de la règle `2r`, ce qui
+est juste pour les plans du backtest, dont le TP2 est posé à 2 R exactement, et
+faux pour un modèle qui pose le sien où il veut.
+
+Le test restait valable, puisque la même erreur touchait les deux bras, mais
+les R affichés auraient été faux, et un plan à TP2 proche aurait pesé plus que
+son dû. **Corrigé : un objectif atteint vaut sa distance réelle à l'entrée, en
+R.** Sous remplissage à la clôture, où les objectifs sont redérivés à 1 R et
+2 R, la valeur nominale reste exacte.
+
+Aucune issue n'avait été calculée, ni par le rejeu (qui n'en produit pas) ni
+par le témoin. Les épreuves de validation, faites sur des plans à 2 R exacts,
+sont inchangées.
+
+Les statistiques du journal (`report.js`) ne sont pas touchées : elles
+comptent des taux de réussite, jamais des R.
+
+### DEC-036 — Résultat, 2026-10-05
+
+**PASSE, d'un millième.** Rejeu exécuté une fois sur le Legion, `GC_2023_2024.csv`
+(SHA-256 `2b8f10ca18c6…`), `qwen3.8:27b`, 100 plans cohérents sur les 100
+premiers jours de la liste, **aucun rejet**.
+
+| | |
+|---|---|
+| Réel, moyenne sur 100 plans | **+0,110 R** |
+| Témoin, médiane des 1 000 tirages | −0,138 R [−0,501 … +0,289] |
+| **p** | **0,049** (48/1000) |
+| Sensibilité, ambigus gagnants | +0,144 R contre −0,130 R, p = 0,035 |
+
+Issues : 29 objectifs atteints, 55 stops, 13 jamais déclenchés, 2 horizons
+dépassés, 1 ambigu. Un objectif atteint vaut en moyenne 2,3 R : c'est ce qui
+rend un taux d'un tiers positif.
+
+**Le modèle a vendu 99 fois sur 100.** Il n'apporte donc aucune information de
+direction. Ce que le test crédite, ce sont ses niveaux, posés ce jour-là
+plutôt qu'un autre.
+
+#### Quatre réserves, écrites le même jour que le résultat
+
+1. **La marge est de l'ordre du bruit de calcul.** À 1 000 tirages, p porte
+   lui-même ±0,007. Une autre graine aurait pu rendre 0,055. Le verdict tient
+   parce que la graine était fixée d'avance, mais c'est le profil exact de
+   HYP-001 (p = 0,0486), dont l'effet a fondu à chaque mesure suivante.
+2. **Frais déduits, il ne reste presque rien.** À 0,08 R par trade (DEC-034),
+   +0,110 R brut fait environ +0,03 R net. Réel ou non, ce n'est pas un système
+   rentable en l'état.
+3. **Le témoin est toujours antérieur au plan.** Si la volatilité de l'or a
+   dérivé pendant la période, les deux bras ne voient pas tout à fait le même
+   marché. Le sens de ce biais est inconnu.
+4. **Ce n'est pas le sens qui est crédité**, puisqu'il est constant.
+
+#### Application de la règle
+
+p < 0,05 : la règle prévoyait de pré-enregistrer la confirmation en direct.
+Elle est **précédée d'une réplication en rejeu**, DEC-037 : même protocole,
+données jamais montrées au modèle, quelques heures au lieu de cinq mois. Le
+direct ne vient qu'ensuite, et seulement si elle tient. Ce choix ne modifie
+rien au résultat ci-dessus. Il ajoute une épreuve avant d'en tirer quoi que ce
+soit.
+
+---
+
+## DEC-037 — Pré-enregistrement : la réplication sur GC 2025-2026
+
+**2026-10-05 · Gelée avant tout appel au modèle sur ces données**
+
+### La question
+
+La même que DEC-036, sur une autre période : **les plans du modèle, posés à
+15 h 30 Paris, rapportent-ils plus que la même géométrie posée à 15 h 30
+d'autres jours ?**
+
+### Les données
+
+`GC_2025_2026.csv`, Databento `GLBX.MDP3`, `ohlcv-1m`, `GC.v.0`,
+2025-01-01 → 2026-08-31. Elles ont servi à HYP-001, une question sur le
+volume, **jamais au modèle**. Le modèle n'a vu aucun graphique de cette
+période.
+
+`GC_2020_2022.csv` reste en réserve, et 2017-2019 vierge (DEC-033).
+
+### Le protocole
+
+**Identique à DEC-036, réglage par réglage** : `rejouer.mjs` sans aucun
+changement de tirage, de graphique, de déguisement, de modèle ni d'invite (SHA-256
+`6bc70e39…`), la même graine 20261005 pour les jours et les facteurs. Seule
+différence : `--protocole DEC-037`, écrit dans `rejeu.json`.
+
+```
+node scripts/rejouer.mjs --csv GC_2025_2026.csv --symbole GC --sortie rejeu-gc-2025 --protocole DEC-037
+node scripts/temoin.mjs --journal rejeu-gc-2025 --symbole GC --csv GC_2025_2026.csv
+```
+
+**Le nombre de jours éligibles n'est pas connu d'avance.** La période fait
+20 mois contre 24 pour DEC-036, qui en avait 114. Il pourrait y en avoir
+moins de 100. Dans ce cas, la liste est épuisée et le témoin porte sur tous
+les plans obtenus, comme DEC-036 le prévoyait déjà. La puissance baisse d'autant,
+et le compte rendu le dit.
+
+### La lecture, seule chose qui change
+
+| | DEC-036 | DEC-037 |
+|---|---|---|
+| Tirages du témoin | 1 000 | **10 000** |
+| Bruit propre de p, autour de 0,05 | ±0,007 | ±0,002 |
+| Ventilation par trimestre | non | **oui, descriptive** |
+
+Les 10 000 tirages corrigent la réserve n°1 de DEC-036 : la marge ne doit plus
+tenir au bruit du calcul. La ventilation par trimestre répond à la réserve n°3
+sans rien décider : elle montre si l'écart réel − témoin se répartit sur la
+période ou tient à quelques mois.
+
+`temoin.mjs` lit le protocole dans `rejeu.json`, applique sa lecture sans
+option, vérifie que le fichier est bien celui du rejeu (SHA-256), et affiche
+la règle.
+
+### La règle de décision, écrite avant
+
+- **p < 0,05** : l'effet se réplique sur une période que le modèle n'a jamais
+  vue. Le direct est alors pré-enregistré : 15 h 30 Paris, captures
+  TradingView XAUUSD, bougies MT5 Vantage, frais réels comptés.
+- **p ≥ 0,05** : l'effet de DEC-036 ne se réplique pas. Il est classé comme
+  probable fluctuation, au même titre que HYP-001, et **on cesse de faire
+  trader ce modèle sur cette invite**. Pas de direct.
+- Dans les deux cas : sensibilité, répartition achat/vente, taux de rejet et
+  trimestres sont rapportés, jamais décisifs.
+
+### Ce qui est interdit
+
+Les mêmes interdits que DEC-036. Ni relance dans un autre dossier, ni autre
+graine, ni regroupement des deux rejeux en un seul test après coup. Un
+regroupement se pré-enregistre, et il ne l'est pas ici.
+
+---
+
+## DEC-038 — On garde le moteur, on refait la carrosserie. La donnée vient de MT5.
+
+**2026-10-06 · Retenue**
+
+### Le cap
+
+L'objectif est fixé par l'opérateur : **un outil qui aide à décider et mesure
+ses propres trades.** Il ne s'agit pas d'un robot qui trade à sa place. Le
+produit de référence est celui d'un bootcamp : analyseur de capture, tableau
+de structure multi-unités de temps, scanner d'order blocks, alertes Telegram,
+journal de performances, robots MT5. On en reprend **l'ergonomie**, pas les
+performances affichées, qui ne sont pas mesurées : profit factor de 56 et
+Sharpe de 74 sur 31 trades, en « exécution idéale », avec des paramètres
+optimisés sur la période testée.
+
+### Pas de page blanche
+
+`src/lib/` est conservé tel quel. Ses 1 183 tests portent les garde-fous qui
+ont coûté le plus cher : la lecture du futur (DEC-013), la règle de sortie
+unique (DEC-015), les contrats non recollés (DEC-027) et le dénominateur creux
+(DEC-033). Repartir de zéro reviendrait à les réapprendre.
+
+**On refait** l'interface, découpée en écrans (Décision, Scanner, Journal,
+Labo), et la source de données. **On rétrograde** l'IA génératrice de plans :
+elle ne fera au mieux que rédiger, à partir de niveaux calculés par le moteur.
+DEC-037 dira si elle garde même ce rôle.
+
+### La donnée : le terminal MT5, par un pont local
+
+Le verrou du projet était la donnée en direct sur l'or et le Forex. Binance ne
+cote que la crypto, et l'export TradingView est payant. Le paquet Python
+`MetaTrader5`, gratuit et officiel, donne depuis le terminal ouvert les bougies
+et l'historique de tout ce que le courtier cote, l'historique des trades du
+compte, et l'envoi d'ordres. Un seul pont alimente donc le journal, puis le
+scanner, puis, plus tard et sous validation humaine, l'exécution.
+
+Le pont **exporte des fichiers** (`pont-mt5/exporter.py` → `donnees/mt5/`) et
+toute la logique vit en JavaScript, testée ici. Le Python reste minimal, parce
+qu'il ne peut pas être exécuté contre un vrai terminal depuis l'environnement
+d'écriture.
+
+### L'heure du serveur, piège principal
+
+MT5 date tout à l'heure du serveur, encodée comme si c'était de l'UTC. Chez
+Axi, l'heure du serveur vaut **l'heure de New York + 7 h**, soit UTC+2 l'hiver
+et UTC+3 pendant l'heure d'été **américaine**, qui ne coïncide pas avec
+l'européenne. Un décalage fixe serait faux plusieurs mois par an, sans aucune
+erreur visible, et toutes les « meilleures heures » du journal seraient
+décalées d'une heure. La règle est donc appliquée date par date, puis
+**confrontée au serveur réel** à chaque export ; si le décalage mesuré la
+contredit, l'export est refusé.
+
+### Le journal ne désigne aucun « meilleur » groupe
+
+La demande type d'un journal de trading (« quelle est ma meilleure heure, mon
+meilleur jour, mon setup favori ») est une machine à fausses découvertes.
+Comparer 24 heures garantit qu'une sortira gagnante par hasard (garde-fou 7).
+Chaque groupe porte donc son effectif et son intervalle, les groupes sont
+rendus dans l'ordre naturel et jamais triés par résultat, et un groupe de
+moins de 30 trades est marqué « trop peu ».
+
+### Le R du journal
+
+Le R se calcule sur le **stop de l'ordre d'ouverture**, et non sur un stop
+déplacé ensuite. Le risque en argent se déduit de ce que le trade a payé par
+unité de prix, ce qui rend inutile toute table de tailles de contrat. Un trade
+ouvert sans stop a un R **inconnu**, compté comme tel.

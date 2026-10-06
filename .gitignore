@@ -12,9 +12,18 @@ dist/
 *.jsonl
 sortie-*.txt
 
+# Le dossier de travail local : fichiers de bougies, exports MT5, journaux de
+# rejeu. Tout ce que les commandes `npm run …` lisent et écrivent par défaut.
+# Il contient l'historique du compte : il ne quitte jamais la machine.
+/donnees/
+
 # Scripts jetables de téléchargement et de vérification, écrits au fil des
 # sessions. Ce qui mérite d'être gardé vit dans `scripts/`, versionné et testé.
 *.py
+# … sauf le pont MT5, qui est du code du projet, versionné et testé.
+!/pont-mt5/*.py
+!/pont-mt5/tests/*.py
+!/pont-mt5/tests/**/*.py
 
 # Fichiers du moteur de lecture, rapatriés par « npm run assets:ocr ».
 # Une trentaine de mégaoctets de binaire : reconstituables, donc non versionnés.
@@ -24,3 +33,7 @@ sortie-*.txt
 # tesseract.js décompresse son dictionnaire dans le répertoire courant
 # quand il tourne sous Node (les tests du moteur réel).
 *.traineddata
+
+# Bytecode Python, régénéré à chaque exécution.
+__pycache__/
+*.pyc
