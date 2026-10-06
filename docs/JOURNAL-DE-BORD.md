@@ -72,9 +72,13 @@ renvoie.
   Modification jamais envoyée, puis abandonnée. Désormais : décrire, attendre
   le « ok », puis agir.
 
-**Prochaine action**
-- **Opérateur** : 10 points de contrôle E3 (procédure dans la feuille de route).
-- **E4 — écran Décision**, à la prochaine session de travail.
+**Prochaine action** (reprise le 2026-10-07)
+- **Opérateur** — finir E0 : poser le tag `v2026.10.06-journal-mt5`, ranger
+  les données dans `donnees\`, puis retirer l'ancienne copie
+  `Documents\trade-analyser`. Toujours se placer d'abord dans le dossier du
+  projet (ligne `cd` dans la mémoire de session).
+- **Opérateur** — 10 points de contrôle E3 (procédure dans la feuille de route).
+- **E4 — écran Décision** : seulement sur feu vert de l'opérateur.
 
 ---
 
