@@ -150,6 +150,7 @@ l'erreur s'écrit au journal.
 - [x] Feuille de route et journal de bord créés (DEC-039)
 - [x] Feuille de route affichée dans l'analyseur (onglet « Feuille de route »)
 - [x] Lanceur et script de raccourcis écrits (`outils/`) — Windows : non exécutables d'ici
+- [x] Feuille de route en page claire autonome (`docs/feuille-de-route.html`, `npm run feuille`), ouverte par le raccourci du bureau sans lancer l'analyseur
 - [ ] **Opérateur** — lancer `outils/creer-raccourcis.ps1` et vérifier les deux raccourcis
 - [ ] **Opérateur** — poser le tag `v2026.10.06-journal-mt5` (le push de tags échoue d'ici)
 - [ ] **Opérateur** — retirer l'ancienne copie `Documents\trade-analyser` une fois les données déplacées

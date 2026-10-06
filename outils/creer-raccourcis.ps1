@@ -3,8 +3,8 @@
 #   powershell -ExecutionPolicy Bypass -File outils\creer-raccourcis.ps1
 #
 #   « Trade Analyser »            lance l'analyseur et ouvre le navigateur
-#   « Feuille de route »          ouvre l'analyseur directement sur la feuille de route
-#   « Feuille de route (GitHub) » la même, lisible sans lancer l'analyseur
+#   « Feuille de route »          ouvre docs/feuille-de-route.html, page claire autonome
+#   « Feuille de route (GitHub) » la même, en ligne
 #
 # Relancer le script remplace les raccourcis existants. Rien d'autre n'est
 # modifié sur la machine.
@@ -26,12 +26,13 @@ $lanceur.WorkingDirectory = $racine
 $lanceur.Description = "Lance l'analyseur (laisser la fenêtre ouverte)"
 $lanceur.Save()
 
-# Ouvre l'analyseur sur l'onglet Feuille de route. Il doit être lancé.
+# Ouvre la feuille de route, page claire autonome, dans le navigateur : rien à
+# lancer, l'analyseur n'est pas concerné. (La première version relançait
+# l'analyseur ; s'il tournait déjà, le port 5173 était pris et rien ne s'ouvrait.)
 $feuille = $shell.CreateShortcut((Join-Path $bureau 'Feuille de route.lnk'))
-$feuille.TargetPath = Join-Path $racine 'outils\lancer-analyseur.bat'
-$feuille.Arguments = '/#feuille-de-route'
-$feuille.WorkingDirectory = $racine
-$feuille.Description = "Lance l'analyseur sur la feuille de route"
+$feuille.TargetPath = Join-Path $racine 'docs\feuille-de-route.html'
+$feuille.WorkingDirectory = Join-Path $racine 'docs'
+$feuille.Description = 'Feuille de route du projet'
 $feuille.Save()
 
 Set-Content -Path (Join-Path $bureau 'Feuille de route (GitHub).url') -Encoding ASCII -Value @(
