@@ -3099,3 +3099,45 @@ Une idée qui n'y figure pas ne se code pas : elle s'y ajoute d'abord.
 Les appels réseau vers Anthropic et vers les fournisseurs compatibles OpenAI.
 La forme des requêtes et la lecture des réponses sont testées contre des
 réponses construites ; le premier essai réel revient à l'opérateur.
+
+---
+
+## DEC-040 — La structure multi-unités de temps se calcule sur la séance
+
+**2026-10-06 · Retenue**
+
+### Le problème
+
+Le tableau de la référence (« KTA MTF ») donne la structure de la 5 min au
+Daily. Pour qu'il soit identique au nôtre, il faut que nos bougies le soient.
+Or TradingView découpe les bougies de 4 h et journalières de l'or, du Forex et
+du CME sur la **séance**, qui commence à 17 h heure de New York. Agréger sur
+minuit UTC, comme le fait `agreger`, donne d'autres plus hauts et d'autres
+plus bas, donc d'autres pivots et d'autres cassures.
+
+### Ce qui est retenu
+
+- **`agregerSeance`** découpe le Daily et les 4 h sur la séance (17 h, 21 h,
+  1 h, 5 h, 9 h, 13 h à New York), en suivant l'heure d'été américaine. Une
+  journée de changement d'heure dure 23 ou 25 h ; sa dernière bougie de 4 h
+  est raccourcie ou allongée d'autant. Jusqu'à 1 h, le découpage sur l'époque
+  coïncide, et `agreger` reste utilisé.
+- **Une seule source par tableau** : des bougies 1 min d'un seul contrat,
+  dont toutes les unités sont déduites. Rien n'est lu après l'instant
+  demandé, et la bougie de chaque unité encore en cours est écartée.
+- **Le biais pondéré additionne le sens des unités avec les poids 1-1-1-2-2-3**
+  (5 min → Daily). Ces poids reproduisent les deux captures de référence
+  (+2 / 10 et 0 / 10). Ils ne sont pas optimisés et ne doivent pas l'être sur
+  les données qu'on mesure. Le biais est un **résumé**, pas un signal : rien
+  ne dit encore qu'il prédit quoi que ce soit (E8).
+- **L'invalidation** est le dernier pivot opposé encore intact, celui dont la
+  cassure en clôture serait un CHoCH.
+- **Le fuseau horaire** n'est calculé qu'à un endroit, `src/lib/temps.js`.
+
+### Non vérifié
+
+L'identité avec TradingView, qui est le critère de fin d'E3. Trois
+conventions de la plateforme n'ont jamais été relevées sur elle : l'heure de
+séance par symbole, la fenêtre des pivots de l'indicateur de référence, et
+les bornes de ses sessions. Les écarts près d'un roulement de contrat sont
+attendus, puisque `GC1!` est une série recollée.

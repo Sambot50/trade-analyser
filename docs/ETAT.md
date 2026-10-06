@@ -34,7 +34,7 @@ dépôt : le nombre de trades qu'il contient ne se voit pas d'ici.
 
 | Quoi | Comment | Résultat |
 |---|---|---|
-| Logique pure | 1 220 tests JS, 67 fichiers, + 10 tests Python du pont MT5 (2026-10-06) | tous passent |
+| Logique pure | 1 250 tests JS, 72 fichiers, + 10 tests Python du pont MT5 (2026-10-06) | tous passent |
 | Build de production | `npm run build` (2026-10-05) | 293 kB JS (96 kB gzip) |
 | Lecture géométrique sur capture TradingView réelle | `capture-reelle.test.js`, OCR réel, fixture 1790×822 thème clair | échelle à moins de 0,2 %, 214 bougies, aucune graduation rejetée, aucun order block au-delà d'un cinquième du graphique |
 | Projection prix → pixel | lecture des pixels du canvas en navigateur | écart max **1,1 px** sur 4 niveaux |
@@ -48,6 +48,7 @@ dépôt : le nombre de trades qu'il contient ne se voit pas d'ici.
 | Unité déclarée d'un CSV | espacement dominant des lignes comparé à `--ut-csv` | un fichier 15 min déclaré 1 min est refusé ; week-ends et pauses tolérés |
 | Décalage horaire sur un horodatage absolu | `Z`, `±hh:mm`, Unix avec `--decalage-heures` | refusé, plutôt qu'appliqué une seconde fois |
 | Témoin des plans (DEC-035, amendé par DEC-036) | marches aléatoires, oracle, marché en pente | hasard : 2 p sur 20 sous 0,05 ; oracle détecté à p = 0,0033 ; pente **non créditée**, p = 0,31 |
+| Structure multi-unités de temps (DEC-040) | tests : cas des deux captures de référence (+2 et 0 sur 10), séances de 23 et 25 h, aucune lecture du futur, bougie en cours écartée, contrat par contrat | tableau 5 min → Daily, biais, lecture, points nommés, sessions |
 | IA interchangeables (DEC-039) | requêtes et réponses de Claude et du connecteur compatible OpenAI, nouvel essai sans `response_format`, erreurs traduites ; panneau de réglages vérifié dans Chromium | quatre fournisseurs décrits par un même contrat, une clé par fournisseur |
 | Journal de performances depuis MT5 (DEC-038) | export de test de 40 trades, ligne de commande et écran « Performances » dans un vrai navigateur | positions reconstituées, R sur le stop d'ouverture, ventilations par heure, jour, setup, symbole avec effectifs et intervalles |
 | Conversion de l'heure du serveur MT5 | tests du pont : hiver, été, heure d'été américaine décalée de l'européenne, minuit serveur = 17 h New York | UTC+2 / UTC+3 selon la date, refus si le serveur contredit la règle |
@@ -66,6 +67,7 @@ dépôt : le nombre de trades qu'il contient ne se voit pas d'ici.
 | **Justesse des bougies lues par la géométrie** | Le test sur capture réelle borne des distributions (amplitudes, zones) ; il ne compare pas chaque bougie aux prix vrais. Une seule capture, thème clair, sans panneau de volume ni bandeau. | Exporter les bougies de la même période depuis la source et les confronter une à une. Puis d'autres thèmes, unités et actifs. |
 | **L'export CSV de TradingView** | Lu d'après un fichier construit sur la description du format (en-tête `time,open,high,low,close`, heure ISO avec décalage ou Unix, colonnes d'indicateurs). Aucun export réel n'a été lu. La dernière bougie est écartée d'office comme provisoire. | Exporter un graphique réel, le lancer dans `resoudre-plan.mjs --csv`, puis l'ajouter à `fixtures/`. |
 | **Le rejeu face au vrai modèle** | ~~Jamais lancé~~ — **lancé le 2026-10-05** sur le Legion : 100 plans, 0 rejet, ~30 s par analyse. Un plan relu à la main : axe lu à moins d'un point de pourcentage, niveaux dans le cadre. | — |
+| **La structure multi-UT face à TradingView** | Le découpage des séances, la fenêtre des pivots et les bornes des sessions sont des conventions de la plateforme ; aucune n'a été relevée sur elle. GC1! est une série recollée, nos fichiers sont découpés par contrat : les écarts près d'un roulement sont attendus. | 10 points de contrôle, procédure dans la feuille de route, E3. |
 | **Les appels réels à Claude et aux fournisseurs compatibles OpenAI** | Réseau inaccessible depuis l'environnement d'écriture. | Choisir le fournisseur dans les réglages, saisir clé et modèle, analyser une capture. |
 | **Le pont MT5 face au vrai terminal Axi** | Le paquet `MetaTrader5` ne tourne que sous Windows avec un terminal : éprouvé contre un faux module seulement. La règle horaire NY+7 est celle qu'affichent les réglages d'un EA sur ce serveur, pas une mesure. | `pip install MetaTrader5`, puis `npm run mt5:export` : la ligne « Heure du serveur » doit dire « confirmée » (marché ouvert). Puis comparer trois trades du journal avec l'historique MT5. |
 | **Le carnet de trades réels** | Le script est testé (ajout seul, anomalies rapportées). Ce qu'il contient est hors dépôt, et le bilan refuse de conclure sous trente trades. | `node scripts/carnet.mjs --bilan` sur la machine locale. |

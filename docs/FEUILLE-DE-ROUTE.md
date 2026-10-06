@@ -105,7 +105,7 @@ brique se remplace par une autre qui respecte le même contrat.
 |---|---|---|---|
 | **Source** | `bougies({ symbole, unite, depuisMs, jusquaMs })` → bougies avec `fermetureMs`, en UTC | CSV ✅ · Binance ✅ · capture (géométrie) ✅ · MT5 fichiers ✅ · MT5 direct ⬜ | `src/lib/sources/` (E5) |
 | **Moteur** | `(bougies, options)` → trouvailles typées (registre `TYPES`) | structure, OB, FVG, liquidité, qualificatifs ✅ · sessions, S/R, breaker ⬜ | `src/lib/marche/` |
-| **Multi-UT** | `(bougies 1 min, unités)` → une ligne par unité de temps + biais | ⬜ | `src/lib/marche/` (E3) |
+| **Multi-UT** | `tableauMultiUT(bougies1m, { aMs, unites, fenetre, seance })` → une ligne par unité (tendance, BOS/CHoCH, âge, invalidation, distance, points nommés) + biais pondéré + lecture. Bougies 1 min d'**un seul contrat** ; rien après `aMs` | ✅ | `src/lib/marche/multiut.js` |
 | **IA** | `analyze(image, config)` → objet d'`ANALYSIS_SCHEMA` · plus tard `rediger(contexte)` → texte | Ollama ✅ · Gemini ✅ · Claude ✅ · compatible OpenAI ✅ | `src/lib/providers/` |
 | **Décision** | trouvailles + IA → rapport + plan (stop obligatoire, R, taille) | ⬜ | `src/` (E4) |
 | **Scanner** | source + moteur, sur une liste d'actifs → opportunités | ⬜ | (E6) |
@@ -136,8 +136,9 @@ l'erreur s'écrit au journal.
 | E0 Remise à plat | ⏸ | tag à poser, ancienne copie à retirer (opérateur) |
 | E1 Pont MT5 + journal | ⏸ | validation sur le vrai terminal Axi (connexion à rétablir) |
 | E2 IA interchangeables | ⏸ | un essai réel avec deux IA différentes |
-| **E3 Moteur multi-unités de temps** | 🔵 | tout |
-| E4 → E10 | ⬜ | — |
+| E3 Moteur multi-unités de temps | ⏸ | 10 points de contrôle relevés sur TradingView (opérateur) |
+| **E4 Écran Décision** | ⬜ prochaine | tout |
+| E5 → E10 | ⬜ | — |
 
 ---
 
@@ -178,18 +179,21 @@ l'erreur s'écrit au journal.
 - [ ] **Opérateur** — une capture analysée avec deux IA différentes (ex. Ollama et Claude)
 - [ ] Corriger ce que les vrais appels révèlent (s'ils révèlent quelque chose)
 
-### E3 — Moteur multi-unités de temps 🔵
+### E3 — Moteur multi-unités de temps ⏸
 
-- [ ] État final de la structure par unité de temps : tendance, dernier évènement (BOS / CHoCH), âge, niveau d'invalidation, distance
-- [ ] Tableau 5 min → Daily, calculé sur des bougies 1 min, **sans lecture du futur**
-- [ ] Biais pondéré sur 10, poids déclarés et visibles
-- [ ] Lecture en une phrase (alignement, repli dans la tendance de fond, conflit)
-- [ ] Points structurels nommés : HH, HL, LH, LL
-- [ ] Sessions : Asie, Londres, New York (plus hauts, plus bas)
-- [ ] Commande `npm run structure` sur un fichier de `donnees/`
-- [ ] Tests : chaque cas du tableau, et l'absence de lecture du futur
-- [ ] Contrat de la brique Multi-UT écrit au § 4, et respecté
-- [ ] **Opérateur** — 10 points de contrôle relevés sur TradingView, comparés : identiques
+- [x] État final de la structure par unité de temps : tendance, dernier évènement (BOS / CHoCH), âge, niveau d'invalidation, distance
+- [x] Bougies 4 h et journalières découpées sur la **séance** (17 h New York), comme TradingView pour l'or et le Forex, et non sur minuit UTC
+- [x] Tableau 5 min → Daily, calculé sur des bougies 1 min, **sans lecture du futur**
+- [x] Biais pondéré sur 10, poids déclarés et visibles (ils reproduisent les deux captures de référence : +2 et 0)
+- [x] Lecture en une phrase (alignement, repli dans la tendance de fond, conflit)
+- [x] Points structurels nommés : HH, HL, LH, LL, datés de leur confirmation
+- [x] Sessions : Asie, Londres, New York (plus hauts, plus bas, balayages)
+- [x] Commande `npm run structure` sur un fichier de `donnees/`, contrat par contrat
+- [x] Tests : chaque cas du tableau, et l'absence de lecture du futur
+- [x] Contrat de la brique Multi-UT écrit au § 4, et respecté
+- [ ] **Opérateur** — 10 points de contrôle : à 10 instants, le tableau KTA MTF de TradingView (mode Replay, `GC1!`) comparé à `npm run structure -- --csv donnees/GC_2025_2026.csv --a <instant>`
+- [ ] **Opérateur** — bornes des sessions confirmées (Asie : 19 h → 4 h New York, ou autre ?)
+- [ ] Ajuster ce que les points de contrôle révèlent (fenêtre des pivots, alignement des séances)
 
 ### E4 — Écran Décision ⬜
 

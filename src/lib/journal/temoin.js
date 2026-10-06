@@ -19,6 +19,7 @@
 
 import { resoudreIssue, gainEnR, reglageObjectif, TRAITEMENTS_AMBIGU } from './resolve.js';
 import { generateurAleatoire, valeurP, resumeDistribution } from '../marche/controle.js';
+import { decalageFuseau } from '../temps.js';
 
 /**
  * Le prix « du moment » d'une analyse : la clôture de la dernière bougie
@@ -130,15 +131,8 @@ export const FUSEAU_PAR_DEFAUT = 'Europe/Paris';
  */
 export const FRAICHEUR_MAX_MS = 15 * 60_000;
 
-/** Décalage du fuseau à un instant donné, en ms (UTC + décalage = heure locale). */
-export function decalageFuseau(ms, fuseau) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
-    timeZone: fuseau, hourCycle: 'h23',
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
-  }).formatToParts(new Date(ms)).map((x) => [x.type, x.value]));
-  const local = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
-  return local - Math.floor(ms / 1000) * 1000;
-}
+// Déplacée dans src/lib/temps.js, réexportée pour les appelants existants.
+export { decalageFuseau } from '../temps.js';
 
 /**
  * Le même instant d'horloge locale, `jours` jours de calendrier plus tôt.
