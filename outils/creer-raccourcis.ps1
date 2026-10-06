@@ -1,4 +1,4 @@
-# Crée sur le bureau Windows les raccourcis de l'analyseur.
+﻿# Crée sur le bureau Windows les raccourcis de l'analyseur.
 #
 #   powershell -ExecutionPolicy Bypass -File outils\creer-raccourcis.ps1
 #
@@ -9,8 +9,11 @@
 # Relancer le script remplace les raccourcis existants. Rien d'autre n'est
 # modifié sur la machine.
 #
-# NON VÉRIFIÉ depuis l'environnement d'écriture (Linux) : à valider par
-# l'opérateur sur le Legion.
+# Enregistré en UTF-8 AVEC marqueur (BOM) : sans lui, PowerShell 5 lit le
+# fichier comme du texte Windows ancien et casse les accents (« crÃ©Ã©s »).
+#
+# Lancé une première fois par l'opérateur le 2026-10-06 : les trois raccourcis
+# sont créés. Leur fonctionnement reste à confirmer.
 
 $ErrorActionPreference = 'Stop'
 $racine = Split-Path -Parent $PSScriptRoot
