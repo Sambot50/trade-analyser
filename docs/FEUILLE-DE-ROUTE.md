@@ -206,13 +206,12 @@ vérifie.
 
 *Order blocks « 5 étoiles » — d'après la méthode du bootcamp (vidéo de Casper), rendue calculable*
 - [x] Force du mouvement mesurée en ATR pour chaque OB (`mouvementEnAtr`) et commande `npm run mesure:mouvement` : 4 seuils figés (1 ; 1,5 ; 2 ; 3 ATR), chacun face à 20 mélanges témoins
-- [ ] « Fort mouvement » réglé : l'opérateur lance `npm run mesure:mouvement` sur GC 2023-2024 (déjà exploré) ; le meilleur seuil est **figé** ici
-- [ ] « Fort mouvement » confirmé une seule fois sur des données jamais utilisées pour les OB
-- [ ] Étoile 1, imbalance : un FVG part de la bougie de l'OB (le plus haut de l'OB reste sous le plus bas de la 3e bougie, et inversement)
-- [ ] Étoile 2, tendance : l'OB va dans le sens de la structure de son unité de temps
-- [ ] Étoile 3, premium / discount : OB haussier sous le 0,5 de Fibonacci de la structure en cours, OB baissier au-dessus
-- [ ] Étoile 4, liquidité : pas de plus hauts ou plus bas égaux juste devant l'OB (analyse nouvelle)
-- [ ] Étoile 5, mitigation : l'OB n'a jamais été retouché depuis sa création, jusqu'à l'instant de lecture (analyse nouvelle)
+- [x] « Fort mouvement » mesuré sur GC 2023-2024 (2 049 OB) : **aucun effet**, réussite ~35 % à tous les seuils, tous sous le témoin. Aucun seuil retenu (DEC-041)
+- [x] Étoile 1, imbalance : un FVG part de la bougie de l'OB (le plus haut de l'OB reste sous le plus bas de la 3e bougie, et inversement) — `etoiles.js`
+- [x] Étoile 2, tendance : l'OB naît d'une cassure dans la tendance (BOS), pas d'un retournement (CHoCH)
+- [x] Étoile 3, premium / discount : OB haussier sous le 0,5 de Fibonacci de la jambe, OB baissier au-dessus
+- [x] Étoile 4, liquidité : pas de plus hauts ou plus bas égaux non pris à moins de 2 ATR devant l'OB (égaux à 0,1 ATR près) — paramètres figés le 2026-10-07
+- [x] Étoile 5, mitigation : pas de retour dans l'OB avant la cassure ; en direct, pas de retour depuis la cassure jusqu'à l'instant de lecture
 - [ ] Chaque OB affiche ses étoiles et la liste des critères remplis ou manquants
 - [ ] Confirmation d'entrée : bougie englobante en 1 min, dans l'OB, dans le bon sens (analyse nouvelle)
 - [ ] Stop sous l'OB, ou sous les OB empilés
@@ -367,20 +366,20 @@ hasard (DEC-025, DEC-029)
 bootcamp) : imbalance, tendance, premium / discount, pas de liquidité
 devant, jamais retouché. La note n'est qu'un compte de critères ; ce qu'elle
 vaut se mesure (HYP-004). Le « 70 à 80 % » annoncé par le bootcamp n'est
-mesuré nulle part. → E4, E8 · ⬜
+mesuré nulle part. → `etoiles.js` · E4, E8 · ✅ calcul · ⬜ mesure (HYP-004)
 
 **Force du mouvement (en ATR)** — L'ampleur de l'impulsion qui suit l'OB,
 du bord de la zone à la clôture de la cassure, divisée par l'ATR des 14
 bougies qui précèdent. Chiffre le « fort mouvement » du bootcamp.
-→ `qualificatifs.js` · E4 · ✅ · seuil en cours de réglage
+→ `qualificatifs.js` · E4 · ✅ · **aucun effet** sur GC 15 min, aucun seuil retenu (DEC-041)
 
 **Plus hauts et plus bas égaux (EQH / EQL)** — Deux sommets ou deux creux au
 même prix, à une tolérance près : un réservoir d'ordres stop que le marché
-vient chercher. Devant un OB, c'est un piège (étoile 4). → E4 · ⬜
+vient chercher. Devant un OB, c'est un piège (étoile 4). → `etoiles.js` · E4 · ✅
 
 **Mitigation jusqu'à l'instant** — L'OB a-t-il été retouché entre sa création
 et maintenant ? Différent de la fraîcheur, qui s'arrête à la cassure.
-→ E4 · ⬜
+→ `etoiles.js` · E4 · ✅
 
 **Confirmation par bougie englobante** — Dans l'OB, en 1 min, une bougie qui
 englobe la précédente dans le sens du trade : le signal d'entrée du

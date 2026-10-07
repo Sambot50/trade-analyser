@@ -52,8 +52,17 @@ renvoie.
   Sur une marche aléatoire, « ≥ 2 ATR » sort +0,23 R (p = 0,24) : la raison
   d'être du témoin.
 
+**Mesuré**
+- « Fort mouvement » sur GC 2023-2024 : 2 049 OB, réussite ~35 % à tous les
+  seuils, tous sous le témoin (p 0,81 à 1,00). Aucun effet, aucun seuil
+  retenu (DEC-041).
+
+**Fait, suite**
+- Les cinq étoiles calculées (`etoiles.js`), paramètres figés avant toute
+  mesure ; jointes à chaque OB du backtest. 1 281 tests.
+
 **Prochaine action**
-- **Opérateur** : `npm run mesure:mouvement` sur le Legion, puis on fige le seuil.
+- HYP-004 : pré-enregistrer le test des cinq étoiles, puis le lancer une fois.
 
 ---
 
