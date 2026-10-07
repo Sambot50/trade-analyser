@@ -32,7 +32,7 @@
 // être écarté : c'est `mitigeDepuisLaCassure`.
 
 import { pivots, HAUSSIER } from './structure.js';
-import { premiumDiscount, fraicheur } from './qualificatifs.js';
+import { premiumDiscount, fraicheur, priseDeLiquidite } from './qualificatifs.js';
 
 export const PARAMETRES_ETOILES = Object.freeze({
   periodeAtr: 14,
@@ -165,6 +165,13 @@ export function etoiles(bougies, ob, { discount } = {}) {
     ...criteres,
     nombre: Object.values(criteres).filter(Boolean).length,
     pocheDevant: poche,
+    // Hors des cinq étoiles, rendu à part : la liquidité BALAYÉE avant l'OB —
+    // un plus bas (OB haussier) percé par une mèche qui referme au-dessus, dans
+    // les 20 bougies qui finissent sur l'OB. Condition d'entrée chez deux
+    // formateurs (Casper : la manipulation ; Interquity : « pas de liquidity
+    // block, pas d'entrée »). Fenêtre de `priseDeLiquidite`, fixée avant toute
+    // mesure de l'OB du bootcamp.
+    balayageAvant: priseDeLiquidite(visibles, ob).presente,
   };
 }
 

@@ -224,7 +224,8 @@ vérifie.
 - [x] Mesure `npm run mesure:ob-bootcamp` : 4 seuils de « fort mouvement » (1 ; 1,5 ; 2 ; 3 ATR) × 4 unités (5 min, 15 min, 1 h, 4 h), chacun face à 20 mélanges ; 1 min, jour et semaine déclarés non mesurables sur ces données, avec la raison
 - [ ] Jour et semaine mesurés sur la série continue de MT5 (E5) : les contrats GC changent tous les deux mois
 - [ ] **Opérateur** — lancer `npm run mesure:ob-bootcamp` sur GC 2023-2024 ; le seuil retenu est **figé** ici
-- [ ] HYP-005 pré-enregistrée puis lancée une fois : OB bootcamp 5 étoiles, sur des données jamais utilisées pour les OB
+- [x] Balayage de liquidité avant l'OB calculé pour chaque OB (`balayageAvant`), hors des cinq étoiles : condition d'entrée chez deux formateurs, à inclure dans HYP-005
+- [ ] HYP-005 pré-enregistrée puis lancée une fois : OB bootcamp 5 étoiles et balayage avant l'OB, sur des données jamais utilisées pour les OB
 
 *Affichage*
 - [ ] Noyau toujours affiché : contexte multi-unités, OB, FVG, liquidité ; par unité, seulement les plus proches du prix
