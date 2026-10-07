@@ -137,7 +137,7 @@ l'erreur s'écrit au journal.
 | E1 Pont MT5 + journal | ⏸ | validation sur le vrai terminal Axi (connexion à rétablir) |
 | E2 IA interchangeables | ⏸ | un essai réel avec deux IA différentes |
 | E3 Moteur multi-unités de temps | ⏸ | 10 points de contrôle relevés sur TradingView (opérateur) |
-| **E4 Écran Décision** | ⬜ prochaine | tout |
+| **E4 Écran Décision** | 🔵 en cours | tout (cases ci-dessous) |
 | E5 → E10 | ⬜ | — |
 
 ---
@@ -196,15 +196,30 @@ l'erreur s'écrit au journal.
 - [ ] **Opérateur** — bornes des sessions confirmées (Asie : 19 h → 4 h New York, ou autre ?)
 - [ ] Ajuster ce que les points de contrôle révèlent (fenêtre des pivots, alignement des séances)
 
-### E4 — Écran Décision ⬜
+### E4 — Écran Décision 🔵
 
-- [ ] Dépôt d'une capture + notes facultatives
-- [ ] Checklist « bonne capture » vérifiée automatiquement (unité, échelle, nombre de bougies)
-- [ ] Rapport : vue d'ensemble, structure, liquidité, zones, FVG, scénarios, niveaux, conclusion
-- [ ] Tous les niveaux viennent du moteur ; l'IA ne fait que rédiger
-- [ ] Plan avec **stop obligatoire**, R, taille de position, coût en R
+Cible : l'écran « Analyste » du bootcamp (captures du 2026-10-07), avec nos
+garde-fous. Critère de fin : le rapport complet sort sur les captures réelles
+(BTC du 2026-10-07, Gold Futures), puis l'opérateur le vérifie.
+
+*Entrée*
+- [ ] Dépôt d'une capture + notes facultatives (actif, unité, contexte)
+- [ ] Checklist « bonne capture » vérifiée automatiquement : unité de temps lue, axe lisible (au moins 3 graduations), 50 à 100 bougies, symbole reconnu ; chaque point manquant dit quoi corriger
+- [ ] Axe lu même en petits chiffres (cas BTC du 2026-10-07 : une seule graduation lue sur un axe pourtant lisible)
+- [ ] OB anormalement haut signalé (cas BTC : une zone de 1 600 points)
+
+*Rapport — tous les niveaux viennent du moteur*
+- [ ] Vue d'ensemble : tendance, dernier BOS / CHoCH, points HH, HL, LH, LL
+- [ ] Liquidité BSL / SSL et balayages ; zones OB et FVG, bornes arrondies au pas de cotation
+- [ ] Niveaux à surveiller : niveau, type, importance selon des critères affichés
+- [ ] Scénario principal et alternatif : chaîne d'étapes, déclencheur, cibles 1 à 3, condition nécessaire, invalidation ; « probabilité » affichée **non mesurée** jusqu'à E8
+- [ ] Conclusion rédigée par l'IA à partir des seuls niveaux du moteur ; un prix cité qui ne vient pas du moteur fait rejeter le texte
+- [ ] Confiance sur 10 = lisibilité de la capture, avec sa justification ; jamais une promesse de gain
+
+*Plan et suite*
+- [ ] Plan avec **stop obligatoire**, R pour chaque cible, taille de position, coût en R
 - [ ] Bouton « Je prends » relié au journal
-- [ ] Le même écran fonctionne avec chacune des IA branchées
+- [ ] Le même écran fonctionne avec chacune des IA ; sans IA, le rapport du moteur s'affiche quand même, sans texte rédigé
 
 ### E5 — Sources interchangeables + direct MT5 ⬜
 
@@ -215,8 +230,16 @@ l'erreur s'écrit au journal.
 
 ### E6 — Scanner multi-marchés ⬜
 
-- [ ] Liste d'actifs (Forex, métaux, indices, crypto) configurable
-- [ ] Détections : OB touché, réaction, entrée dans une zone, distance au prix
+Cible : l'« OB Scanner » du bootcamp (captures du 2026-10-07), avec le taux
+mesuré en plus.
+
+- [ ] Liste d'actifs configurable ; classes NQ100, Métaux, Énergie, Forex, Crypto ; recherche par symbole
+- [ ] Unités 4 h, Daily, Weekly
+- [ ] Tri : proximité d'une zone, nombre d'OB, plus récent ; vue grille ou liste
+- [ ] Une carte par marché : mini-graphique avec zones d'achat et de vente, état « dans la zone » / « prix à x % »
+- [ ] Onglets : toutes les zones, OB touchés, réactions (comptées sur **toutes** les zones touchées, pas seulement celles qui ont réagi)
+- [ ] Vue détail : sens, bornes arrondies, lien TradingView
+- [ ] Sur chaque carte, le taux mesuré du type de zone (E8), ou « non mesuré »
 - [ ] Opportunité détectée en moins d'une minute
 
 ### E7 — Alertes Telegram ⬜
@@ -395,6 +418,16 @@ l'axe des prix ; les lignes ne sont tracées que si l'axe lu est cohérent.
 reconnaissance de texte, les bougies sont reconstruites depuis l'image.
 → `src/lib/vision/` · ✅ · un seul essai réel ; gênée par les bandeaux et
 boutons d'ordre
+
+**Réaction à une zone** — La zone est touchée, puis le prix est rejeté. Le
+taux se compte sur toutes les zones touchées, jamais sur les seules qui ont
+réagi : ne montrer que les réussites, c'est le biais des ✓ du bootcamp.
+→ E6, E8 · ⬜
+
+**Entrée Fibonacci dans la zone (OTE)** — Une fois le prix dans l'OB, entrer
+sur un retracement de 0,5 à 0,786 de l'impulsion plutôt qu'au bord de la
+zone. Vu sur le robot du bootcamp ; à mesurer contre l'entrée simple.
+→ E8 · ⬜
 
 **Checklist « bonne capture »** — Ce qu'une capture doit montrer pour être
 lisible : unité de temps visible, échelle lisible, 50 à 100 bougies, pas
