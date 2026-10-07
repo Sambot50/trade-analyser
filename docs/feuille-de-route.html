@@ -95,7 +95,7 @@ th, td { border: 1px solid #dde2e8; padding: 6px 10px; vertical-align: top; }
 <tr><td><strong>Analyste</strong> : dépôt d'une capture + notes facultatives</td><td>Décision</td><td>E4</td><td>🟡 dépôt ✅, notes ⬜</td></tr>
 <tr><td>Checklist « bonne capture » (unité de temps visible, échelle lisible, 50-100 bougies, pas d'indicateurs superflus, volumes si possible)</td><td>Décision</td><td>E4</td><td>⬜</td></tr>
 <tr><td>Rapport : vue d'ensemble, biais, phase, dernier évènement, pattern structurel</td><td>Moteur + IA</td><td>E3, E4</td><td>🟡 calcul ✅ sur une unité de temps</td></tr>
-<tr><td>Points structurels (HH, LH, LL…) avec dates et prix</td><td>Moteur</td><td>E3</td><td>🟡 pivots ✅, libellés ⬜</td></tr>
+<tr><td>Points structurels (HH, LH, LL…) avec dates et prix</td><td>Moteur</td><td>E3</td><td>✅</td></tr>
 <tr><td>Liquidité acheteuse / vendeuse (BSL / SSL), balayage récent</td><td>Moteur</td><td>E3</td><td>🟡 prise de liquidité ✅</td></tr>
 <tr><td>Zones d'offre et de demande, avec « force »</td><td>Moteur + Labo</td><td>E3, E8</td><td>🔁 force = statistique mesurée, pas étoiles</td></tr>
 <tr><td>FVG, breaker blocks</td><td>Moteur</td><td>E3</td><td>🟡 FVG ✅, breaker ⬜</td></tr>
@@ -103,8 +103,8 @@ th, td { border: 1px solid #dde2e8; padding: 6px 10px; vertical-align: top; }
 <tr><td>« Probabilité estimée 65 % / 35 % »</td><td>Labo</td><td>E8</td><td>🔁 remplacée par le taux mesuré du signal</td></tr>
 <tr><td>Niveaux à surveiller, conclusion, confiance</td><td>Décision + IA</td><td>E4</td><td>⬜</td></tr>
 <tr><td><strong>Coach</strong> (onglet)</td><td>Journal + IA</td><td>E9</td><td>⬜ (retour sur TES trades mesurés)</td></tr>
-<tr><td><strong>KTA MTF</strong> : tableau 5m → Daily, structure, BOS/CHoCH, âge, invalidation, distance, biais pondéré, lecture</td><td>Multi-UT</td><td>E3</td><td>⬜</td></tr>
-<tr><td>OB « 5 étoiles », Imbalance, Swing Points, session asiatique, supports/résistances</td><td>Moteur</td><td>E3, E5</td><td>🟡 OB ✅ FVG ✅ swings ✅, sessions ⬜, S/R ⬜</td></tr>
+<tr><td><strong>KTA MTF</strong> : tableau 5m → Daily, structure, BOS/CHoCH, âge, invalidation, distance, biais pondéré, lecture</td><td>Multi-UT</td><td>E3</td><td>✅ (⏸ 10 points de contrôle)</td></tr>
+<tr><td>OB « 5 étoiles », Imbalance, Swing Points, session asiatique, supports/résistances</td><td>Moteur</td><td>E3, E5</td><td>🟡 OB ✅ FVG ✅ swings ✅, sessions ✅, S/R ⬜</td></tr>
 <tr><td>Analyse <strong>par capture</strong></td><td>Décision</td><td>E4</td><td>🟡</td></tr>
 <tr><td>Analyse <strong>en direct</strong>, multi-marchés</td><td>Source + Scanner</td><td>E5, E6</td><td>⬜ (attend MT5)</td></tr>
 <tr><td><strong>OB Scanner</strong> : scanner, OB touchés, réaction, achat / vente, « dans la zone », « prix à x % »</td><td>Scanner</td><td>E6</td><td>⬜</td></tr>
