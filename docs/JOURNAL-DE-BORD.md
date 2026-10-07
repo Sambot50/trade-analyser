@@ -76,6 +76,9 @@ renvoie.
 
 - Trois transcriptions du bootcamp analysées (OB) : neuf pistes notées dans
   PISTES.md, sans code, à éprouver une par une.
+- Deux champions Robbins analysés (Gian Luca, Chris) : régimes de
+  volatilité, dégradation, Monte Carlo en E8 ; bonnes et mauvaises pertes,
+  règles d'arrêt en E9 ; quatre filtres dans PISTES.md.
 
 **Prochaine action**
 - **Opérateur** : `npm run mesure:ob-bootcamp`, puis on fige le seuil et on
