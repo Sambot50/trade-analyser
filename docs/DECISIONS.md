@@ -3141,3 +3141,34 @@ conventions de la plateforme n'ont jamais été relevées sur elle : l'heure de
 séance par symbole, la fenêtre des pivots de l'indicateur de référence, et
 les bornes de ses sessions. Les écarts près d'un roulement de contrat sont
 attendus, puisque `GC1!` est une série recollée.
+
+---
+
+## DEC-041 — Le « fort mouvement » ne fait pas l'order block
+
+**2026-10-07 · Mesuré, exploration**
+
+La méthode « OB 5 étoiles » du bootcamp exige un « fort mouvement » après
+l'OB, sans le chiffrer. On l'a chiffré : `mouvementEnAtr`, l'ampleur de
+l'impulsion (bord de la zone → clôture de la cassure) divisée par l'ATR des 14
+bougies d'avant. Quatre seuils figés d'avance, chacun face à 20 mélanges.
+
+GC 2023-2024 (déjà exploré), 11 contrats, OB en 15 min, plan à 2 R, entrée à
+la mèche, frais 4 ticks, sans filtre de tendance :
+
+| Seuil | OB | Tranchés | Réussite | Espérance | Témoin | p |
+|---|---|---|---|---|---|---|
+| tous | 2 049 | 1 764 | 35,5 % | −0,164 R | −0,130 R | 0,86 |
+| ≥ 1 ATR | 1 265 | 1 012 | 35,1 % | −0,175 R | −0,095 R | 1,00 |
+| ≥ 1,5 ATR | 869 | 658 | 35,4 % | −0,162 R | −0,076 R | 0,95 |
+| ≥ 2 ATR | 604 | 444 | 35,6 % | −0,158 R | −0,067 R | 1,00 |
+| ≥ 3 ATR | 283 | 189 | 34,4 % | −0,199 R | −0,053 R | 0,81 |
+
+**Décision.** La force du mouvement ne change pas la réussite : aucun seuil
+n'est retenu, il n'y a rien à confirmer. Elle reste affichée sur chaque OB,
+comme information. Quatre essais consommés sur GC 2023-2024 pour cette
+question, à compter.
+
+**Ce que ça ne dit pas.** La méthode repose sur les cinq étoiles ENSEMBLE ; un
+critère seul ne la réfute pas. C'est la question de HYP-004.
+

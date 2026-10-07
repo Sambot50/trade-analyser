@@ -25,6 +25,7 @@ import { coutEnRDuPlan, distributionDesStops, seuilDeRentabilite } from '../src/
 import { generateurAleatoire, melangerBougies, valeurP, resumeDistribution } from '../src/lib/marche/controle.js';
 import { decouperParContrat, minimumPourResoudre } from '../src/lib/marche/contrats.js';
 import { qualifier } from '../src/lib/marche/qualificatifs.js';
+import { etoiles } from '../src/lib/marche/etoiles.js';
 import { calculerExcursions, enUnitesDeRisque } from '../src/lib/journal/excursion.js';
 import { cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER, INDETERMINE } from '../src/lib/marche/structure.js';
 import { detecterEnDetail, anomalieVolume } from '../src/lib/marche/orderblocks.js';
@@ -257,6 +258,7 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
       ms: ob.ms, sens: ob.sens, typeCassure: ob.typeCassure, biais, aligne,
       plan: ob.plan, statut, detail, excursions,
       qualificatifs: qualifier(bougiesDetection, ob),
+      etoiles: etoiles(bougiesDetection, ob),
       delaiEntreeMs: detail.declencheLe ? detail.declencheLe - ob.valideAPartirDeMs : null,
       volume: anomalieVolume(bougiesDetection, ob.index, 20),
       // Le coût dépend du plan : un stop serré paie le même spread sur un
