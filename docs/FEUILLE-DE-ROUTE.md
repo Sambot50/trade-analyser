@@ -271,78 +271,134 @@ l'erreur s'écrit au journal.
 
 ## 7. Les analyses techniques
 
-Le catalogue de la brique **Moteur**. Toutes les analyses techniques vivent
-**au même endroit**, `src/lib/marche/`, un fichier par analyse. Les autres
-briques (Décision, Scanner, Notificateur, Exécution) les **appellent**, elles
-ne les recopient jamais : une analyse améliorée ici l'est partout, et sa
-mesure vaut partout. Décidé avec l'opérateur le 2026-10-06.
+Le catalogue de la brique **Moteur**. Toutes les analyses vivent au même
+endroit, `src/lib/marche/` ; les autres briques les appellent sans les
+recopier. Une analyse nouvelle s'inscrit ici **avant** d'être codée.
+Statut : ✅ existe · 🟡 partiel · ⬜ à faire · 🔁 remplacée par une version mesurée.
 
-Ce tableau s'enrichit au fur et à mesure. Une analyse nouvelle s'y inscrit
-**avant** d'être codée (règle 3). **Statut** : ✅ existe · 🟡 partiel · ⬜ à
-faire · 🔁 remplacée par une version mesurée.
+**Aucune de ces analyses n'a encore prouvé qu'elle gagne.**
 
-**Aucune de ces analyses n'a encore prouvé qu'elle gagne.** La colonne
-« Mesure » dit ce qu'on sait, pas ce qu'on espère.
+**Points pivots (swings)** — Les plus hauts et plus bas marquants du prix. Un
+pivot n'est compté qu'une fois confirmé par les bougies qui suivent, jamais
+avant. → `structure.js` · E3 · ✅
 
-### Structure et unités de temps
+**BOS (Break of Structure)** — Le prix casse le dernier pivot dans le sens de
+la tendance : la tendance continue. Daté à la fermeture de la bougie qui
+casse. → `structure.js` · E3 · ✅ · datation corrigée, 62 % → 45 % (DEC-013)
 
-| Analyse | Ce qu'elle rend | Fichier | Étape | Statut | Mesure |
-|---|---|---|---|---|---|
-| Points pivots (swings) | plus hauts et plus bas, datés à leur confirmation | `structure.js` | E3 | ✅ | — |
-| BOS / CHoCH | cassure dans la tendance / changement de caractère, à la fermeture de la bougie | `structure.js` | E3 | ✅ | datation corrigée : 62 % → 45 % (DEC-013) |
-| Tendance et invalidation | haussière / baissière, dernier pivot opposé, distance | `structure.js` | E3 | ✅ | — |
-| Points nommés HH, HL, LH, LL | type, prix, date | `structure.js` | E3 | ✅ | — |
-| Séance de marché | bougies 4 h et Daily démarrant à 17 h New York, heure d'été comprise | `seance.js` | E3 | ✅ | ⏸ alignement TradingView à contrôler |
-| Tableau multi-UT « KTA MTF » | 5 min → Daily : tendance, évènement, âge, invalidation, distance | `multiut.js` | E3 | ✅ | ⏸ 10 points de contrôle |
-| Biais pondéré | score sur 10, poids 1-1-1-2-2-3 | `multiut.js` | E3 | ✅ | aucune : un résumé, pas un signal (E8) |
-| Lecture du tableau | alignement, repli, conflit, mêlé | `multiut.js` | E3 | ✅ | aucune |
+**CHoCH (Change of Character)** — Le prix casse le dernier pivot contre la
+tendance : premier signe de retournement. → `structure.js` · E3 · ✅
 
-### Zones et liquidité
+**Tendance et invalidation** — Le sens actuel (haussier, baissier ou
+indéterminé) et le prix qui le remettrait en cause : le dernier pivot opposé.
+La distance du prix à ce niveau dit la marge restante. → `structure.js` · E3 · ✅
 
-| Analyse | Ce qu'elle rend | Fichier | Étape | Statut | Mesure |
-|---|---|---|---|---|---|
-| Order blocks | zone, sens, stop au-delà | `orderblocks.js` | E3 | ✅ | **ne bat pas le hasard** (DEC-025, DEC-029) |
-| Qualificatifs d'un OB | FVG de l'impulsion, prise de liquidité, déplacement, importance du niveau, premium / discount, fraîcheur, niveau vierge, zone / ATR, définition alternative | `qualificatifs.js` | E3, E8 | ✅ | croisés avec l'issue, corrigés pour la recherche (DEC-018) |
-| OB validé par le volume | volume de l'impulsion au-dessus d'un seuil | `orderblocks.js` | E3 | ✅ | voir DEC-031 |
-| « Force » d'une zone (les étoiles du bootcamp) | taux mesuré du type de zone | — | E8 | 🔁 | à mesurer |
-| Imbalance / FVG | trou de cotation laissé par une impulsion | `qualificatifs.js` | E3 | 🟡 | seulement attaché à un OB ; détection autonome ⬜ |
-| Breaker blocks | OB cassé devenu niveau opposé | — | E3 | ⬜ | — |
-| Zones d'offre et de demande | zones de départ des impulsions | — | E3 | ⬜ | — |
-| Supports et résistances | niveaux touchés plusieurs fois | — | E3, E5 | ⬜ | — |
-| Liquidité BSL / SSL et balayage | au-dessus des hauts / sous les bas, prise récente | `qualificatifs.js`, `sessions.js` | E3 | 🟡 | — |
-| Sessions Asie, Londres, New York | haut, bas, balayés ou non | `sessions.js` | E3 | ✅ | ⏸ bornes de l'Asie à confirmer (« 1900-0001 ») |
-| Premium / discount | moitié chère ou bon marché du range | `qualificatifs.js` | E3 | ✅ | — |
+**Points nommés HH, HL, LH, LL** — Chaque pivot nommé par rapport au
+précédent : plus haut plus haut (HH), plus bas plus haut (HL), plus haut plus
+bas (LH), plus bas plus bas (LL). Avec son prix et sa date.
+→ `structure.js` · E3 · ✅
 
-### Volume (contrats à terme)
+**Séance de marché** — Les bougies 4 h et Daily démarrent à 17 h heure de New
+York, comme sur la plateforme, heure d'été comprise. Sans ça, les plus hauts,
+les plus bas et donc la structure seraient différents de l'écran.
+→ `seance.js` · E3 · ✅ · à contrôler face à TradingView
 
-| Analyse | Ce qu'elle rend | Fichier | Étape | Statut | Mesure |
-|---|---|---|---|---|---|
-| Détecteurs d'anomalies | absorption, déplacement, rejet, hors séance, gap, pic de volume | `anomalies.js` | — | ✅ | prédit **l'amplitude, jamais la direction** (DEC-031) |
-| Profil horaire, fenêtres d'annonces | volume par heure ; 8 h 30, 10 h, 14 h New York | `anomalies.js` | — | ✅ | — |
-| Après une anomalie | excursions favorable et contraire, pour placer stop et objectif | `apres.js`, `plan.js` | — | ✅ | stop annoncé ≠ stop mesuré (ERRATUM-001) |
-| Volume acheteur / vendeur (delta) | depuis les transactions ; **absent** d'un CSV de CFD | `transactions.js` | — | ✅ | jamais déduit de la couleur (garde-fou 5) |
+**Tableau multi-unités de temps (« KTA MTF »)** — Une ligne par unité, de
+5 min à Daily : tendance, dernier BOS ou CHoCH, son âge, le niveau
+d'invalidation et la distance. → `multiut.js` · E3 · ✅ · 10 points de contrôle à faire
 
-### Plan de trade et coûts
+**Biais pondéré** — Un score sur 10 qui additionne le sens de chaque unité,
+les longues pesant plus (poids 1-1-1-2-2-3). Un résumé du tableau, pas un
+signal : rien ne dit encore qu'il prédit. → `multiut.js` · E3 · ✅
 
-| Analyse | Ce qu'elle rend | Fichier | Étape | Statut | Mesure |
-|---|---|---|---|---|---|
-| Cohérence du plan | rejet si stop ou cibles contredisent le sens | `src/lib/analysis.js` | — | ✅ | garde-fou 1 |
-| Ratio R | recalculé par le programme, jamais lu chez l'IA | `src/lib/analysis.js` | — | ✅ | premier essai réel : 0,87 |
-| Coûts en R | spread et commission, par instrument | `couts.js` | — | ✅ | **0,08 R par trade** (DEC-034) |
-| Taille de position | selon le risque et la taille du contrat | `scripts/dimensionner.mjs` | E4 | 🟡 | — |
-| Scénarios, déclencheur, cibles, niveaux à surveiller | principal / alternatif, stop obligatoire | — | E4 | ⬜ | « 65 % / 35 % » 🔁 taux mesuré (E8) |
+**Lecture du tableau** — Le tableau en une phrase : alignement, repli dans la
+tendance de fond, conflit entre 4 h et Daily, ou tendances mêlées.
+→ `multiut.js` · E3 · ✅
 
-### Lecture d'une capture (premier analyseur)
+**Order blocks (OB)** — La dernière bougie opposée avant une impulsion qui
+casse la structure : une zone où le prix pourrait réagir à son retour. Stop
+posé au-delà de la zone. → `orderblocks.js` · E3 · ✅ · ne bat pas le
+hasard (DEC-025, DEC-029)
 
-| Analyse | Ce qu'elle rend | Fichier | Étape | Statut | Mesure |
-|---|---|---|---|---|---|
-| Lecture par l'IA de vision | plan + repère `scale` de l'axe | `src/lib/providers/` | E2 | ✅ | `qwen3.8:27b` lit l'axe à 2,3 px (DEC-005) ; un seul essai réel |
-| Lecture géométrique (sans IA) | axe par OCR, bougies reconstruites | `src/lib/vision/` | — | ✅ | un seul essai réel ; défaut sur bandeau et boutons d'ordre |
-| Checklist « bonne capture » | unité visible, échelle lisible, 50-100 bougies | — | E4 | ⬜ | — |
+**Qualificatifs d'un OB** — Dix critères qui décrivent un OB : FVG laissé par
+l'impulsion, prise de liquidité avant, force du déplacement, importance du
+niveau, zone premium ou discount, fraîcheur, niveau vierge, taille par rapport
+à l'ATR, définition alternative, volume. Ils servent à chercher quels OB
+marchent mieux que les autres. → `qualificatifs.js` · E3, E8 · ✅
 
-### Les outils de mesure (brique Labo)
+**Force d'une zone** — Les « étoiles » du bootcamp, remplacées par le taux de
+réussite réellement mesuré de ce type de zone. → E8 · 🔁
 
-Ils ne sont pas des analyses : ils **jugent** les analyses ci-dessus.
-Backtest, témoin par permutation (`controle.js`), rejeu pré-enregistré
-(`src/lib/journal/rejeu.js`), témoin des plans (`src/lib/journal/temoin.js`),
-découpage par contrat (`contrats.js`). Voir CLAUDE.md, garde-fous 4 à 8.
+**Imbalance / FVG (Fair Value Gap)** — Un trou entre trois bougies laissé par
+un mouvement trop rapide ; le prix revient souvent le combler. Aujourd'hui
+cherché seulement dans l'impulsion d'un OB. → `qualificatifs.js` · E3 · 🟡
+
+**Breaker block** — Un OB que le prix a cassé, et qui sert ensuite de niveau
+dans l'autre sens. → E3 · ⬜
+
+**Zones d'offre et de demande** — Les zones d'où sont partis les grands
+mouvements de hausse (demande) ou de baisse (offre). → E3 · ⬜
+
+**Supports et résistances** — Les prix touchés plusieurs fois sans être
+franchis. → E3, E5 · ⬜
+
+**Liquidité BSL / SSL** — Les ordres stop accumulés au-dessus des plus hauts
+(BSL, acheteuse) et sous les plus bas (SSL, vendeuse), et s'ils viennent
+d'être balayés. → `qualificatifs.js`, `sessions.js` · E3 · 🟡
+
+**Sessions Asie, Londres, New York** — Le plus haut et le plus bas de chaque
+session, et s'ils ont été balayés depuis. → `sessions.js` · E3 · ✅ · bornes
+de l'Asie à confirmer (« 1900-0001 »)
+
+**Premium / discount** — Le prix est-il dans la moitié haute (chère) ou basse
+(bon marché) du range ? On achète plutôt en discount, on vend plutôt en
+premium. → `qualificatifs.js` · E3 · ✅
+
+**Anomalies de volume** — Six détecteurs sur les contrats à terme :
+absorption, déplacement, rejet, activité hors séance, gap, pic de volume.
+→ `anomalies.js` · ✅ · prédit l'amplitude, jamais la direction (DEC-031)
+
+**Profil horaire et annonces** — Le volume habituel heure par heure, et les
+fenêtres des annonces économiques de New York (8 h 30, 10 h, 14 h).
+→ `anomalies.js` · ✅
+
+**Après une anomalie** — Ce que le prix fait ensuite, mesuré sur tous les cas
+: jusqu'où il va dans chaque sens, pour placer stop et objectif.
+→ `apres.js`, `plan.js` · ✅ · stop annoncé ≠ stop mesuré (ERRATUM-001)
+
+**Volume acheteur / vendeur (delta)** — Ce qui a été acheté et vendu,
+séparément, calculé depuis les transactions. Absent d'un fichier CFD :
+jamais deviné d'après la couleur des bougies. → `transactions.js` · ✅
+
+**Cohérence du plan** — Un plan dont le stop ou les cibles contredisent le
+sens (achat avec stop au-dessus) est rejeté, jamais corrigé en silence.
+→ `src/lib/analysis.js` · ✅
+
+**Ratio risque / rendement (R)** — Calculé par le programme, jamais lu dans
+la réponse de l'IA, qui se trompe en calcul. → `src/lib/analysis.js` · ✅
+
+**Coûts en R** — Spread et commission ramenés au risque du trade.
+→ `couts.js` · ✅ · 0,08 R par trade sur l'or (DEC-034)
+
+**Taille de position** — Combien de lots ou de contrats pour risquer le
+montant choisi. → `scripts/dimensionner.mjs` · E4 · 🟡
+
+**Scénarios et plan complet** — Scénario principal et alternatif,
+déclencheur, cibles, invalidation, niveaux à surveiller, stop obligatoire.
+Les « 65 % / 35 % » du bootcamp seront remplacés par un taux mesuré. → E4 · ⬜
+
+**Lecture d'une capture par l'IA** — L'IA de vision lit le graphique et
+l'axe des prix ; les lignes ne sont tracées que si l'axe lu est cohérent.
+→ `src/lib/providers/` · ✅ · un seul essai réel
+
+**Lecture géométrique d'une capture** — Sans IA : l'axe est lu par
+reconnaissance de texte, les bougies sont reconstruites depuis l'image.
+→ `src/lib/vision/` · ✅ · un seul essai réel ; gênée par les bandeaux et
+boutons d'ordre
+
+**Checklist « bonne capture »** — Ce qu'une capture doit montrer pour être
+lisible : unité de temps visible, échelle lisible, 50 à 100 bougies, pas
+d'indicateurs superflus. → E4 · ⬜
+
+Ces analyses sont jugées par le **Labo**, qui n'en est pas une : backtest,
+témoin, rejeu pré-enregistré. Voir `CLAUDE.md`, garde-fous 4 à 8.
