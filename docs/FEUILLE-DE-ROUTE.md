@@ -493,7 +493,9 @@ zone. Vu sur le robot du bootcamp ; à mesurer contre l'entrée simple.
 ≥ 2 fois la précédente ; OB d'une seule bougie ; stop sous le plus bas protégé
 et objectif sur le dernier plus haut ; sortie partielle à 1 R ; deux CHoCH
 d'affilée = pas de trade ; confirmation par englobante ou doji ; balayage de
-liquidité avant l'OB ; emboîtement d'unités ; liquidité de trendline. Détail et
+liquidité avant l'OB (la plus solide : posée par deux formateurs) ; emboîtement
+d'unités ; liquidité de trendline ; plus haut et plus bas de la veille ; pas de
+trade les jours fériés. Détail et
 source dans `PISTES.md`. → E8 · ⬜
 
 **Checklist « bonne capture »** — Ce qu'une capture doit montrer pour être

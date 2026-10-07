@@ -241,6 +241,11 @@ par mois », « 80 % du temps », « 6 % en risquant 1 % » sont des affirmation
    balayés par une mèche, puis le dernier sell avant le buy). Bon signe, à ne
    pas confondre avec l'étoile 4 (liquidité non prise DEVANT l'OB, piège).
    Mesurable : `priseDeLiquidite`.
+   **Renforcée le 2026-10-07** : chez Interquity (vidéo sur l'or), c'est une
+   condition d'entrée — « pas de liquidity block, pas d'entrée » : une zone
+   ne se trade que si un plus bas a été balayé avant la poussée qui l'a créée,
+   et que des vendeurs ont été piégés (« inducement »). Deux formateurs
+   distincts la posent : **la piste la plus solide à éprouver après HYP-005.**
 8. **Emboîtement d'unités.** OB repéré en 4 h, affiné en 1 h, 30 min, 15 min,
    5 min : un OB de petite unité à l'intérieur d'un OB de grande unité ; entrée
    sur le petit, stop sous le grand.
@@ -248,4 +253,10 @@ par mois », « 80 % du temps », « 6 % en risquant 1 % » sont des affirmation
    bas égaux de l'étoile 4.
 10. **Zone OTE 0,62–0,786** comme zone d'entrée (vidéo « SMC »), là où la
     vidéo « 5 étoiles » prend le 0,5. Déjà au catalogue (§ 7, entrée OTE).
+11. **Plus haut et plus bas de la veille** (Interquity ; le trader « price
+    action » marque aussi ceux du jour). Une source de liquidité de plus : le
+    plus haut de la veille balayé, viser son plus bas. Calculable comme les
+    sessions (`sessions.js`).
+12. **Pas de trade les jours fériés** (Interquity). Filtre de calendrier ; à
+    mesurer comme les autres avant de l'imposer.
 
