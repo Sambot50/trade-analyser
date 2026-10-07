@@ -21,14 +21,34 @@ import { basename } from 'node:path';
 
 import { analyser as analyserCsv, avertissementsLecture } from '../src/lib/marche/csv.js';
 import { generateurAleatoire, melangerBougies, valeurP, resumeDistribution } from '../src/lib/marche/controle.js';
+import { dureeUnite } from '../src/lib/marche/bougies.js';
 import { parseArgs, validerOptions, chaine, agreger } from './backtest.mjs';
 
 export const SEUILS_ATR = Object.freeze([1, 1.5, 2, 3]);
+
+/**
+ * Les unités demandées par l'opérateur : 1 min, 5 min, 15 min, 1 h, 4 h,
+ * jour, semaine. Quatre se mesurent ici ; trois ne le peuvent pas, et on dit
+ * pourquoi au lieu de rendre un chiffre creux.
+ */
+export const UNITES_MESUREES = Object.freeze(['5m', '15m', '1h', '4h']);
+export const UNITES_NON_MESURABLES = Object.freeze({
+  '1m': "le fichier n'a rien de plus fin qu'une minute : impossible de savoir si le stop ou l'objectif a été touché en premier dans la bougie",
+  '1d': 'les contrats GC changent tous les deux mois environ : chaque contrat ne porte que quelques dizaines de bougies journalières, trop peu pour une structure, un ATR et un horizon de sortie',
+  '1w': 'deux ans font cent semaines, coupées par les changements de contrat : aucune mesure possible',
+});
+
+/** Horizon de sortie : 192 bougies de l'unité de détection (48 h en 15 min, comme avant). */
+export const HORIZON_EN_BOUGIES = 192;
 export const TEMOIN = Object.freeze({ tirages: 20, graine: 20261007 });
 
 /** Une ligne de tableau pour un seuil : le réel, et l'espérance de chaque mélange. */
-export function mesurerSeuil(fines, base, seuilAtr, { tirages = TEMOIN.tirages, graine = TEMOIN.graine, surTirage = () => {} } = {}) {
-  const o = { ...base, detecteur: 'bootcamp', seuilAtr };
+export function mesurerSeuil(fines, base, seuilAtr, { unite = '15m', tirages = TEMOIN.tirages, graine = TEMOIN.graine, surTirage = () => {} } = {}) {
+  const o = {
+    ...base, detecteur: 'bootcamp', seuilAtr,
+    utDetection: unite, utResolution: '1m',
+    horizonHeures: (HORIZON_EN_BOUGIES * dureeUnite(unite)) / 3_600_000,
+  };
   const a = agreger(chaine(fines, o).resultats, o.coutEnR, o.objectif, o.ambigu);
   const alea = generateurAleatoire(graine);
   const temoin = [];
@@ -38,6 +58,7 @@ export function mesurerSeuil(fines, base, seuilAtr, { tirages = TEMOIN.tirages, 
     surTirage(i + 1);
   }
   return {
+    unite,
     seuilAtr,
     orderBlocks: a.total,
     tranchees: a.tranchees,
@@ -55,7 +76,7 @@ const r3 = (v) => (v === null || v === undefined ? '—' : `${v >= 0 ? '+' : ''}
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  for (const interdit of ['seuils', 'seuilAtr', 'detecteur', 'utDetection', 'objectif', 'remplissage', 'ambigu', 'sansFiltreBiais']) {
+  for (const interdit of ['seuils', 'seuilAtr', 'detecteur', 'utDetection', 'utResolution', 'horizonHeures', 'objectif', 'remplissage', 'ambigu', 'sansFiltreBiais']) {
     if (args[interdit] !== undefined) {
       console.error(`\n--${interdit} n'existe pas ici : la mesure est figée (quatre seuils comptés d'avance).\n`);
       process.exit(1);
@@ -73,23 +94,37 @@ async function main() {
   console.log(`${lecture.bougies.length} bougies 1 min`);
   for (const l of avertissementsLecture(lecture)) console.log(`  ⚠  ${l}`);
 
+  const entete = `  ${'Unité'.padEnd(7)}${'Seuil'.padEnd(12)}${'OB'.padStart(7)}${'Tranchés'.padStart(10)}${'Réussite'.padStart(11)}${'IC 95 %'.padStart(19)}${'Espérance'.padStart(12)}${'Témoin'.padStart(12)}${'p'.padStart(8)}`;
+  const ligneTexte = (l) => {
+    const ic = l.bas === null ? '—' : `${pct(l.bas)} – ${pct(l.haut)}`;
+    return `  ${l.unite.padEnd(7)}${`≥ ${l.seuilAtr} ATR`.padEnd(12)}${String(l.orderBlocks).padStart(7)}${String(l.tranchees).padStart(10)}${pct(l.taux).padStart(11)}${ic.padStart(19)}${r3(l.esperance).padStart(12)}${r3(l.temoinMediane).padStart(12)}${(l.p === null ? '—' : l.p.toFixed(2)).padStart(8)}`;
+  };
+
   const lignes = [];
-  for (const s of SEUILS_ATR) {
-    process.stdout.write(`  seuil ${s} ATR : détection et ${TEMOIN.tirages} mélanges `);
-    lignes.push(mesurerSeuil(lecture.bougies, o, s, { surTirage: () => process.stdout.write('.') }));
-    console.log(' terminé');
+  for (const unite of UNITES_MESUREES) {
+    for (const s of SEUILS_ATR) {
+      process.stdout.write(`  ${unite}, seuil ${s} ATR : détection et ${TEMOIN.tirages} mélanges `);
+      lignes.push(mesurerSeuil(lecture.bougies, o, s, { unite, surTirage: () => process.stdout.write('.') }));
+      console.log(' terminé');
+    }
   }
 
   console.log(`\nOB « bootcamp » — ${basename(o.csv)}`);
-  console.log(`Dernière bougie inverse + accumulation, mouvement immédiat ; OB en ${o.utDetection}, plan à 2 R, entrée à la mèche, frais ${o.spread ? `${o.spread} en prix` : 'non fournis'}.\n`);
-  console.log(`  ${'Seuil'.padEnd(12)}${'OB'.padStart(7)}${'Tranchés'.padStart(10)}${'Réussite'.padStart(11)}${'IC 95 %'.padStart(19)}${'Espérance'.padStart(12)}${'Témoin'.padStart(12)}${'p'.padStart(8)}`);
+  console.log(`Dernière bougie inverse + accumulation, toujours en tendance, mouvement immédiat ; plan à 2 R, entrée à la mèche, issue lue en 1 min, horizon ${HORIZON_EN_BOUGIES} bougies, frais ${o.spread ? `${o.spread} en prix` : 'non fournis'}.\n`);
+  console.log(entete);
+  let precedente = null;
   for (const l of lignes) {
-    const ic = l.bas === null ? '—' : `${pct(l.bas)} – ${pct(l.haut)}`;
-    console.log(`  ${`≥ ${l.seuilAtr} ATR`.padEnd(12)}${String(l.orderBlocks).padStart(7)}${String(l.tranchees).padStart(10)}${pct(l.taux).padStart(11)}${ic.padStart(19)}${r3(l.esperance).padStart(12)}${r3(l.temoinMediane).padStart(12)}${(l.p === null ? '—' : l.p.toFixed(2)).padStart(8)}`);
+    if (precedente && precedente !== l.unite) console.log('');
+    console.log(ligneTexte(l));
+    precedente = l.unite;
   }
+  console.log('\n  Non mesurables ici :');
+  for (const [u, raison] of Object.entries(UNITES_NON_MESURABLES)) console.log(`    ${u.padEnd(4)} ${raison}.`);
+  console.log('    Le jour et la semaine se mesureront sur la série continue de MT5.');
   console.log(`\n  Témoin = espérance médiane sur ${TEMOIN.tirages} mélanges des mêmes bougies. p = part des mélanges qui font au moins aussi bien.`);
   console.log('  À 2 R, le seuil de rentabilité est 33,3 % avant frais.');
-  console.log('  Exploration : 4 seuils. Le seuil retenu se FIGE, puis la méthode entière se teste une seule fois (HYP-005).\n');
+  console.log(`  Exploration : ${UNITES_MESUREES.length * SEUILS_ATR.length} configurations essayées. Sur autant d'essais, un p de 0,05 sort par hasard une fois sur vingt :`);
+  console.log('  la configuration retenue se FIGE, puis se teste une seule fois sur des données neuves (HYP-005).\n');
 }
 
 if (import.meta.url === (await import('node:url')).pathToFileURL(process.argv[1] || '').href) {
