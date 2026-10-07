@@ -74,7 +74,7 @@ Inventaire complet des captures du bootcamp (2026-10-06). **Statut** :
 | **Analyste** : dépôt d'une capture + notes facultatives | Décision | E4 | 🟡 dépôt ✅, notes ⬜ |
 | Checklist « bonne capture » (unité de temps visible, échelle lisible, 50-100 bougies, pas d'indicateurs superflus, volumes si possible) | Décision | E4 | ⬜ |
 | Rapport : vue d'ensemble, biais, phase, dernier évènement, pattern structurel | Moteur + IA | E3, E4 | 🟡 calcul ✅ sur une unité de temps |
-| Points structurels (HH, LH, LL…) avec dates et prix | Moteur | E3 | 🟡 pivots ✅, libellés ⬜ |
+| Points structurels (HH, LH, LL…) avec dates et prix | Moteur | E3 | ✅ |
 | Liquidité acheteuse / vendeuse (BSL / SSL), balayage récent | Moteur | E3 | 🟡 prise de liquidité ✅ |
 | Zones d'offre et de demande, avec « force » | Moteur + Labo | E3, E8 | 🔁 force = statistique mesurée, pas étoiles |
 | FVG, breaker blocks | Moteur | E3 | 🟡 FVG ✅, breaker ⬜ |
@@ -82,8 +82,8 @@ Inventaire complet des captures du bootcamp (2026-10-06). **Statut** :
 | « Probabilité estimée 65 % / 35 % » | Labo | E8 | 🔁 remplacée par le taux mesuré du signal |
 | Niveaux à surveiller, conclusion, confiance | Décision + IA | E4 | ⬜ |
 | **Coach** (onglet) | Journal + IA | E9 | ⬜ (retour sur TES trades mesurés) |
-| **KTA MTF** : tableau 5m → Daily, structure, BOS/CHoCH, âge, invalidation, distance, biais pondéré, lecture | Multi-UT | E3 | ⬜ |
-| OB « 5 étoiles », Imbalance, Swing Points, session asiatique, supports/résistances | Moteur | E3, E5 | 🟡 OB ✅ FVG ✅ swings ✅, sessions ⬜, S/R ⬜ |
+| **KTA MTF** : tableau 5m → Daily, structure, BOS/CHoCH, âge, invalidation, distance, biais pondéré, lecture | Multi-UT | E3 | ✅ (⏸ 10 points de contrôle) |
+| OB « 5 étoiles », Imbalance, Swing Points, session asiatique, supports/résistances | Moteur | E3, E5 | 🟡 OB ✅ FVG ✅ swings ✅, sessions ✅, S/R ⬜ |
 | Analyse **par capture** | Décision | E4 | 🟡 |
 | Analyse **en direct**, multi-marchés | Source + Scanner | E5, E6 | ⬜ (attend MT5) |
 | **OB Scanner** : scanner, OB touchés, réaction, achat / vente, « dans la zone », « prix à x % » | Scanner | E6 | ⬜ |
