@@ -3172,3 +3172,62 @@ question, à compter.
 **Ce que ça ne dit pas.** La méthode repose sur les cinq étoiles ENSEMBLE ; un
 critère seul ne la réfute pas. C'est la question de HYP-004.
 
+---
+
+## HYP-004 — Les cinq étoiles d'un order block. Gelée le 2026-10-07
+
+**Pré-enregistrement, écrit avant toute exécution.**
+
+### La question
+
+Les order blocks qui remplissent les cinq critères de la méthode du bootcamp
+(« OB 5 étoiles ») rapportent-ils plus que les OB à 0-2 étoiles, et plus que
+le hasard ? Le bootcamp annonce 70 à 80 % de réussite, sans mesure.
+
+### Les critères (`src/lib/marche/etoiles.js`, paramètres figés)
+
+1. **Imbalance** : un FVG part de la bougie de l'OB (3e bougie).
+2. **Tendance** : l'OB naît d'un BOS, pas d'un CHoCH.
+3. **Discount** : OB haussier sous le 0,5 de la jambe, baissier au-dessus.
+4. **Liquidité** : aucune poche de plus bas (ou hauts) égaux non pris à moins
+   de 2 ATR devant l'OB, « égaux » à 0,1 ATR près, pivots de fenêtre 5 sur
+   les 200 bougies d'avant la cassure.
+5. **Mitigation** : aucun retour dans l'OB entre sa création et la cassure.
+
+Rien n'est lu après la cassure. La force du mouvement n'est pas un critère
+(DEC-041).
+
+### Les données
+
+`GC_2020_2022.csv` (`donnees/metaux-2020/`), Databento, 1 min, contrats
+séparés. **Jamais utilisé pour une question d'order block** : il a servi une
+fois, à HYP-003 (un système de volume). Son empreinte SHA-256 est calculée et
+enregistrée au lancement.
+
+### Le protocole (`scripts/hyp-004.mjs`, objet `GEL`)
+
+Chaîne identique à DEC-041 : OB en 15 min, plan à 2 R, entrée à la mèche,
+ambigus exclus, frais 4 ticks aller-retour (0,40), sans filtre de tendance
+(la tendance est l'étoile 2). Témoin : 200 mélanges des mêmes bougies, graine
+20261007, sur lesquels on mesure l'espérance du groupe 5 étoiles.
+
+### La règle de décision
+
+**Confirmée** si et seulement si :
+
+1. au moins **30 trades** à 5 étoiles ;
+2. leur espérance **dépasse** celle des OB à 0-2 étoiles ;
+3. elle **bat le témoin** : p < 0,05.
+
+Moins de 30 trades : **non concluant**, dit tel quel. Sinon : **réfutée**
+pour l'or en 15 min.
+
+### Ce que HYP-004 ne fera pas
+
+- Elle ne se lance qu'**une fois** : le script écrit `donnees/hyp-004.json` et
+  refuse de tourner si ce fichier existe.
+- Aucun réglage ne change après le lancement : ni les critères, ni le seuil de
+  la poche, ni l'unité de temps, ni l'objectif.
+- Une réfutation ne s'efface pas en essayant une autre unité de temps sur les
+  mêmes données. Une autre question se pré-enregistre à part.
+

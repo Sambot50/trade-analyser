@@ -23,7 +23,8 @@
     "journal": "node scripts/journal-mt5.mjs --dossier donnees/mt5",
     "structure": "node scripts/structure.mjs",
     "feuille": "node scripts/feuille-de-route.mjs",
-    "mesure:mouvement": "node scripts/mesure-mouvement.mjs --csv donnees/GC_2023_2024.csv --spread 0.4"
+    "mesure:mouvement": "node scripts/mesure-mouvement.mjs --csv donnees/GC_2023_2024.csv --spread 0.4",
+    "hyp:004": "node scripts/hyp-004.mjs --csv donnees/metaux-2020/GC_2020_2022.csv"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",

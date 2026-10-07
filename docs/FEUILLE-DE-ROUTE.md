@@ -215,7 +215,8 @@ vérifie.
 - [ ] Chaque OB affiche ses étoiles et la liste des critères remplis ou manquants
 - [ ] Confirmation d'entrée : bougie englobante en 1 min, dans l'OB, dans le bon sens (analyse nouvelle)
 - [ ] Stop sous l'OB, ou sous les OB empilés
-- [ ] HYP-004 pré-enregistrée — un OB 5 étoiles réagit-il mieux qu'un OB à 0-2 étoiles, frais compris, face au témoin ? Règle, données jamais utilisées pour les OB et seuil de décision écrits avant ; mesurée une seule fois
+- [x] HYP-004 pré-enregistrée (DECISIONS.md) : 5 étoiles contre 0-2 étoiles, GC 2020-2022 jamais utilisé pour les OB, 200 mélanges témoins, règle de décision écrite ; `npm run hyp:004`, qui refuse de tourner deux fois
+- [ ] **Opérateur** — lancer `npm run hyp:004` une seule fois, puis inscrire le verdict
 
 *Affichage*
 - [ ] Noyau toujours affiché : contexte multi-unités, OB, FVG, liquidité ; par unité, seulement les plus proches du prix
