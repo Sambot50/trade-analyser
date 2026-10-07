@@ -78,7 +78,7 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 1 290 tests (2026-10-07), dont le pont MT5 en Python
+npm test                         # 1 306 tests (2026-10-07), dont le pont MT5 en Python
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 
@@ -105,6 +105,7 @@ npm run structure -- --csv donnees/GC_2025_2026.csv --a 2026-07-15T12:30:00Z   #
 npm run rejeu:037                # réplication DEC-037 ; npm run temoin:037 ensuite
 npm run mesure:mouvement         # OB : réussite par force du mouvement (1-3 ATR), face au témoin
 npm run hyp:004                  # HYP-004 : les OB 5 étoiles, UNE seule fois (refuse de se relancer)
+npm run mesure:ob-bootcamp       # OB du bootcamp : seuil du « fort mouvement », face au témoin
 
 # Rejeu pré-enregistré (DEC-036) : 100 jours de GC rejoués au modèle, puis le témoin, UNE fois.
 # Ne jamais relancer dans un autre dossier pour obtenir un autre p.

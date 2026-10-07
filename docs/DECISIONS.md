@@ -3262,3 +3262,27 @@ ne se confirme que par un nouveau test pré-enregistré, sur des données jamais
 utilisées pour les OB, avec assez de trades. Il ne se cherche pas en regardant
 les 3 ou 4 étoiles sur ces mêmes données.
 
+---
+
+## DEC-042 — Deux définitions de l'order block. DEC-041 et HYP-004 ne jugent que la nôtre
+
+**2026-10-07 · Correction, signalée par l'opérateur depuis le bootcamp**
+
+DEC-041 et HYP-004 ont été présentées comme un jugement de la méthode du
+bootcamp. **C'était faux.** Elles ont mesuré l'OB de `orderblocks.js` : la
+dernière bougie opposée avant une **cassure de structure** (BOS ou CHoCH),
+quelle que soit la longueur de l'impulsion.
+
+L'OB du bootcamp est autre (diapos du 2026-10-07, transcription) : **la
+dernière bougie inverse d'un fort mouvement**, avec l'**accumulation** de
+bougies inverses qui la précède, suivie d'un mouvement fort **immédiat**, sans
+cassure exigée. Le FVG de l'étoile 1 part du haut de toute la zone.
+
+**Décision.** Les deux définitions vivent côte à côte dans la brique Moteur :
+`orderblocks.js` (structure) et `ob-bootcamp.js` (bootcamp), même chaîne de
+mesure (`--detecteur structure|bootcamp`). DEC-041 et HYP-004 restent vraies,
+**pour la définition de structure seulement**. La méthode du bootcamp n'est
+pas encore testée : son seuil de « fort mouvement » s'explore sur GC 2023-2024
+(`npm run mesure:ob-bootcamp`, quatre seuils), se fige, puis la méthode entière
+se teste une fois sur des données jamais utilisées pour les OB (HYP-005).
+

@@ -29,6 +29,7 @@ import { etoiles } from '../src/lib/marche/etoiles.js';
 import { calculerExcursions, enUnitesDeRisque } from '../src/lib/journal/excursion.js';
 import { cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER, INDETERMINE } from '../src/lib/marche/structure.js';
 import { detecterEnDetail, anomalieVolume } from '../src/lib/marche/orderblocks.js';
+import { detecterBootcamp } from '../src/lib/marche/ob-bootcamp.js';
 import { intervalleWilson, conclusionPossible, esperanceEnR } from '../src/lib/marche/statistiques.js';
 import { resoudreIssue, gainEnR, OBJECTIFS, REMPLISSAGES, TRAITEMENTS_AMBIGU, reglageObjectif } from '../src/lib/journal/resolve.js';
 
@@ -205,6 +206,12 @@ export function validerOptions(args) {
   }
 
   o.sansFiltreBiais = Boolean(args.sansFiltreBiais);
+  o.detecteur = args.detecteur ?? 'structure';
+  if (!['structure', 'bootcamp'].includes(o.detecteur)) erreurs.push(`--detecteur "${args.detecteur}" inconnu (structure, bootcamp)`);
+  if (o.detecteur === 'bootcamp') {
+    o.seuilAtr = Number(args.seuilAtr);
+    if (!(o.seuilAtr > 0)) erreurs.push('--seuil-atr : un nombre positif est requis avec --detecteur bootcamp');
+  }
   o.baseUrl = typeof args.baseUrl === 'string' ? args.baseUrl : undefined;
   if (o.csv && o.baseUrl) erreurs.push('--csv et --base-url désignent deux sources : choisis-en une.');
 
@@ -292,7 +299,11 @@ function chaineDUnSegment(fines, o) {
 
   const serieBiais = tendanceAuFilDuTemps(cassures(biaisBougies, o.fenetre));
   const evenements = cassures(detectionBougies, o.fenetre);
-  const { retenus: orderBlocks, rejetes } = detecterEnDetail(detectionBougies, evenements, { volume: o.volume });
+  // Deux définitions de l'order block, une même chaîne : celle de la
+  // structure (par défaut) et celle du bootcamp (`ob-bootcamp.js`).
+  const { retenus: orderBlocks, rejetes } = o.detecteur === 'bootcamp'
+    ? { retenus: detecterBootcamp(detectionBougies, { seuilAtr: o.seuilAtr }), rejetes: [] }
+    : detecterEnDetail(detectionBougies, evenements, { volume: o.volume });
 
   const horizonBougies = Math.round((o.horizonHeures * 3_600_000) / dureeUnite(o.utResolution));
   const resultats = evaluer({
