@@ -216,7 +216,13 @@ vérifie.
 - [ ] Confirmation d'entrée : bougie englobante en 1 min, dans l'OB, dans le bon sens (analyse nouvelle)
 - [ ] Stop sous l'OB, ou sous les OB empilés
 - [x] HYP-004 pré-enregistrée (DECISIONS.md) : 5 étoiles contre 0-2 étoiles, GC 2020-2022 jamais utilisé pour les OB, 200 mélanges témoins, règle de décision écrite ; `npm run hyp:004`, qui refuse de tourner deux fois
-- [x] HYP-004 lancée une fois (2026-10-07) : **réfutée** pour l'or en 15 min — 5 étoiles 43,6 %, +0,054 R sur 78 trades, contre −0,115 R aux 0-2 étoiles, mais p = 0,184 face au témoin
+- [x] HYP-004 lancée une fois (2026-10-07) : **réfutée** pour l'or en 15 min, **OB de structure seulement** (DEC-042) — 5 étoiles 43,6 %, +0,054 R sur 78 trades, contre −0,115 R aux 0-2 étoiles, mais p = 0,184 face au témoin
+
+*OB tel que l'enseigne le bootcamp (DEC-042)*
+- [x] Détecteur `ob-bootcamp.js` : dernière bougie inverse + accumulation, mouvement fort immédiat, sans cassure exigée ; FVG mesuré depuis le haut de la zone
+- [x] Mesure `npm run mesure:ob-bootcamp` : 4 seuils de « fort mouvement » figés (1 ; 1,5 ; 2 ; 3 ATR), chacun face à 20 mélanges
+- [ ] **Opérateur** — lancer `npm run mesure:ob-bootcamp` sur GC 2023-2024 ; le seuil retenu est **figé** ici
+- [ ] HYP-005 pré-enregistrée puis lancée une fois : OB bootcamp 5 étoiles, sur des données jamais utilisées pour les OB
 
 *Affichage*
 - [ ] Noyau toujours affiché : contexte multi-unités, OB, FVG, liquidité ; par unité, seulement les plus proches du prix
@@ -362,6 +368,11 @@ tendance de fond, conflit entre 4 h et Daily, ou tendances mêlées.
 casse la structure : une zone où le prix pourrait réagir à son retour. Stop
 posé au-delà de la zone. → `orderblocks.js` · E3 · ✅ · ne bat pas le
 hasard (DEC-025, DEC-029)
+
+**OB « bootcamp »** — La dernière bougie inverse d'un fort mouvement, avec
+l'accumulation de bougies inverses qui la précède ; le mouvement doit partir
+immédiatement. Pas de cassure de structure exigée, contrairement à l'OB de
+`orderblocks.js`. → `ob-bootcamp.js` · E4 · ✅ calcul · ⬜ seuil, puis HYP-005
 
 **OB « 5 étoiles »** — La note d'un OB selon cinq critères (méthode du
 bootcamp) : imbalance, tendance, premium / discount, pas de liquidité

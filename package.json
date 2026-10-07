@@ -24,7 +24,8 @@
     "structure": "node scripts/structure.mjs",
     "feuille": "node scripts/feuille-de-route.mjs",
     "mesure:mouvement": "node scripts/mesure-mouvement.mjs --csv donnees/GC_2023_2024.csv --spread 0.4",
-    "hyp:004": "node scripts/hyp-004.mjs --csv donnees/metaux-2020/GC_2020_2022.csv"
+    "hyp:004": "node scripts/hyp-004.mjs --csv donnees/metaux-2020/GC_2020_2022.csv",
+    "mesure:ob-bootcamp": "node scripts/mesure-ob-bootcamp.mjs --csv donnees/GC_2023_2024.csv --spread 0.4"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",

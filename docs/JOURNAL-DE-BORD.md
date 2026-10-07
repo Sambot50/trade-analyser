@@ -68,9 +68,15 @@ renvoie.
   trades, 43,6 %, +0,054 R ; 0-2 étoiles : −0,115 R ; témoin −0,075 R,
   p = 0,184. Sens favorable, échantillon trop petit. Piste notée (PISTES.md).
 
+**Erreur reconnue**
+- DEC-041 et HYP-004 présentées comme un jugement de la méthode du bootcamp,
+  alors qu'elles mesuraient notre OB de structure. Relevé par l'opérateur
+  (diapos du bootcamp). Corrigé : DEC-042, second détecteur `ob-bootcamp.js`
+  (dernière bougie inverse + accumulation, mouvement immédiat).
+
 **Prochaine action**
-- Décider avec l'opérateur : nouveau test pré-enregistré avec plus de trades,
-  ou suite d'E4 avec les étoiles affichées comme « non prouvées ».
+- **Opérateur** : `npm run mesure:ob-bootcamp`, puis on fige le seuil et on
+  pré-enregistre HYP-005.
 
 ---
 

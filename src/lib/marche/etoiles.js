@@ -6,8 +6,8 @@
 // face au témoin, sur des données jamais utilisées pour les OB. Le « 70 à
 // 80 % de réussite » annoncé n'est mesuré nulle part.
 //
-//   1. Imbalance   — un FVG part de la bougie de l'OB : pour un OB haussier,
-//                    le plus haut de l'OB reste sous le plus bas de la 3e bougie.
+//   1. Imbalance   — un FVG part de l'OB : pour un OB haussier, le haut de la
+//                    zone reste sous le plus bas de la 3e bougie.
 //   2. Tendance    — l'OB naît d'une cassure DANS la tendance (BOS), pas d'un
 //                    retournement (CHoCH).
 //   3. Discount    — OB haussier sous le 0,5 de la jambe, baissier au-dessus.
@@ -61,13 +61,18 @@ export function atrJusqua(bougies, fin, periode = PARAMETRES_ETOILES.periodeAtr)
   return atr > 0 ? atr : null;
 }
 
-/** Étoile 1 — le FVG part de la bougie de l'OB. */
+/**
+ * Étoile 1 — le FVG part de l'OB : pour un OB haussier, le HAUT DE LA ZONE
+ * reste sous le plus bas de la 3e bougie (la 2e après la dernière bougie de
+ * l'OB). Diapo « 1. Crée de l'imbalance » du bootcamp : la zone rose part du
+ * haut de toute la zone grise, accumulation comprise. Pour un OB d'une seule
+ * bougie, c'est le plus haut de cette bougie.
+ */
 export function imbalanceDepuisOB(bougies, ob) {
   const i = ob.index;
   if (i + 2 > ob.indexCassure) return false;
-  const a = bougies[i];
   const c = bougies[i + 2];
-  return ob.sens === HAUSSIER ? a.plusHaut < c.plusBas : a.plusBas > c.plusHaut;
+  return ob.sens === HAUSSIER ? ob.zone.haut < c.plusBas : ob.zone.bas > c.plusHaut;
 }
 
 /**
@@ -115,7 +120,9 @@ export function etoiles(bougies, ob) {
 
   const criteres = {
     imbalance: imbalanceDepuisOB(visibles, ob),
-    tendance: ob.typeCassure === 'BOS',
+    // OB de structure : né d'un BOS. OB « bootcamp » : la tendance de
+    // l'unité au moment de sa validation (`ob-bootcamp.js`).
+    tendance: ob.dansLaTendance ?? ob.typeCassure === 'BOS',
     discount: zone?.enZoneFavorable === true,
     sansLiquiditeDevant: poche === null,
     nonMitige: fraicheur(visibles, ob).intacte,
