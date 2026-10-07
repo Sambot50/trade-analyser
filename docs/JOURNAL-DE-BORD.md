@@ -38,8 +38,17 @@ renvoie.
 - Réplication DEC-037 trouvée **arrêtée à 91 plans sur 100**, 0 rejet. Résultat
   non lu : le témoin ne se lance qu'une fois les 100 plans faits.
 
+**Fait, suite — E4 lancée**
+- Captures du bootcamp (Analyste, OB Scanner, robot) et transcription de la
+  vidéo « OB 5 étoiles » analysées. E4 détaillée ; E6 et le § 7 enrichis.
+- Décidé avec l'opérateur : les **order blocks sont le cœur du projet** ;
+  bloc « OB 5 étoiles » en tête d'E4, avec HYP-004 pré-enregistrée avant
+  toute mesure. Affichage : un noyau (contexte, OB, FVG, liquidité) et le
+  reste en calques à cocher.
+- Risque : capital 2 000 € ; cibles à 1:2 et 1:3, gérées par l'opérateur.
+
 **Prochaine action**
-- E1, E2, E3 attendent des vérifications de l'opérateur ; E4 attend son feu vert.
+- E4, bloc OB : fixer le seuil du « fort mouvement », puis les étoiles.
 
 ---
 

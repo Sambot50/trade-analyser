@@ -137,7 +137,7 @@ l'erreur s'écrit au journal.
 | E1 Pont MT5 + journal | ⏸ | validation sur le vrai terminal Axi (connexion à rétablir) |
 | E2 IA interchangeables | ⏸ | un essai réel avec deux IA différentes |
 | E3 Moteur multi-unités de temps | ⏸ | 10 points de contrôle relevés sur TradingView (opérateur) |
-| **E4 Écran Décision** | ⬜ prochaine | tout |
+| **E4 Écran Décision** | 🔵 en cours | tout (cases ci-dessous) |
 | E5 → E10 | ⬜ | — |
 
 ---
@@ -196,15 +196,48 @@ l'erreur s'écrit au journal.
 - [ ] **Opérateur** — bornes des sessions confirmées (Asie : 19 h → 4 h New York, ou autre ?)
 - [ ] Ajuster ce que les points de contrôle révèlent (fenêtre des pivots, alignement des séances)
 
-### E4 — Écran Décision ⬜
+### E4 — Écran Décision 🔵
 
-- [ ] Dépôt d'une capture + notes facultatives
-- [ ] Checklist « bonne capture » vérifiée automatiquement (unité, échelle, nombre de bougies)
-- [ ] Rapport : vue d'ensemble, structure, liquidité, zones, FVG, scénarios, niveaux, conclusion
-- [ ] Tous les niveaux viennent du moteur ; l'IA ne fait que rédiger
-- [ ] Plan avec **stop obligatoire**, R, taille de position, coût en R
+Cible : l'écran « Analyste » du bootcamp (captures du 2026-10-07), avec nos
+garde-fous. **Les order blocks sont le cœur du projet** (opérateur,
+2026-10-07) : leur bloc passe en premier. Critère de fin : le rapport complet
+sort sur des captures réelles et sur les données MT5, puis l'opérateur le
+vérifie.
+
+*Order blocks « 5 étoiles » — d'après la méthode du bootcamp (vidéo de Casper), rendue calculable*
+- [ ] « Fort mouvement » défini par un seuil écrit avant toute mesure
+- [ ] Étoile 1, imbalance : un FVG part de la bougie de l'OB (le plus haut de l'OB reste sous le plus bas de la 3e bougie, et inversement)
+- [ ] Étoile 2, tendance : l'OB va dans le sens de la structure de son unité de temps
+- [ ] Étoile 3, premium / discount : OB haussier sous le 0,5 de Fibonacci de la structure en cours, OB baissier au-dessus
+- [ ] Étoile 4, liquidité : pas de plus hauts ou plus bas égaux juste devant l'OB (analyse nouvelle)
+- [ ] Étoile 5, mitigation : l'OB n'a jamais été retouché depuis sa création, jusqu'à l'instant de lecture (analyse nouvelle)
+- [ ] Chaque OB affiche ses étoiles et la liste des critères remplis ou manquants
+- [ ] Confirmation d'entrée : bougie englobante en 1 min, dans l'OB, dans le bon sens (analyse nouvelle)
+- [ ] Stop sous l'OB, ou sous les OB empilés
+- [ ] HYP-004 pré-enregistrée — un OB 5 étoiles réagit-il mieux qu'un OB à 0-2 étoiles, frais compris, face au témoin ? Règle, données jamais utilisées pour les OB et seuil de décision écrits avant ; mesurée une seule fois
+
+*Affichage*
+- [ ] Noyau toujours affiché : contexte multi-unités, OB, FVG, liquidité ; par unité, seulement les plus proches du prix
+- [ ] Onglet « Analyses » : le reste en cases à cocher, éteintes par défaut, choix mémorisé ; l'IA ne reçoit que ce qui est affiché
+
+*Entrée*
+- [ ] Dépôt d'une capture + notes facultatives (actif, unité, contexte)
+- [ ] Checklist « bonne capture » vérifiée automatiquement : unité de temps lue, axe lisible (au moins 3 graduations), 50 à 100 bougies, symbole reconnu ; chaque point manquant dit quoi corriger
+- [ ] Axe lu même en petits chiffres (cas BTC du 2026-10-07 : une seule graduation lue sur un axe pourtant lisible)
+- [ ] OB anormalement haut signalé (cas BTC : une zone de 1 600 points)
+
+*Rapport — tous les niveaux viennent du moteur*
+- [ ] Vue d'ensemble : tendance, dernier BOS / CHoCH, points HH, HL, LH, LL
+- [ ] Liquidité BSL / SSL et balayages ; zones OB et FVG, bornes arrondies au pas de cotation
+- [ ] Niveaux à surveiller : niveau, type, importance selon des critères affichés
+- [ ] Scénario principal et alternatif : chaîne d'étapes, déclencheur, cibles 1 à 3, condition nécessaire, invalidation ; « probabilité » affichée **non mesurée** jusqu'à E8
+- [ ] Conclusion rédigée par l'IA à partir des seuls niveaux du moteur ; un prix cité qui ne vient pas du moteur fait rejeter le texte
+- [ ] Confiance sur 10 = lisibilité de la capture, avec sa justification ; jamais une promesse de gain
+
+*Plan et suite*
+- [ ] Plan avec **stop obligatoire**, cibles à 1:2 et 1:3 (l'opérateur choisit et gère), taille de position, coût en R
 - [ ] Bouton « Je prends » relié au journal
-- [ ] Le même écran fonctionne avec chacune des IA branchées
+- [ ] Le même écran fonctionne avec chacune des IA ; sans IA, le rapport du moteur s'affiche quand même, sans texte rédigé
 
 ### E5 — Sources interchangeables + direct MT5 ⬜
 
@@ -215,8 +248,16 @@ l'erreur s'écrit au journal.
 
 ### E6 — Scanner multi-marchés ⬜
 
-- [ ] Liste d'actifs (Forex, métaux, indices, crypto) configurable
-- [ ] Détections : OB touché, réaction, entrée dans une zone, distance au prix
+Cible : l'« OB Scanner » du bootcamp (captures du 2026-10-07), avec le taux
+mesuré en plus.
+
+- [ ] Liste d'actifs configurable ; classes NQ100, Métaux, Énergie, Forex, Crypto ; recherche par symbole
+- [ ] Unités 4 h, Daily, Weekly
+- [ ] Tri : proximité d'une zone, nombre d'OB, plus récent ; vue grille ou liste
+- [ ] Une carte par marché : mini-graphique avec zones d'achat et de vente, état « dans la zone » / « prix à x % »
+- [ ] Onglets : toutes les zones, OB touchés, réactions (comptées sur **toutes** les zones touchées, pas seulement celles qui ont réagi)
+- [ ] Vue détail : sens, bornes arrondies, lien TradingView
+- [ ] Sur chaque carte, le taux mesuré du type de zone (E8), ou « non mesuré »
 - [ ] Opportunité détectée en moins d'une minute
 
 ### E7 — Alertes Telegram ⬜
@@ -320,6 +361,28 @@ casse la structure : une zone où le prix pourrait réagir à son retour. Stop
 posé au-delà de la zone. → `orderblocks.js` · E3 · ✅ · ne bat pas le
 hasard (DEC-025, DEC-029)
 
+**OB « 5 étoiles »** — La note d'un OB selon cinq critères (méthode du
+bootcamp) : imbalance, tendance, premium / discount, pas de liquidité
+devant, jamais retouché. La note n'est qu'un compte de critères ; ce qu'elle
+vaut se mesure (HYP-004). Le « 70 à 80 % » annoncé par le bootcamp n'est
+mesuré nulle part. → E4, E8 · ⬜
+
+**Plus hauts et plus bas égaux (EQH / EQL)** — Deux sommets ou deux creux au
+même prix, à une tolérance près : un réservoir d'ordres stop que le marché
+vient chercher. Devant un OB, c'est un piège (étoile 4). → E4 · ⬜
+
+**Mitigation jusqu'à l'instant** — L'OB a-t-il été retouché entre sa création
+et maintenant ? Différent de la fraîcheur, qui s'arrête à la cassure.
+→ E4 · ⬜
+
+**Confirmation par bougie englobante** — Dans l'OB, en 1 min, une bougie qui
+englobe la précédente dans le sens du trade : le signal d'entrée du
+bootcamp. → E4 · ⬜
+
+**Stop sous des OB empilés** — Deux OB proches l'un de l'autre : le stop
+passe sous les deux, pour que seul un scénario invalidé le déclenche.
+→ E4 · ⬜
+
 **Qualificatifs d'un OB** — Dix critères qui décrivent un OB : FVG laissé par
 l'impulsion, prise de liquidité avant, force du déplacement, importance du
 niveau, zone premium ou discount, fraîcheur, niveau vierge, taille par rapport
@@ -395,6 +458,16 @@ l'axe des prix ; les lignes ne sont tracées que si l'axe lu est cohérent.
 reconnaissance de texte, les bougies sont reconstruites depuis l'image.
 → `src/lib/vision/` · ✅ · un seul essai réel ; gênée par les bandeaux et
 boutons d'ordre
+
+**Réaction à une zone** — La zone est touchée, puis le prix est rejeté. Le
+taux se compte sur toutes les zones touchées, jamais sur les seules qui ont
+réagi : ne montrer que les réussites, c'est le biais des ✓ du bootcamp.
+→ E6, E8 · ⬜
+
+**Entrée Fibonacci dans la zone (OTE)** — Une fois le prix dans l'OB, entrer
+sur un retracement de 0,5 à 0,786 de l'impulsion plutôt qu'au bord de la
+zone. Vu sur le robot du bootcamp ; à mesurer contre l'entrée simple.
+→ E8 · ⬜
 
 **Checklist « bonne capture »** — Ce qu'une capture doit montrer pour être
 lisible : unité de temps visible, échelle lisible, 50 à 100 bougies, pas
