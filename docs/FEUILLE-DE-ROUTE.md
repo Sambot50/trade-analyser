@@ -266,3 +266,83 @@ l'erreur s'écrit au journal.
    contrat change, et ce changement s'écrit dans `DECISIONS.md`.
 5. **Le journal de bord est tenu chaque jour de travail.**
 6. **Aucun chiffre affiché sans mesure, aucun ordre envoyé sans validation.**
+
+---
+
+## 7. Les analyses techniques
+
+Le catalogue de la brique **Moteur**. Toutes les analyses techniques vivent
+**au même endroit**, `src/lib/marche/`, un fichier par analyse. Les autres
+briques (Décision, Scanner, Notificateur, Exécution) les **appellent**, elles
+ne les recopient jamais : une analyse améliorée ici l'est partout, et sa
+mesure vaut partout. Décidé avec l'opérateur le 2026-10-06.
+
+Ce tableau s'enrichit au fur et à mesure. Une analyse nouvelle s'y inscrit
+**avant** d'être codée (règle 3). **Statut** : ✅ existe · 🟡 partiel · ⬜ à
+faire · 🔁 remplacée par une version mesurée.
+
+**Aucune de ces analyses n'a encore prouvé qu'elle gagne.** La colonne
+« Mesure » dit ce qu'on sait, pas ce qu'on espère.
+
+### Structure et unités de temps
+
+| Analyse | Ce qu'elle rend | Fichier | Étape | Statut | Mesure |
+|---|---|---|---|---|---|
+| Points pivots (swings) | plus hauts et plus bas, datés à leur confirmation | `structure.js` | E3 | ✅ | — |
+| BOS / CHoCH | cassure dans la tendance / changement de caractère, à la fermeture de la bougie | `structure.js` | E3 | ✅ | datation corrigée : 62 % → 45 % (DEC-013) |
+| Tendance et invalidation | haussière / baissière, dernier pivot opposé, distance | `structure.js` | E3 | ✅ | — |
+| Points nommés HH, HL, LH, LL | type, prix, date | `structure.js` | E3 | ✅ | — |
+| Séance de marché | bougies 4 h et Daily démarrant à 17 h New York, heure d'été comprise | `seance.js` | E3 | ✅ | ⏸ alignement TradingView à contrôler |
+| Tableau multi-UT « KTA MTF » | 5 min → Daily : tendance, évènement, âge, invalidation, distance | `multiut.js` | E3 | ✅ | ⏸ 10 points de contrôle |
+| Biais pondéré | score sur 10, poids 1-1-1-2-2-3 | `multiut.js` | E3 | ✅ | aucune : un résumé, pas un signal (E8) |
+| Lecture du tableau | alignement, repli, conflit, mêlé | `multiut.js` | E3 | ✅ | aucune |
+
+### Zones et liquidité
+
+| Analyse | Ce qu'elle rend | Fichier | Étape | Statut | Mesure |
+|---|---|---|---|---|---|
+| Order blocks | zone, sens, stop au-delà | `orderblocks.js` | E3 | ✅ | **ne bat pas le hasard** (DEC-025, DEC-029) |
+| Qualificatifs d'un OB | FVG de l'impulsion, prise de liquidité, déplacement, importance du niveau, premium / discount, fraîcheur, niveau vierge, zone / ATR, définition alternative | `qualificatifs.js` | E3, E8 | ✅ | croisés avec l'issue, corrigés pour la recherche (DEC-018) |
+| OB validé par le volume | volume de l'impulsion au-dessus d'un seuil | `orderblocks.js` | E3 | ✅ | voir DEC-031 |
+| « Force » d'une zone (les étoiles du bootcamp) | taux mesuré du type de zone | — | E8 | 🔁 | à mesurer |
+| Imbalance / FVG | trou de cotation laissé par une impulsion | `qualificatifs.js` | E3 | 🟡 | seulement attaché à un OB ; détection autonome ⬜ |
+| Breaker blocks | OB cassé devenu niveau opposé | — | E3 | ⬜ | — |
+| Zones d'offre et de demande | zones de départ des impulsions | — | E3 | ⬜ | — |
+| Supports et résistances | niveaux touchés plusieurs fois | — | E3, E5 | ⬜ | — |
+| Liquidité BSL / SSL et balayage | au-dessus des hauts / sous les bas, prise récente | `qualificatifs.js`, `sessions.js` | E3 | 🟡 | — |
+| Sessions Asie, Londres, New York | haut, bas, balayés ou non | `sessions.js` | E3 | ✅ | ⏸ bornes de l'Asie à confirmer (« 1900-0001 ») |
+| Premium / discount | moitié chère ou bon marché du range | `qualificatifs.js` | E3 | ✅ | — |
+
+### Volume (contrats à terme)
+
+| Analyse | Ce qu'elle rend | Fichier | Étape | Statut | Mesure |
+|---|---|---|---|---|---|
+| Détecteurs d'anomalies | absorption, déplacement, rejet, hors séance, gap, pic de volume | `anomalies.js` | — | ✅ | prédit **l'amplitude, jamais la direction** (DEC-031) |
+| Profil horaire, fenêtres d'annonces | volume par heure ; 8 h 30, 10 h, 14 h New York | `anomalies.js` | — | ✅ | — |
+| Après une anomalie | excursions favorable et contraire, pour placer stop et objectif | `apres.js`, `plan.js` | — | ✅ | stop annoncé ≠ stop mesuré (ERRATUM-001) |
+| Volume acheteur / vendeur (delta) | depuis les transactions ; **absent** d'un CSV de CFD | `transactions.js` | — | ✅ | jamais déduit de la couleur (garde-fou 5) |
+
+### Plan de trade et coûts
+
+| Analyse | Ce qu'elle rend | Fichier | Étape | Statut | Mesure |
+|---|---|---|---|---|---|
+| Cohérence du plan | rejet si stop ou cibles contredisent le sens | `src/lib/analysis.js` | — | ✅ | garde-fou 1 |
+| Ratio R | recalculé par le programme, jamais lu chez l'IA | `src/lib/analysis.js` | — | ✅ | premier essai réel : 0,87 |
+| Coûts en R | spread et commission, par instrument | `couts.js` | — | ✅ | **0,08 R par trade** (DEC-034) |
+| Taille de position | selon le risque et la taille du contrat | `scripts/dimensionner.mjs` | E4 | 🟡 | — |
+| Scénarios, déclencheur, cibles, niveaux à surveiller | principal / alternatif, stop obligatoire | — | E4 | ⬜ | « 65 % / 35 % » 🔁 taux mesuré (E8) |
+
+### Lecture d'une capture (premier analyseur)
+
+| Analyse | Ce qu'elle rend | Fichier | Étape | Statut | Mesure |
+|---|---|---|---|---|---|
+| Lecture par l'IA de vision | plan + repère `scale` de l'axe | `src/lib/providers/` | E2 | ✅ | `qwen3.8:27b` lit l'axe à 2,3 px (DEC-005) ; un seul essai réel |
+| Lecture géométrique (sans IA) | axe par OCR, bougies reconstruites | `src/lib/vision/` | — | ✅ | un seul essai réel ; défaut sur bandeau et boutons d'ordre |
+| Checklist « bonne capture » | unité visible, échelle lisible, 50-100 bougies | — | E4 | ⬜ | — |
+
+### Les outils de mesure (brique Labo)
+
+Ils ne sont pas des analyses : ils **jugent** les analyses ci-dessus.
+Backtest, témoin par permutation (`controle.js`), rejeu pré-enregistré
+(`src/lib/journal/rejeu.js`), témoin des plans (`src/lib/journal/temoin.js`),
+découpage par contrat (`contrats.js`). Voir CLAUDE.md, garde-fous 4 à 8.
