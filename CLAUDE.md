@@ -78,7 +78,7 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 1 250 tests (2026-10-06), dont le pont MT5 en Python
+npm test                         # 1 266 tests (2026-10-07), dont le pont MT5 en Python
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 
@@ -103,6 +103,7 @@ npm run mt5:export -- --bougies XAUUSD --depuis 2026-01-01   # + bougies M1
 npm run journal                  # journal de performances depuis l'export MT5
 npm run structure -- --csv donnees/GC_2025_2026.csv --a 2026-07-15T12:30:00Z   # tableau multi-UT
 npm run rejeu:037                # réplication DEC-037 ; npm run temoin:037 ensuite
+npm run mesure:mouvement         # OB : réussite par force du mouvement (1-3 ATR), face au témoin
 
 # Rejeu pré-enregistré (DEC-036) : 100 jours de GC rejoués au modèle, puis le témoin, UNE fois.
 # Ne jamais relancer dans un autre dossier pour obtenir un autre p.
