@@ -237,6 +237,8 @@ vérifie.
 - [ ] Checklist « bonne capture » vérifiée automatiquement : unité de temps lue, axe lisible (au moins 3 graduations), 50 à 100 bougies, symbole reconnu ; chaque point manquant dit quoi corriger
 - [ ] Axe lu même en petits chiffres (cas BTC du 2026-10-07 : une seule graduation lue sur un axe pourtant lisible)
 - [ ] OB anormalement haut signalé (cas BTC : une zone de 1 600 points)
+- [ ] TradingView en direct via **Claude dans Chrome** (extension officielle, lecture seule, aucun ordre — règle 7) : l'opérateur et Claude regardent le même graphique
+- [ ] Contrôle visuel des OB : les OB détectés par le moteur sur les bougies MT5 sont comparés à ceux que l'opérateur voit sur TradingView, au même instant ; chaque écart est noté. C'est un **contrôle de détection**, jamais une mesure de rendement : celle-ci se fait sur les bougies, face au témoin
 
 *Rapport — tous les niveaux viennent du moteur*
 - [ ] Vue d'ensemble : tendance, dernier BOS / CHoCH, points HH, HL, LH, LL
@@ -325,6 +327,8 @@ mesuré en plus.
    contrat change, et ce changement s'écrit dans `DECISIONS.md`.
 5. **Le journal de bord est tenu chaque jour de travail.**
 6. **Aucun chiffre affiché sans mesure, aucun ordre envoyé sans validation.**
+7. **Aucune IA ne passe d'ordre.** Elle lit, analyse, propose ; l'opérateur
+   seul décide et exécute. Vaut aussi pour Claude dans Chrome sur TradingView.
 
 ---
 
