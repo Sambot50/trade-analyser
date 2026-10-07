@@ -74,6 +74,9 @@ renvoie.
   (diapos du bootcamp). Corrigé : DEC-042, second détecteur `ob-bootcamp.js`
   (dernière bougie inverse + accumulation, mouvement immédiat).
 
+- Trois transcriptions du bootcamp analysées (OB) : neuf pistes notées dans
+  PISTES.md, sans code, à éprouver une par une.
+
 **Prochaine action**
 - **Opérateur** : `npm run mesure:ob-bootcamp`, puis on fige le seuil et on
   pré-enregistre HYP-005.
