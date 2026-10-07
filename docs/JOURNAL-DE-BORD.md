@@ -10,6 +10,21 @@ renvoie.
 
 ---
 
+## 2026-10-07 — catalogue des analyses, fin d'E0
+
+**Fait**
+- Feuille de route, § 7 « Les analyses techniques » : le catalogue de la
+  brique Moteur (analyse, fichier, étape, statut, mesure), validé la veille.
+
+**Décidé**
+- Toutes les analyses restent dans une seule brique, le Moteur ; les autres
+  briques les appellent sans les recopier (décision du 2026-10-06).
+
+**Prochaine action**
+- **Opérateur** — finir E0 : tag, données dans `donnees\`, ancienne copie.
+
+---
+
 ## 2026-10-06 — étapes E0, E1, E2
 
 **Fait**
