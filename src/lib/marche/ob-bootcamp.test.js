@@ -197,3 +197,28 @@ describe('balayage de liquidité avant l’OB', () => {
     expect(e.nombre).toBe([e.imbalance, e.tendance, e.discount, e.sansLiquiditeDevant, e.nonMitige].filter(Boolean).length);
   });
 });
+
+describe('une bougie sans corps n’est pas une bougie inverse (DEC-043)', () => {
+  // Heure creuse : bougies plates (ouverture = haut = bas = clôture), puis une
+  // forte baisse. L'ancienne règle comptait la bougie plate comme haussière et
+  // en faisait un OB baissier de hauteur nulle : risque nul, frais incalculables.
+  function plat() {
+    const l = [];
+    for (let i = 0; i < 20; i++) l.push(i % 2 ? [100.1, 100.3, 99.9, 100.0] : [100.0, 100.3, 99.9, 100.1]);
+    for (let i = 0; i < 3; i++) l.push([100.0, 100.0, 100.0, 100.0]);
+    l.push([100.0, 100.0, 99.0, 99.1], [99.1, 99.1, 98.2, 98.3]);
+    for (let i = 0; i < 5; i++) l.push([98.3, 98.5, 98.1, 98.2]);
+    return serie(l);
+  }
+
+  it('aucun OB de hauteur nulle, dans un sens comme dans l’autre', () => {
+    const obs = detecterBootcamp(plat(), { seuilAtr: 1, seulementEnTendance: false });
+    expect(obs.every((o) => o.zone.hauteur > 0 && o.plan.risque > 0)).toBe(true);
+  });
+
+  it('une bougie sans corps interrompt un mouvement, haussier comme baissier', () => {
+    const avecDoji = scenario([[99.6, 100.9, 99.6, 100.8], [100.8, 100.9, 100.7, 100.8], [100.8, 101.6, 100.7, 101.5]]);
+    const obs = detecterBootcamp(avecDoji, { seuilAtr: 2, seulementEnTendance: false }).filter((o) => o.index === 20);
+    expect(obs).toHaveLength(0);
+  });
+});

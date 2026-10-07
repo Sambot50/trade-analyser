@@ -249,6 +249,11 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
   const resultats = [];
 
   for (const ob of orderBlocks) {
+    // Un plan dont l'entrée est le stop n'est pas un plan : rejeté, jamais
+    // résolu. Il n'a pas de coût en R, et un seul suffisait à faire retomber
+    // tout le groupe sur le coût supposé (DEC-043).
+    if (!(Math.abs(ob.plan.prixEntree - ob.plan.prixStopLoss) > 0)) continue;
+
     // Le biais s'apprécie à l'instant où l'on pourrait agir — la cassure
     // connue — et non à la formation de l'order block, antérieure.
     const biais = tendanceA(serieBiais, ob.valideAPartirDeMs);
@@ -453,6 +458,12 @@ export function agreger(resultats, coutParDefaut, objectif = '2r', ambigu = 'exc
   // Coût mesuré quand le spread est connu, constante supposée sinon. La
   // moyenne suffit : l'espérance est linéaire en coût.
   const couts = tranchees.map((r) => r.coutEnR).filter((c) => typeof c === 'number');
+  // Tout ou rien. Des frais mesurés sur une partie des trades et supposés sur
+  // l'ensemble, c'est une estimation qui se fait passer pour une mesure : la
+  // moyenne retombait en silence sur `coutParDefaut` (DEC-043).
+  if (couts.length && couts.length !== tranchees.length) {
+    throw new Error(`Frais mesurés sur ${couts.length} trades sur ${tranchees.length} : un plan sans coût calculable s'est glissé dans la mesure. Rien n'est agrégé.`);
+  }
   const coutEnR = couts.length === tranchees.length && couts.length
     ? Number((couts.reduce((a, c) => a + c, 0) / couts.length).toFixed(4))
     : coutParDefaut;

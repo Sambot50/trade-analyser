@@ -226,7 +226,9 @@ vérifie.
 - [x] **Opérateur** — `npm run mesure:ob-bootcamp` lancé sur GC 2023-2024 (2026-10-07) : 5 min positif aux 4 seuils (+0,08 à +0,16 R, p = 0,05), 1 h positif à 1,5-2 ATR, 15 min négatif ; **figé : 5 min, ≥ 2 ATR** (HYP-005)
 - [x] Balayage de liquidité avant l'OB calculé pour chaque OB (`balayageAvant`), hors des cinq étoiles : condition d'entrée chez deux formateurs, à inclure dans HYP-005
 - [x] HYP-005 pré-enregistrée (DECISIONS.md) : OB bootcamp 5 min ≥ 2 ATR sur SI, PL, HG, CL, ES, jamais utilisés pour les OB ; frais 4 ticks ; 200 mélanges ; confirmée si ≥ 300 trades, espérance > 0 et p < 0,01 ; 5 étoiles, balayage, achats/ventes et marchés en lectures secondaires ; `npm run hyp:005`, qui refuse de tourner deux fois
-- [ ] **Opérateur** — lancer `npm run hyp:005` **une seule fois**
+- [x] **Opérateur** — `npm run hyp:005` lancé une fois (2026-10-07) : **réfutée** — 21 275 trades, 37,8 %, −0,096 R, témoin −0,104 R, p = 0,443
+- [x] Erratum DEC-043 : frais supposés (0,05 R) mêlés aux frais mesurés ; bougie sans corps prise pour une bougie inverse. Corrigé ; le verdict de HYP-005 tient, l'exploration sur GC est fausse sur ses frais
+- [ ] **Opérateur** — relancer `npm run mesure:ob-bootcamp` sur GC 2023-2024, avec les frais réels (colonne « Frais » affichée)
 
 *Affichage*
 - [ ] Noyau toujours affiché : contexte multi-unités, OB, FVG, liquidité ; par unité, seulement les plus proches du prix
@@ -378,7 +380,7 @@ signal : rien ne dit encore qu'il prédit. → `multiut.js` · E3 · ✅
 tendance de fond, conflit entre 4 h et Daily, ou tendances mêlées.
 → `multiut.js` · E3 · ✅
 
-### Synthèse order block — mise à jour à chaque mesure (2026-10-07)
+### Synthèse order block — mise à jour à chaque mesure (2026-10-07, après HYP-005)
 
 Le cœur du projet. Ce bloc résume les lignes OB qui suivent ; il se corrige
 après chaque mesure, jamais avant.
@@ -389,8 +391,8 @@ après chaque mesure, jamais avant.
   (DEC-025, DEC-029, DEC-041).
 - **OB du bootcamp** → `ob-bootcamp.js` : dernière bougie inverse au
   mouvement, avec l'accumulation qui la précède ; mouvement fort immédiat
-  (≥ 2 ATR, figé) ; toujours en tendance ; pas de cassure exigée. **En test**
-  (HYP-005).
+  (≥ 2 ATR, figé) ; toujours en tendance ; pas de cassure exigée. **Réfuté
+  en 5 min sur cinq marchés neufs** (HYP-005, p = 0,443).
 
 **Le plan, le même pour les deux** — entrée au bord proche de la zone, stop
 au-delà avec 10 % de marge, objectif 2 R (l'opérateur vise 1:2 ou 1:3 et
@@ -407,16 +409,16 @@ condition d'entrée chez deux formateurs.
 |---|---|
 | OB de structure × force du mouvement (GC 15 min) | ≈ 35 % à tous les seuils, sous le témoin : aucun effet (DEC-041) |
 | HYP-004 : 5 étoiles, OB de structure (GC 2020-2022) | +0,054 R sur 78 trades, p = 0,184 : réfutée ; sens favorable |
-| OB du bootcamp, exploration (GC 2023-2024, 16 essais) | 5 min positif aux 4 seuils (+0,08 à +0,16 R frais compris), 1 h positif à 1,5-2 ATR, 15 min négatif |
-| **HYP-005** : 5 min ≥ 2 ATR, SI, PL, HG, CL, ES | en cours ; confirmée si ≥ 300 trades, espérance > 0 et p < 0,01 |
+| OB du bootcamp, exploration (GC 2023-2024, 16 essais) | bat le témoin en 5 min ; **frais faux** (0,05 R supposés, DEC-043) : à relancer |
+| **HYP-005** : 5 min ≥ 2 ATR, SI, PL, HG, CL, ES | **réfutée** : 21 275 trades, −0,096 R, témoin −0,104 R, p = 0,443 |
 
-**Ce qui n'est pas établi** — aucun OB n'est encore prouvé : le 5 min reste
-une exploration tant que HYP-005 n'a pas parlé. Le « 70 à 80 % » du bootcamp
-n'est mesuré nulle part ; notre meilleur chiffre est 40 %, assez à 2 R.
+**Ce qui n'est pas établi** — aucun OB n'est prouvé, et l'OB du bootcamp en
+5 min est réfuté hors de l'or (HYP-005). Le « 70 à 80 % » du bootcamp n'est
+mesuré nulle part ; nos réussites vont de 35 à 42 %.
 L'entrée à la mèche est l'hypothèse la plus favorable. 1 min, jour et
 semaine attendent la série MT5.
 
-**En file, une par une, après HYP-005** (PISTES.md) — balayage avant l'OB
+**En file, une par une** (PISTES.md, ordre à décider après la relance corrigée sur GC) — balayage avant l'OB
 (la plus solide), séance de New York (deux sources), confirmation par
 englobante en 1 min, stop sous des OB empilés, emboîtement d'unités, zone
 OTE 0,62-0,786, plus haut et plus bas de la veille, deux CHoCH = pas de
@@ -430,7 +432,7 @@ hasard (DEC-025, DEC-029)
 **OB « bootcamp »** — La dernière bougie inverse d'un fort mouvement, avec
 l'accumulation de bougies inverses qui la précède ; le mouvement doit partir
 immédiatement. Pas de cassure de structure exigée, contrairement à l'OB de
-`orderblocks.js`. → `ob-bootcamp.js` · E4 · ✅ calcul · ✅ seuil figé (5 min, 2 ATR) · ⬜ HYP-005 à lancer
+`orderblocks.js`. → `ob-bootcamp.js` · E4 · ✅ calcul · ✅ seuil figé (5 min, 2 ATR) · **réfuté** sur 5 marchés (HYP-005) · DEC-043
 
 **OB « 5 étoiles »** — La note d'un OB selon cinq critères (méthode du
 bootcamp) : imbalance, tendance, premium / discount, pas de liquidité
