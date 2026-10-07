@@ -220,6 +220,7 @@ vérifie.
 
 *OB tel que l'enseigne le bootcamp (DEC-042)*
 - [x] Détecteur `ob-bootcamp.js` : dernière bougie inverse + accumulation, mouvement fort immédiat, sans cassure exigée ; FVG mesuré depuis le haut de la zone
+- [x] Toujours en tendance : un OB contre la tendance n'est pas détecté ; étoile 3 lue à l'entrée, Fibonacci du bas de la structure au plus haut depuis (DEC-042)
 - [x] Mesure `npm run mesure:ob-bootcamp` : 4 seuils de « fort mouvement » figés (1 ; 1,5 ; 2 ; 3 ATR), chacun face à 20 mélanges
 - [ ] **Opérateur** — lancer `npm run mesure:ob-bootcamp` sur GC 2023-2024 ; le seuil retenu est **figé** ici
 - [ ] HYP-005 pré-enregistrée puis lancée une fois : OB bootcamp 5 étoiles, sur des données jamais utilisées pour les OB

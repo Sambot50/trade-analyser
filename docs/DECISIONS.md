@@ -3286,3 +3286,14 @@ pas encore testée : son seuil de « fort mouvement » s'explore sur GC 2023-202
 (`npm run mesure:ob-bootcamp`, quatre seuils), se fige, puis la méthode entière
 se teste une fois sur des données jamais utilisées pour les OB (HYP-005).
 
+**Complément, même jour (diapos GBPUSD et EURJPY du bootcamp).** Deux
+précisions de l'opérateur, intégrées avant toute mesure de l'OB du bootcamp :
+
+- **« L'order block doit toujours être en tendance. »** Un OB contre la
+  tendance de son unité n'est pas détecté du tout (`seulementEnTendance`, vrai
+  par défaut) ; l'étoile 2 est donc toujours remplie pour cette définition.
+- **L'étoile 3 se lit à l'entrée.** Le Fibonacci va du bas de la structure —
+  le creux d'où est partie la série de cassures dans le sens de l'OB — au plus
+  haut atteint avant que le prix revienne dans l'OB (`discountALEntree`). Rien
+  n'est lu après l'entrée. L'OB de structure garde sa définition d'origine.
+

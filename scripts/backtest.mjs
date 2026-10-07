@@ -25,7 +25,7 @@ import { coutEnRDuPlan, distributionDesStops, seuilDeRentabilite } from '../src/
 import { generateurAleatoire, melangerBougies, valeurP, resumeDistribution } from '../src/lib/marche/controle.js';
 import { decouperParContrat, minimumPourResoudre } from '../src/lib/marche/contrats.js';
 import { qualifier } from '../src/lib/marche/qualificatifs.js';
-import { etoiles } from '../src/lib/marche/etoiles.js';
+import { etoiles, discountALEntree } from '../src/lib/marche/etoiles.js';
 import { calculerExcursions, enUnitesDeRisque } from '../src/lib/journal/excursion.js';
 import { cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER, INDETERMINE } from '../src/lib/marche/structure.js';
 import { detecterEnDetail, anomalieVolume } from '../src/lib/marche/orderblocks.js';
@@ -229,7 +229,7 @@ export function validerOptions(args) {
 }
 
 /** Applique le filtre de biais et résout chaque order block. */
-export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesResolution, horizonBougies, sansFiltreBiais, objectif, remplissage, spread = 0, commission = 0 }) {
+export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesResolution, horizonBougies, sansFiltreBiais, objectif, remplissage, spread = 0, commission = 0, evenementsDetection = [] }) {
   const resultats = [];
 
   for (const ob of orderBlocks) {
@@ -265,7 +265,14 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
       ms: ob.ms, sens: ob.sens, typeCassure: ob.typeCassure, biais, aligne,
       plan: ob.plan, statut, detail, excursions,
       qualificatifs: qualifier(bougiesDetection, ob),
-      etoiles: etoiles(bougiesDetection, ob),
+      // OB du bootcamp : l'étoile 3 se lit à l'entrée (Fibonacci du bas de la
+      // structure au plus haut depuis). Sans entrée, pas de trade, et l'étoile
+      // n'a pas à être jugée. L'OB de structure garde sa définition (HYP-004).
+      etoiles: ob.definition === 'bootcamp'
+        ? etoiles(bougiesDetection, ob, {
+            discount: detail.declencheLe ? discountALEntree(bougiesDetection, ob, evenementsDetection, detail.declencheLe)?.enZoneFavorable === true : false,
+          })
+        : etoiles(bougiesDetection, ob),
       delaiEntreeMs: detail.declencheLe ? detail.declencheLe - ob.valideAPartirDeMs : null,
       volume: anomalieVolume(bougiesDetection, ob.index, 20),
       // Le coût dépend du plan : un stop serré paie le même spread sur un
@@ -310,6 +317,7 @@ function chaineDUnSegment(fines, o) {
     orderBlocks, bougiesDetection: detectionBougies, serieBiais,
     bougiesResolution: resolutionBougies, horizonBougies, sansFiltreBiais: o.sansFiltreBiais,
     objectif: o.objectif, remplissage: o.remplissage, spread: o.spread ?? 0, commission: o.commission ?? 0,
+    evenementsDetection: evenements,
   });
 
   return {
