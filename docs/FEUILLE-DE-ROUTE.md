@@ -374,6 +374,50 @@ signal : rien ne dit encore qu'il prédit. → `multiut.js` · E3 · ✅
 tendance de fond, conflit entre 4 h et Daily, ou tendances mêlées.
 → `multiut.js` · E3 · ✅
 
+### Synthèse order block — mise à jour à chaque mesure (2026-10-07)
+
+Le cœur du projet. Ce bloc résume les lignes OB qui suivent ; il se corrige
+après chaque mesure, jamais avant.
+
+**Deux définitions, côte à côte (DEC-042)**
+- **OB de structure** → `orderblocks.js` : dernière bougie opposée avant une
+  cassure de structure (BOS ou CHoCH). **Fermé** : ne bat pas le hasard
+  (DEC-025, DEC-029, DEC-041).
+- **OB du bootcamp** → `ob-bootcamp.js` : dernière bougie inverse au
+  mouvement, avec l'accumulation qui la précède ; mouvement fort immédiat
+  (≥ 2 ATR, figé) ; toujours en tendance ; pas de cassure exigée. **En test**
+  (HYP-005).
+
+**Le plan, le même pour les deux** — entrée au bord proche de la zone, stop
+au-delà avec 10 % de marge, objectif 2 R (l'opérateur vise 1:2 ou 1:3 et
+manage ; la mesure tient une seule règle), frais 4 ticks aller-retour.
+
+**Les 5 étoiles** → `etoiles.js`, figées avant toute mesure : imbalance depuis
+le haut de la zone ; tendance ; discount lu à l'entrée ; pas de liquidité
+devant ; jamais retouché. À part : le **balayage de liquidité avant l'OB**,
+condition d'entrée chez deux formateurs.
+
+**Ce qui est mesuré**
+
+| Mesure | Résultat |
+|---|---|
+| OB de structure × force du mouvement (GC 15 min) | ≈ 35 % à tous les seuils, sous le témoin : aucun effet (DEC-041) |
+| HYP-004 : 5 étoiles, OB de structure (GC 2020-2022) | +0,054 R sur 78 trades, p = 0,184 : réfutée ; sens favorable |
+| OB du bootcamp, exploration (GC 2023-2024, 16 essais) | 5 min positif aux 4 seuils (+0,08 à +0,16 R frais compris), 1 h positif à 1,5-2 ATR, 15 min négatif |
+| **HYP-005** : 5 min ≥ 2 ATR, SI, PL, HG, CL, ES | en cours ; confirmée si ≥ 300 trades, espérance > 0 et p < 0,01 |
+
+**Ce qui n'est pas établi** — aucun OB n'est encore prouvé : le 5 min reste
+une exploration tant que HYP-005 n'a pas parlé. Le « 70 à 80 % » du bootcamp
+n'est mesuré nulle part ; notre meilleur chiffre est 40 %, assez à 2 R.
+L'entrée à la mèche est l'hypothèse la plus favorable. 1 min, jour et
+semaine attendent la série MT5.
+
+**En file, une par une, après HYP-005** (PISTES.md) — balayage avant l'OB
+(la plus solide), séance de New York (deux sources), confirmation par
+englobante en 1 min, stop sous des OB empilés, emboîtement d'unités, zone
+OTE 0,62-0,786, plus haut et plus bas de la veille, deux CHoCH = pas de
+trade, jours fériés et d'annonces, plancher de volume.
+
 **Order blocks (OB)** — La dernière bougie opposée avant une impulsion qui
 casse la structure : une zone où le prix pourrait réagir à son retour. Stop
 posé au-delà de la zone. → `orderblocks.js` · E3 · ✅ · ne bat pas le
