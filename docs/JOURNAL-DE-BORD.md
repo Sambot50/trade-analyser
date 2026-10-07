@@ -25,8 +25,21 @@ renvoie.
 - Toutes les analyses restent dans une seule brique, le Moteur ; les autres
   briques les appellent sans les recopier (décision du 2026-10-06).
 
+**Fait, suite — E0 terminée**
+- Tag `v2026.10.06-journal-mt5` posé et envoyé par l'opérateur.
+- Données rangées dans `C:\Users\alexa\trade-analyser\donnees\` : GC
+  2023-2024 et 2025-2026, `marches\`, `metaux-2020\`, `rejeu-gc` (100 plans),
+  `rejeu-gc-2025` ; fichiers personnels de l'ancienne copie (scripts, mesures
+  `.jsonl`, `.env.local`, planches) dans `donnees\ancienne-copie\`.
+- Ancienne copie `Documents\trade-analyser` supprimée, après vérification :
+  aucun code modifié ni commit non envoyé (seul `package-lock.json` différait).
+
+**Mesuré**
+- Réplication DEC-037 trouvée **arrêtée à 91 plans sur 100**, 0 rejet. Résultat
+  non lu : le témoin ne se lance qu'une fois les 100 plans faits.
+
 **Prochaine action**
-- **Opérateur** — finir E0 : tag, données dans `donnees\`, ancienne copie.
+- E1, E2, E3 attendent des vérifications de l'opérateur ; E4 attend son feu vert.
 
 ---
 
