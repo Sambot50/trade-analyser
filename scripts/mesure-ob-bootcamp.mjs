@@ -42,13 +42,18 @@ export const UNITES_NON_MESURABLES = Object.freeze({
 export const HORIZON_EN_BOUGIES = 192;
 export const TEMOIN = Object.freeze({ tirages: 20, graine: 20261007 });
 
-/** Une ligne de tableau pour un seuil : le réel, et l'espérance de chaque mélange. */
-export function mesurerSeuil(fines, base, seuilAtr, { unite = '15m', tirages = TEMOIN.tirages, graine = TEMOIN.graine, surTirage = () => {} } = {}) {
-  const o = {
+/** Les options de la chaîne pour une unité et un seuil — partagées avec HYP-005. */
+export function optionsDeMesure(base, seuilAtr, unite) {
+  return {
     ...base, detecteur: 'bootcamp', seuilAtr,
     utDetection: unite, utResolution: '1m',
     horizonHeures: (HORIZON_EN_BOUGIES * dureeUnite(unite)) / 3_600_000,
   };
+}
+
+/** Une ligne de tableau pour un seuil : le réel, et l'espérance de chaque mélange. */
+export function mesurerSeuil(fines, base, seuilAtr, { unite = '15m', tirages = TEMOIN.tirages, graine = TEMOIN.graine, surTirage = () => {} } = {}) {
+  const o = optionsDeMesure(base, seuilAtr, unite);
   const a = agreger(chaine(fines, o).resultats, o.coutEnR, o.objectif, o.ambigu);
   const alea = generateurAleatoire(graine);
   const temoin = [];
