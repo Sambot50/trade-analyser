@@ -216,7 +216,7 @@ vérifie.
 - [ ] Confirmation d'entrée : bougie englobante en 1 min, dans l'OB, dans le bon sens (analyse nouvelle)
 - [ ] Stop sous l'OB, ou sous les OB empilés
 - [x] HYP-004 pré-enregistrée (DECISIONS.md) : 5 étoiles contre 0-2 étoiles, GC 2020-2022 jamais utilisé pour les OB, 200 mélanges témoins, règle de décision écrite ; `npm run hyp:004`, qui refuse de tourner deux fois
-- [ ] **Opérateur** — lancer `npm run hyp:004` une seule fois, puis inscrire le verdict
+- [x] HYP-004 lancée une fois (2026-10-07) : **réfutée** pour l'or en 15 min — 5 étoiles 43,6 %, +0,054 R sur 78 trades, contre −0,115 R aux 0-2 étoiles, mais p = 0,184 face au témoin
 
 *Affichage*
 - [ ] Noyau toujours affiché : contexte multi-unités, OB, FVG, liquidité ; par unité, seulement les plus proches du prix
@@ -367,7 +367,7 @@ hasard (DEC-025, DEC-029)
 bootcamp) : imbalance, tendance, premium / discount, pas de liquidité
 devant, jamais retouché. La note n'est qu'un compte de critères ; ce qu'elle
 vaut se mesure (HYP-004). Le « 70 à 80 % » annoncé par le bootcamp n'est
-mesuré nulle part. → `etoiles.js` · E4, E8 · ✅ calcul · ⬜ mesure (HYP-004)
+mesuré nulle part. → `etoiles.js` · E4, E8 · ✅ calcul · **réfutée** sur l'or 15 min (HYP-004 : 43,6 %, +0,054 R, p = 0,184)
 
 **Force du mouvement (en ATR)** — L'ampleur de l'impulsion qui suit l'OB,
 du bord de la zone à la clôture de la cassure, divisée par l'ATR des 14

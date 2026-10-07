@@ -63,8 +63,14 @@ renvoie.
 
 - HYP-004 pré-enregistrée et codée (`npm run hyp:004`).
 
+**Mesuré — HYP-004**
+- Lancée une fois sur GC 2020-2022 : **réfutée**. 5 étoiles : 95 OB, 78
+  trades, 43,6 %, +0,054 R ; 0-2 étoiles : −0,115 R ; témoin −0,075 R,
+  p = 0,184. Sens favorable, échantillon trop petit. Piste notée (PISTES.md).
+
 **Prochaine action**
-- **Opérateur** : `npm run hyp:004`, une seule fois.
+- Décider avec l'opérateur : nouveau test pré-enregistré avec plus de trades,
+  ou suite d'E4 avec les étoiles affichées comme « non prouvées ».
 
 ---
 
