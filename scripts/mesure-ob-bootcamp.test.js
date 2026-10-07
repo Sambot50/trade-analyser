@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { SEUILS_ATR, TEMOIN, mesurerSeuil } from './mesure-ob-bootcamp.mjs';
+import { SEUILS_ATR, TEMOIN, mesurerSeuil, UNITES_MESUREES, UNITES_NON_MESURABLES } from './mesure-ob-bootcamp.mjs';
+import { premierIndexAPartirDe } from './backtest.mjs';
 import { validerOptions } from './backtest.mjs';
 
 const MINUTE = 60_000;
@@ -33,6 +34,22 @@ describe('mesure de l’OB bootcamp', () => {
     expect(l.seuilAtr).toBe(1);
     expect(l.orderBlocks).toBeGreaterThan(0);
     expect(l.p).toBeGreaterThan(0);
+  });
+
+  it('couvre les sept unités demandées : quatre mesurées, trois expliquées', () => {
+    expect(UNITES_MESUREES).toEqual(['5m', '15m', '1h', '4h']);
+    expect(Object.keys(UNITES_NON_MESURABLES)).toEqual(['1m', '1d', '1w']);
+  });
+
+  it('mesure chaque unité avec une issue lue en 1 min', () => {
+    const o = validerOptions({ csv: 'x.csv', sansFiltreBiais: true });
+    o.uniteFine = '1m';
+    expect(mesurerSeuil(marche(), o, 1, { unite: '5m', tirages: 2 }).unite).toBe('5m');
+  });
+
+  it('trouve le départ par dichotomie', () => {
+    const b = [10, 20, 30].map((ouvertureMs) => ({ ouvertureMs }));
+    expect([5, 10, 11, 30, 31].map((ms) => premierIndexAPartirDe(b, ms))).toEqual([0, 0, 1, 2, -1]);
   });
 
   it('refuse le détecteur bootcamp sans seuil', () => {

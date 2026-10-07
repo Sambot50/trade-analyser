@@ -30,6 +30,7 @@ import { calculerExcursions, enUnitesDeRisque } from '../src/lib/journal/excursi
 import { cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER, INDETERMINE } from '../src/lib/marche/structure.js';
 import { detecterEnDetail, anomalieVolume } from '../src/lib/marche/orderblocks.js';
 import { detecterBootcamp } from '../src/lib/marche/ob-bootcamp.js';
+import { agregerSeance } from '../src/lib/marche/seance.js';
 import { intervalleWilson, conclusionPossible, esperanceEnR } from '../src/lib/marche/statistiques.js';
 import { resoudreIssue, gainEnR, OBJECTIFS, REMPLISSAGES, TRAITEMENTS_AMBIGU, reglageObjectif } from '../src/lib/journal/resolve.js';
 
@@ -229,6 +230,21 @@ export function validerOptions(args) {
 }
 
 /** Applique le filtre de biais et résout chaque order block. */
+/**
+ * Premier indice dont l'ouverture est ≥ `ms`, ou −1. Dichotomie : les bougies
+ * sont triées, et une recherche linéaire par order block rendait la chaîne
+ * quadratique (une minute par passage en 5 min sur deux ans de 1 min).
+ */
+export function premierIndexAPartirDe(bougies, ms) {
+  let lo = 0;
+  let hi = bougies.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (bougies[mid].ouvertureMs < ms) lo = mid + 1; else hi = mid;
+  }
+  return lo < bougies.length ? lo : -1;
+}
+
 export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesResolution, horizonBougies, sansFiltreBiais, objectif, remplissage, spread = 0, commission = 0, evenementsDetection = [] }) {
   const resultats = [];
 
@@ -240,7 +256,7 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
     if (!sansFiltreBiais && !aligne) continue;
 
     // Le prix ne peut revenir chercher l'order block qu'après la cassure.
-    const depart = bougiesResolution.findIndex((b) => b.ouvertureMs >= ob.valideAPartirDeMs);
+    const depart = premierIndexAPartirDe(bougiesResolution, ob.valideAPartirDeMs);
     if (depart === -1) continue;
 
     const suite = bougiesResolution.slice(depart, depart + horizonBougies);
@@ -298,7 +314,14 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
  */
 function chaineDUnSegment(fines, o) {
   const memeUnite = (unite) => dureeUnite(unite) === dureeUnite(o.uniteFine);
-  const vers = (unite) => (memeUnite(unite) ? fines : agregerBougies(fines, unite));
+  // Au-delà d'une heure, l'OB du bootcamp se lit sur des bougies découpées
+  // comme à l'écran : séance de 17 h New York (seance.js). L'OB de structure
+  // garde l'agrégation d'origine, sur laquelle ses mesures ont été faites.
+  const vers = (unite) => {
+    if (memeUnite(unite)) return fines;
+    if (o.detecteur === 'bootcamp' && dureeUnite(unite) > 3_600_000) return agregerSeance(fines, unite);
+    return agregerBougies(fines, unite);
+  };
 
   const biaisBougies = vers(o.utBiais);
   const detectionBougies = vers(o.utDetection);
