@@ -199,8 +199,26 @@ l'erreur s'écrit au journal.
 ### E4 — Écran Décision 🔵
 
 Cible : l'écran « Analyste » du bootcamp (captures du 2026-10-07), avec nos
-garde-fous. Critère de fin : le rapport complet sort sur les captures réelles
-(BTC du 2026-10-07, Gold Futures), puis l'opérateur le vérifie.
+garde-fous. **Les order blocks sont le cœur du projet** (opérateur,
+2026-10-07) : leur bloc passe en premier. Critère de fin : le rapport complet
+sort sur des captures réelles et sur les données MT5, puis l'opérateur le
+vérifie.
+
+*Order blocks « 5 étoiles » — d'après la méthode du bootcamp (vidéo de Casper), rendue calculable*
+- [ ] « Fort mouvement » défini par un seuil écrit avant toute mesure
+- [ ] Étoile 1, imbalance : un FVG part de la bougie de l'OB (le plus haut de l'OB reste sous le plus bas de la 3e bougie, et inversement)
+- [ ] Étoile 2, tendance : l'OB va dans le sens de la structure de son unité de temps
+- [ ] Étoile 3, premium / discount : OB haussier sous le 0,5 de Fibonacci de la structure en cours, OB baissier au-dessus
+- [ ] Étoile 4, liquidité : pas de plus hauts ou plus bas égaux juste devant l'OB (analyse nouvelle)
+- [ ] Étoile 5, mitigation : l'OB n'a jamais été retouché depuis sa création, jusqu'à l'instant de lecture (analyse nouvelle)
+- [ ] Chaque OB affiche ses étoiles et la liste des critères remplis ou manquants
+- [ ] Confirmation d'entrée : bougie englobante en 1 min, dans l'OB, dans le bon sens (analyse nouvelle)
+- [ ] Stop sous l'OB, ou sous les OB empilés
+- [ ] HYP-004 pré-enregistrée — un OB 5 étoiles réagit-il mieux qu'un OB à 0-2 étoiles, frais compris, face au témoin ? Règle, données jamais utilisées pour les OB et seuil de décision écrits avant ; mesurée une seule fois
+
+*Affichage*
+- [ ] Noyau toujours affiché : contexte multi-unités, OB, FVG, liquidité ; par unité, seulement les plus proches du prix
+- [ ] Onglet « Analyses » : le reste en cases à cocher, éteintes par défaut, choix mémorisé ; l'IA ne reçoit que ce qui est affiché
 
 *Entrée*
 - [ ] Dépôt d'une capture + notes facultatives (actif, unité, contexte)
@@ -217,7 +235,7 @@ garde-fous. Critère de fin : le rapport complet sort sur les captures réelles
 - [ ] Confiance sur 10 = lisibilité de la capture, avec sa justification ; jamais une promesse de gain
 
 *Plan et suite*
-- [ ] Plan avec **stop obligatoire**, R pour chaque cible, taille de position, coût en R
+- [ ] Plan avec **stop obligatoire**, cibles à 1:2 et 1:3 (l'opérateur choisit et gère), taille de position, coût en R
 - [ ] Bouton « Je prends » relié au journal
 - [ ] Le même écran fonctionne avec chacune des IA ; sans IA, le rapport du moteur s'affiche quand même, sans texte rédigé
 
@@ -342,6 +360,28 @@ tendance de fond, conflit entre 4 h et Daily, ou tendances mêlées.
 casse la structure : une zone où le prix pourrait réagir à son retour. Stop
 posé au-delà de la zone. → `orderblocks.js` · E3 · ✅ · ne bat pas le
 hasard (DEC-025, DEC-029)
+
+**OB « 5 étoiles »** — La note d'un OB selon cinq critères (méthode du
+bootcamp) : imbalance, tendance, premium / discount, pas de liquidité
+devant, jamais retouché. La note n'est qu'un compte de critères ; ce qu'elle
+vaut se mesure (HYP-004). Le « 70 à 80 % » annoncé par le bootcamp n'est
+mesuré nulle part. → E4, E8 · ⬜
+
+**Plus hauts et plus bas égaux (EQH / EQL)** — Deux sommets ou deux creux au
+même prix, à une tolérance près : un réservoir d'ordres stop que le marché
+vient chercher. Devant un OB, c'est un piège (étoile 4). → E4 · ⬜
+
+**Mitigation jusqu'à l'instant** — L'OB a-t-il été retouché entre sa création
+et maintenant ? Différent de la fraîcheur, qui s'arrête à la cassure.
+→ E4 · ⬜
+
+**Confirmation par bougie englobante** — Dans l'OB, en 1 min, une bougie qui
+englobe la précédente dans le sens du trade : le signal d'entrée du
+bootcamp. → E4 · ⬜
+
+**Stop sous des OB empilés** — Deux OB proches l'un de l'autre : le stop
+passe sous les deux, pour que seul un scénario invalidé le déclenche.
+→ E4 · ⬜
 
 **Qualificatifs d'un OB** — Dix critères qui décrivent un OB : FVG laissé par
 l'impulsion, prise de liquidité avant, force du déplacement, importance du
