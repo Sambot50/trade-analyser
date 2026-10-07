@@ -133,7 +133,7 @@ l'erreur s'écrit au journal.
 
 | Étape | Statut | Reste |
 |---|---|---|
-| E0 Remise à plat | ⏸ | tag à poser, ancienne copie à retirer (opérateur) |
+| E0 Remise à plat | ✅ | — (terminée le 2026-10-07) |
 | E1 Pont MT5 + journal | ⏸ | validation sur le vrai terminal Axi (connexion à rétablir) |
 | E2 IA interchangeables | ⏸ | un essai réel avec deux IA différentes |
 | E3 Moteur multi-unités de temps | ⏸ | 10 points de contrôle relevés sur TradingView (opérateur) |
@@ -142,7 +142,7 @@ l'erreur s'écrit au journal.
 
 ---
 
-### E0 — Remise à plat ⏸
+### E0 — Remise à plat ✅
 
 - [x] Branche de travail fusionnée dans `main` (#52)
 - [x] `donnees/` ignoré par git ; il ne quitte jamais la machine
@@ -152,8 +152,8 @@ l'erreur s'écrit au journal.
 - [x] Lanceur et script de raccourcis écrits (`outils/`) — Windows : non exécutables d'ici
 - [x] Feuille de route en page claire autonome (`docs/feuille-de-route.html`, `npm run feuille`), ouverte par le raccourci du bureau sans lancer l'analyseur
 - [x] **Opérateur** — lancer `outils/creer-raccourcis.ps1` et vérifier les deux raccourcis (2026-10-06)
-- [ ] **Opérateur** — poser le tag `v2026.10.06-journal-mt5` (le push de tags échoue d'ici)
-- [ ] **Opérateur** — retirer l'ancienne copie `Documents\trade-analyser` une fois les données déplacées
+- [x] **Opérateur** — poser le tag `v2026.10.06-journal-mt5` (2026-10-07)
+- [x] **Opérateur** — retirer l'ancienne copie `Documents\trade-analyser` une fois les données déplacées (2026-10-07 : CSV et rejeux dans `donnees\`, fichiers personnels dans `donnees\ancienne-copie\`)
 
 ### E1 — Pont MT5 + journal de performances ⏸
 
@@ -245,7 +245,7 @@ l'erreur s'écrit au journal.
 
 ### En parallèle, côté opérateur
 
-- [ ] Réplication DEC-037 : `npm run rejeu:037`, puis `npm run temoin:037`
+- [ ] Réplication DEC-037 : `npm run rejeu:037` (arrêtée à 91 / 100 plans, la commande reprend au 92e), puis `npm run temoin:037` une seule fois
 - [ ] Connexion MT5 Axi rétablie
 
 ---
