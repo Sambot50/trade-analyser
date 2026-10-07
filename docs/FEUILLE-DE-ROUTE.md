@@ -224,7 +224,8 @@ vérifie.
 - [x] Mesure `npm run mesure:ob-bootcamp` : 4 seuils de « fort mouvement » (1 ; 1,5 ; 2 ; 3 ATR) × 4 unités (5 min, 15 min, 1 h, 4 h), chacun face à 20 mélanges ; 1 min, jour et semaine déclarés non mesurables sur ces données, avec la raison
 - [ ] Jour et semaine mesurés sur la série continue de MT5 (E5) : les contrats GC changent tous les deux mois
 - [ ] **Opérateur** — lancer `npm run mesure:ob-bootcamp` sur GC 2023-2024 ; le seuil retenu est **figé** ici
-- [ ] HYP-005 pré-enregistrée puis lancée une fois : OB bootcamp 5 étoiles, sur des données jamais utilisées pour les OB
+- [x] Balayage de liquidité avant l'OB calculé pour chaque OB (`balayageAvant`), hors des cinq étoiles : condition d'entrée chez deux formateurs, à inclure dans HYP-005
+- [ ] HYP-005 pré-enregistrée puis lancée une fois : OB bootcamp 5 étoiles et balayage avant l'OB, sur des données jamais utilisées pour les OB
 
 *Affichage*
 - [ ] Noyau toujours affiché : contexte multi-unités, OB, FVG, liquidité ; par unité, seulement les plus proches du prix
@@ -493,7 +494,9 @@ zone. Vu sur le robot du bootcamp ; à mesurer contre l'entrée simple.
 ≥ 2 fois la précédente ; OB d'une seule bougie ; stop sous le plus bas protégé
 et objectif sur le dernier plus haut ; sortie partielle à 1 R ; deux CHoCH
 d'affilée = pas de trade ; confirmation par englobante ou doji ; balayage de
-liquidité avant l'OB ; emboîtement d'unités ; liquidité de trendline. Détail et
+liquidité avant l'OB (la plus solide : posée par deux formateurs) ; emboîtement
+d'unités ; liquidité de trendline ; plus haut et plus bas de la veille ; pas de
+trade les jours fériés. Détail et
 source dans `PISTES.md`. → E8 · ⬜
 
 **Checklist « bonne capture »** — Ce qu'une capture doit montrer pour être

@@ -165,3 +165,35 @@ describe('étoile 3 à l’entrée — Fibonacci du bas de la structure au plus 
     expect(etoiles(b, ob, { discount: false }).discount).toBe(false);
   });
 });
+
+describe('balayage de liquidité avant l’OB', () => {
+  /** Range, un creux de référence à 99,0, puis une mèche qui le perce et referme au-dessus, puis l'OB. */
+  function avecBalayage(perce) {
+    const l = [];
+    for (let i = 0; i < 25; i++) l.push(i === 5 ? [100.0, 100.3, 99.0, 100.1] : (i % 2 ? [100.1, 100.3, 99.9, 100.0] : [100.0, 100.3, 99.9, 100.1]));
+    l.push(perce ? [100.0, 100.1, 98.6, 99.8] : [100.0, 100.1, 99.5, 99.8]); // 25 : mèche sous 99,0 (ou non), clôture au-dessus
+    l.push([99.8, 99.9, 99.4, 99.5]);                                        // 26 : dernière bougie inverse
+    l.push([99.5, 101.0, 99.5, 100.9], [100.9, 101.8, 100.8, 101.7]);
+    for (let i = 0; i < 5; i++) l.push([101.5, 101.7, 101.3, 101.4]);
+    return serie(l);
+  }
+
+  it('le voit quand un creux est percé par une mèche qui referme au-dessus', () => {
+    const b = avecBalayage(true);
+    const ob = detecterBootcamp(b, { seuilAtr: 2, seulementEnTendance: false }).find((o) => o.index === 26);
+    expect(etoiles(b, ob).balayageAvant).toBe(true);
+  });
+
+  it('ne le voit pas sans percée', () => {
+    const b = avecBalayage(false);
+    const ob = detecterBootcamp(b, { seuilAtr: 2, seulementEnTendance: false }).find((o) => o.index === 26);
+    expect(etoiles(b, ob).balayageAvant).toBe(false);
+  });
+
+  it('ne compte pas dans les cinq étoiles', () => {
+    const b = avecBalayage(true);
+    const ob = detecterBootcamp(b, { seuilAtr: 2, seulementEnTendance: false }).find((o) => o.index === 26);
+    const e = etoiles(b, ob);
+    expect(e.nombre).toBe([e.imbalance, e.tendance, e.discount, e.sansLiquiditeDevant, e.nonMitige].filter(Boolean).length);
+  });
+});
