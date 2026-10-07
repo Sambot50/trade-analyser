@@ -289,6 +289,12 @@ par mois », « 80 % du temps », « 6 % en risquant 1 % » sont des affirmation
   « 15 hacks » de Casper : « si ce n'est pas rentable, il l'optimise ») :
   essayer jusqu'à ce que ça passe, c'est fabriquer le résultat (garde-fou 7,
   DEC-018). Sur les données passées, ça finit toujours par passer.
-- **Le connecteur TradingView d'un dépôt GitHub tiers** (même vidéo) : aucune
-  API officielle, et du code inconnu avec accès aux fichiers et à l'écran.
+- **Le connecteur qui pilote TradingView Desktop** (vidéo « 15 hacks »,
+  `tradesdontlie/tradingview-mcp`) : il ouvre un port de débogage par lequel
+  tout programme de la machine peut prendre la main sur la session connectée,
+  et l'automatisation est hors des conditions de TradingView. Remplacé par
+  Claude dans Chrome, en lecture seule (feuille de route, E4).
+- **`atilaahmettaner/tradingview-mcp`**, lu le 2026-10-07 : aucun code
+  dangereux trouvé, compte TradingView jamais utilisé, mais rien pour nous —
+  pas d'order blocks, pas de 1 min sur des années, des backtests sans témoin.
 

@@ -95,6 +95,11 @@ renvoie.
   la piste 14 (deux sources) ; l'optimisation automatique et le connecteur
   TradingView tiers vont dans « Ce qu'on ne prend pas ».
 
+- TradingView : deux connecteurs écartés (pilotage de TradingView Desktop ;
+  `atilaahmettaner/tradingview-mcp`, lu sans rien installer). Retenu par
+  l'opérateur : Claude dans Chrome, lecture seule, pour le contrôle visuel
+  des OB (E4). Règle 7 ajoutée : aucune IA ne passe d'ordre.
+
 **Prochaine action**
 - **Opérateur** : `npm run hyp:005`, une seule fois. Le script annonce sa
   durée après cinq tirages.
