@@ -112,8 +112,42 @@ export function liquiditeDevant(bougies, ob, p = PARAMETRES_ETOILES) {
   return null;
 }
 
-/** Les cinq étoiles d'un OB, à l'instant de sa cassure. */
-export function etoiles(bougies, ob) {
+/**
+ * Étoile 3 telle que le bootcamp la trace (diapos GBPUSD du 2026-10-07) : le
+ * Fibonacci va du BAS DE LA STRUCTURE — le creux d'où est partie la tendance
+ * en cours — au PLUS HAUT atteint depuis, et se lit AU MOMENT DE L'ENTRÉE,
+ * quand le prix revient dans l'OB. Un OB haussier est en discount si le haut
+ * de sa zone est sous le 0,5.
+ *
+ * Le bas de la structure : l'origine de la première cassure de la série de
+ * cassures dans le sens de l'OB qui précède sa validation — là où la tendance
+ * a commencé. Rien n'est lu au-delà de la dernière bougie FERMÉE avant
+ * `entreeMs` : à l'entrée, tout cela est connu.
+ */
+export function discountALEntree(bougies, ob, evenements, entreeMs) {
+  const haussier = ob.sens === HAUSSIER;
+  const valide = bougies[ob.indexCassure].fermetureMs;
+  let k = -1;
+  for (let i = evenements.length - 1; i >= 0; i--) if (evenements[i].ms <= valide) { k = i; break; }
+  if (k < 0 || evenements[k].sens !== ob.sens) return null;
+  while (k > 0 && evenements[k - 1].sens === ob.sens) k--;
+  const origine = Math.min(evenements[k].indexOrigine, ob.indexDebut ?? ob.index);
+
+  let fin = ob.indexCassure;
+  while (fin + 1 < bougies.length && bougies[fin + 1].fermetureMs < entreeMs) fin++;
+  const jambe = bougies.slice(origine, fin + 1);
+  const bas = Math.min(...jambe.map((b) => b.plusBas));
+  const haut = Math.max(...jambe.map((b) => b.plusHaut));
+  if (!(haut > bas)) return null;
+  const position = ((haussier ? ob.zone.haut : ob.zone.bas) - bas) / (haut - bas);
+  return { position: Number(position.toFixed(4)), enZoneFavorable: haussier ? position <= 0.5 : position >= 0.5, bas, haut };
+}
+
+/**
+ * Les cinq étoiles d'un OB, à l'instant de sa cassure (ou de sa validation).
+ * `discount` remplace l'étoile 3 quand l'appelant l'a mesurée à l'entrée.
+ */
+export function etoiles(bougies, ob, { discount } = {}) {
   const visibles = bougies.slice(0, ob.indexCassure + 1);
   const zone = premiumDiscount(visibles, ob);
   const poche = liquiditeDevant(visibles, ob);
@@ -123,7 +157,7 @@ export function etoiles(bougies, ob) {
     // OB de structure : né d'un BOS. OB « bootcamp » : la tendance de
     // l'unité au moment de sa validation (`ob-bootcamp.js`).
     tendance: ob.dansLaTendance ?? ob.typeCassure === 'BOS',
-    discount: zone?.enZoneFavorable === true,
+    discount: discount === undefined ? zone?.enZoneFavorable === true : discount === true,
     sansLiquiditeDevant: poche === null,
     nonMitige: fraicheur(visibles, ob).intacte,
   };

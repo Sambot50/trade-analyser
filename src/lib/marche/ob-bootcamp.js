@@ -28,11 +28,12 @@
 // lisent rien d'inconnu.
 //
 // Pour les étoiles :
-//   - la tendance (étoile 2) est celle de la structure de la même unité au
-//     moment de la validation : `dansLaTendance` ;
-//   - la jambe du Fibonacci (étoile 3) part du dernier pivot opposé confirmé
-//     avant l'OB (le sommet d'où le prix est descendu jusqu'à l'OB haussier)
-//     et va jusqu'à la validation : `indexOrigine`.
+//   - la tendance est celle de la structure de la même unité au moment de la
+//     validation ; un OB contre elle est ÉCARTÉ (« toujours en tendance »),
+//     l'étoile 2 est donc toujours remplie ;
+//   - le Fibonacci de l'étoile 3 se lit à l'entrée, du bas de la structure au
+//     plus haut depuis : `discountALEntree` (etoiles.js), appelée par le
+//     backtest une fois l'entrée connue.
 
 import { estHaussiere, estBaissiere } from './bougies.js';
 import { pivots, cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER } from './structure.js';
@@ -84,8 +85,10 @@ function construire(bougies, debut, i, validation, sens, origine, dansLaTendance
  *
  * @param seuilAtr  force minimale du mouvement, en ATR — à régler par la
  *                  mesure, puis à figer (feuille de route, E4)
+ * @param seulementEnTendance  vrai par défaut : la méthode ne prend jamais
+ *                  un OB contre la tendance de son unité
  */
-export function detecterBootcamp(bougies, { seuilAtr, p = PARAMETRES_OB_BOOTCAMP } = {}) {
+export function detecterBootcamp(bougies, { seuilAtr, seulementEnTendance = true, p = PARAMETRES_OB_BOOTCAMP } = {}) {
   if (!(seuilAtr > 0)) throw new Error('seuilAtr doit être un nombre positif.');
   const serieTendance = tendanceAuFilDuTemps(cassures(bougies, p.fenetrePivots));
   const { hauts, bas } = pivots(bougies, p.fenetrePivots);
@@ -125,6 +128,9 @@ export function detecterBootcamp(bougies, { seuilAtr, p = PARAMETRES_OB_BOOTCAMP
     }
 
     const tendance = tendanceA(serieTendance, bougies[validation].fermetureMs);
+    // « L'order block doit TOUJOURS être en tendance » (opérateur, bootcamp,
+    // 2026-10-07) : un OB contre la tendance n'est pas un OB de la méthode.
+    if (seulementEnTendance && tendance !== sens) continue;
     resultats.push(construire(bougies, debut, i, validation, sens, origine, tendance === sens));
   }
 
