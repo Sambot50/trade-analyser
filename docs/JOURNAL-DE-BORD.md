@@ -61,8 +61,10 @@ renvoie.
 - Les cinq étoiles calculées (`etoiles.js`), paramètres figés avant toute
   mesure ; jointes à chaque OB du backtest. 1 281 tests.
 
+- HYP-004 pré-enregistrée et codée (`npm run hyp:004`).
+
 **Prochaine action**
-- HYP-004 : pré-enregistrer le test des cinq étoiles, puis le lancer une fois.
+- **Opérateur** : `npm run hyp:004`, une seule fois.
 
 ---
 
