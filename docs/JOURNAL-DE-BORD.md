@@ -14,7 +14,12 @@ renvoie.
 
 **Fait**
 - Feuille de route, § 7 « Les analyses techniques » : le catalogue de la
-  brique Moteur (analyse, fichier, étape, statut, mesure), validé la veille.
+  brique Moteur. Réécrit à la demande de l'opérateur : une liste simple, un
+  titre et une explication par analyse, sans regroupement en familles.
+
+**Erreur reconnue**
+- Première version rangée en « cinq familles » et fusionnée sans l'avoir
+  montrée ni expliquée : l'accord portait sur la liste, pas sur sa forme.
 
 **Décidé**
 - Toutes les analyses restent dans une seule brique, le Moteur ; les autres
