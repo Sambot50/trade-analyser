@@ -259,4 +259,23 @@ par mois », « 80 % du temps », « 6 % en risquant 1 % » sont des affirmation
     sessions (`sessions.js`).
 12. **Pas de trade les jours fériés** (Interquity). Filtre de calendrier ; à
     mesurer comme les autres avant de l'imposer.
+13. **Pas de trade les jours d'annonces fortes** (NFP, CPI — Gian Luca : sa
+    stratégie y perd). Rejoint la piste 12 ; les fenêtres d'annonces existent
+    déjà (`anomalies.js`).
+14. **Session de New York contre Londres** (Gian Luca : New York meilleure
+    pour lui). À ventiler sur nos mesures avant d'en faire un filtre.
+15. **Participation minimale** (Chris : un plancher de volume par bougie de
+    5 min, en dessous il ne trade pas). Possible sur les contrats à terme, qui
+    portent le volume ; pas sur un CSV de CFD.
+16. **La « bougie valide »** (Gian Luca) : corps plus grand que la plus longue
+    mèche ; le bas de structure est la bougie valide la plus proche de la
+    cassure. Définition sans interprétation, à comparer à nos pivots.
+
+### Ce qu'on ne prend pas (2026-10-07)
+
+- **Les rendements de compétition** (104 % en un trimestre, 254 %, 100 % en
+  un mois) : tailles de compétition, et le gagnant parmi des milliers est aussi
+  celui qui a pris le plus de risque.
+- **Le gamma des options et le carnet d'ordres** (Chris) : données d'options
+  payantes, transactions absentes des CFD. Une autre stratégie que la nôtre.
 

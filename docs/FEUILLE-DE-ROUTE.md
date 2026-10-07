@@ -283,11 +283,17 @@ mesuré en plus.
 - [ ] Statistiques mesurées par type de signal, avec témoin et frais réels
 - [ ] Les « étoiles » et les probabilités remplacées par ces chiffres
 - [ ] Plus aucune note non mesurée à l'écran
+- [ ] Régimes de volatilité (Gian Luca, champion Robbins 2025-2026) : rang de l'ATR(14) sur 200 bougies → faible 0-25, moyen 26-50, élevé 51-75, extrême 76-100 ; chaque résultat ventilé par régime, régime du jour affiché
+- [ ] Dégradation surveillée : espérance et Sharpe sur les 60 derniers trades face à l'ensemble ; alerte au-delà de −30 %, avantage déclaré non solide au-delà de −50 %
+- [ ] Monte Carlo : 10 000 réordonnancements des trades → pire creux, risque de ruine
+- [ ] Taille de position modulée (série de gains, score, fraction de Kelly) : **seulement** pour un signal qui a passé le Labo — moduler un avantage non prouvé amplifie du bruit
 
 ### E9 — Coach ⬜
 
 - [ ] Écarts entre le plan pris et l'exécution réelle
 - [ ] Erreurs récurrentes, établies sur le journal mesuré seulement
+- [ ] Chaque perte qualifiée : « bonne » (plan respecté) ou « mauvaise » (entrée anticipée, poursuite, règle contournée) — Chris, champion Robbins 2026 : la constance vient de la suppression des mauvaises pertes
+- [ ] Règles d'arrêt personnelles, mesurées sur tes trades : pertes consécutives et heure au-delà desquelles tes résultats se dégradent, puis alerte
 
 ### E10 — Exécution assistée ⬜
 
