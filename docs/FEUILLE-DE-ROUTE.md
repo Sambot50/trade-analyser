@@ -489,6 +489,13 @@ sur un retracement de 0,5 à 0,786 de l'impulsion plutôt qu'au bord de la
 zone. Vu sur le robot du bootcamp ; à mesurer contre l'entrée simple.
 → E8 · ⬜
 
+**Pistes OB du bootcamp, à éprouver une par une** — Fort mouvement = bougie
+≥ 2 fois la précédente ; OB d'une seule bougie ; stop sous le plus bas protégé
+et objectif sur le dernier plus haut ; sortie partielle à 1 R ; deux CHoCH
+d'affilée = pas de trade ; confirmation par englobante ou doji ; balayage de
+liquidité avant l'OB ; emboîtement d'unités ; liquidité de trendline. Détail et
+source dans `PISTES.md`. → E8 · ⬜
+
 **Checklist « bonne capture »** — Ce qu'une capture doit montrer pour être
 lisible : unité de temps visible, échelle lisible, 50 à 100 bougies, pas
 d'indicateurs superflus. → E4 · ⬜

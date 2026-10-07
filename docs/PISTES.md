@@ -212,3 +212,40 @@ l'échantillon insuffisante : 5 étoiles = 3,1 % des OB.
 jamais utilisées pour les OB, avec assez de trades à 5 étoiles pour qu'un écart
 de cette taille se voie — plusieurs marchés réunis, ou les données MT5 à venir.
 
+## Order blocks : ce que les vidéos du bootcamp ajoutent (2026-10-07)
+
+**Rencontré, pas éprouvé.** Relevé dans trois vidéos de Casper (bootcamp),
+transcrites par l'opérateur. Chaque piste se teste **seule**, pré-enregistrée,
+sur des données jamais regardées pour les OB — jamais toutes ensemble, ce qui
+multiplierait les essais (garde-fou 7). Aucun chiffre n'y est mesuré : « 30 000 €
+par mois », « 80 % du temps », « 6 % en risquant 1 % » sont des affirmations.
+
+1. **Fort mouvement = bougie ≥ 2 fois la précédente.** Définition chiffrée
+   donnée par Casper pour l'imbalance. Alternative au seuil en ATR de
+   `mesure:ob-bootcamp` : **candidate n° 1** si cette mesure ne désigne pas de
+   seuil net.
+2. **OB d'une seule bougie.** La vidéo « SMC » trace l'OB sur la seule
+   dernière bougie inverse ; la diapo retenue par l'opérateur prend
+   l'accumulation. Autre candidate si l'accumulation déçoit.
+3. **Stop sous le plus bas protégé, objectif sur le dernier plus haut.**
+   « Entrer dans la liquidité interne, viser la liquidité externe. » Règle de
+   sortie distincte du 2 R fixe : une seule règle de sortie par plan
+   (garde-fou 6).
+4. **Sortie partielle à 1 R, puis objectif final sur la liquidité.** Même
+   remarque : une règle de sortie à part entière, à pré-enregistrer comme telle.
+5. **Deux CHoCH d'affilée = range, pas de trade.** Filtre d'indécision ; le
+   moteur détecte déjà les CHoCH.
+6. **Confirmation d'entrée par une bougie** : englobante (vidéo « 5 étoiles »)
+   ou doji (vidéo « SMC ») sur l'OB, en petite unité.
+7. **Balayage de liquidité AVANT l'OB** (la manipulation : plus bas égaux
+   balayés par une mèche, puis le dernier sell avant le buy). Bon signe, à ne
+   pas confondre avec l'étoile 4 (liquidité non prise DEVANT l'OB, piège).
+   Mesurable : `priseDeLiquidite`.
+8. **Emboîtement d'unités.** OB repéré en 4 h, affiné en 1 h, 30 min, 15 min,
+   5 min : un OB de petite unité à l'intérieur d'un OB de grande unité ; entrée
+   sur le petit, stop sous le grand.
+9. **Liquidité de trendline** (trois touches), en plus des plus hauts et plus
+   bas égaux de l'étoile 4.
+10. **Zone OTE 0,62–0,786** comme zone d'entrée (vidéo « SMC »), là où la
+    vidéo « 5 étoiles » prend le 0,5. Déjà au catalogue (§ 7, entrée OTE).
+
