@@ -264,6 +264,13 @@ par mois », « 80 % du temps », « 6 % en risquant 1 % » sont des affirmation
     déjà (`anomalies.js`).
 14. **Session de New York contre Londres** (Gian Luca : New York meilleure
     pour lui). À ventiler sur nos mesures avant d'en faire un filtre.
+    **Renforcée le 2026-10-07** : la checklist de Casper (vidéo « 15 hacks »)
+    est « en tendance, 15 min, **session américaine**, retour sur l'OB ». Deux
+    sources. À éprouver **après HYP-005**, sur des données qu'elle n'a pas
+    touchées (`GC_2025_2026.csv` ou la série MT5) : OB du bootcamp limités à la
+    séance de New York, contre les autres heures. À noter : son 15 min est
+    l'unité qui sort **négative** dans `mesure:ob-bootcamp` ; le filtre de
+    séance est peut-être ce qui la sépare de notre mesure, ou ne l'est pas.
 15. **Participation minimale** (Chris : un plancher de volume par bougie de
     5 min, en dessous il ne trade pas). Possible sur les contrats à terme, qui
     portent le volume ; pas sur un CSV de CFD.
@@ -278,4 +285,10 @@ par mois », « 80 % du temps », « 6 % en risquant 1 % » sont des affirmation
   celui qui a pris le plus de risque.
 - **Le gamma des options et le carnet d'ordres** (Chris) : données d'options
   payantes, transactions absentes des CFD. Une autre stratégie que la nôtre.
+- **L'optimisation automatique de stratégie** (skill « autoresearch », vidéo
+  « 15 hacks » de Casper : « si ce n'est pas rentable, il l'optimise ») :
+  essayer jusqu'à ce que ça passe, c'est fabriquer le résultat (garde-fou 7,
+  DEC-018). Sur les données passées, ça finit toujours par passer.
+- **Le connecteur TradingView d'un dépôt GitHub tiers** (même vidéo) : aucune
+  API officielle, et du code inconnu avec accès aux fichiers et à l'écran.
 

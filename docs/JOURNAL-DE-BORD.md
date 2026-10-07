@@ -91,6 +91,10 @@ renvoie.
 - HYP-005 pré-enregistrée et codée (`npm run hyp:005`) : cinq marchés neufs,
   p < 0,01 sur 200 mélanges. `GC_2025_2026.csv` gardé en réserve.
 
+- Vidéo « 15 hacks » de Casper analysée : la séance de New York renforce
+  la piste 14 (deux sources) ; l'optimisation automatique et le connecteur
+  TradingView tiers vont dans « Ce qu'on ne prend pas ».
+
 **Prochaine action**
 - **Opérateur** : `npm run hyp:005`, une seule fois. Le script annonce sa
   durée après cinq tirages.
