@@ -47,8 +47,13 @@ renvoie.
   reste en calques à cocher.
 - Risque : capital 2 000 € ; cibles à 1:2 et 1:3, gérées par l'opérateur.
 
+- Force du mouvement en ATR ajoutée aux qualificatifs ; `npm run
+  mesure:mouvement` compare 4 seuils figés, chacun face à 20 mélanges.
+  Sur une marche aléatoire, « ≥ 2 ATR » sort +0,23 R (p = 0,24) : la raison
+  d'être du témoin.
+
 **Prochaine action**
-- E4, bloc OB : fixer le seuil du « fort mouvement », puis les étoiles.
+- **Opérateur** : `npm run mesure:mouvement` sur le Legion, puis on fige le seuil.
 
 ---
 

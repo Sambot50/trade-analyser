@@ -205,7 +205,9 @@ sort sur des captures réelles et sur les données MT5, puis l'opérateur le
 vérifie.
 
 *Order blocks « 5 étoiles » — d'après la méthode du bootcamp (vidéo de Casper), rendue calculable*
-- [ ] « Fort mouvement » défini par un seuil écrit avant toute mesure
+- [x] Force du mouvement mesurée en ATR pour chaque OB (`mouvementEnAtr`) et commande `npm run mesure:mouvement` : 4 seuils figés (1 ; 1,5 ; 2 ; 3 ATR), chacun face à 20 mélanges témoins
+- [ ] « Fort mouvement » réglé : l'opérateur lance `npm run mesure:mouvement` sur GC 2023-2024 (déjà exploré) ; le meilleur seuil est **figé** ici
+- [ ] « Fort mouvement » confirmé une seule fois sur des données jamais utilisées pour les OB
 - [ ] Étoile 1, imbalance : un FVG part de la bougie de l'OB (le plus haut de l'OB reste sous le plus bas de la 3e bougie, et inversement)
 - [ ] Étoile 2, tendance : l'OB va dans le sens de la structure de son unité de temps
 - [ ] Étoile 3, premium / discount : OB haussier sous le 0,5 de Fibonacci de la structure en cours, OB baissier au-dessus
@@ -366,6 +368,11 @@ bootcamp) : imbalance, tendance, premium / discount, pas de liquidité
 devant, jamais retouché. La note n'est qu'un compte de critères ; ce qu'elle
 vaut se mesure (HYP-004). Le « 70 à 80 % » annoncé par le bootcamp n'est
 mesuré nulle part. → E4, E8 · ⬜
+
+**Force du mouvement (en ATR)** — L'ampleur de l'impulsion qui suit l'OB,
+du bord de la zone à la clôture de la cassure, divisée par l'ATR des 14
+bougies qui précèdent. Chiffre le « fort mouvement » du bootcamp.
+→ `qualificatifs.js` · E4 · ✅ · seuil en cours de réglage
 
 **Plus hauts et plus bas égaux (EQH / EQL)** — Deux sommets ou deux creux au
 même prix, à une tolérance près : un réservoir d'ordres stop que le marché

@@ -22,7 +22,8 @@
     "mt5:export": "python pont-mt5/exporter.py --sortie donnees/mt5",
     "journal": "node scripts/journal-mt5.mjs --dossier donnees/mt5",
     "structure": "node scripts/structure.mjs",
-    "feuille": "node scripts/feuille-de-route.mjs"
+    "feuille": "node scripts/feuille-de-route.mjs",
+    "mesure:mouvement": "node scripts/mesure-mouvement.mjs --csv donnees/GC_2023_2024.csv --spread 0.4"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",
