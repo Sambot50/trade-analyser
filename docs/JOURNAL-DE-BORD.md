@@ -100,9 +100,23 @@ renvoie.
   l'opérateur : Claude dans Chrome, lecture seule, pour le contrôle visuel
   des OB (E4). Règle 7 ajoutée : aucune IA ne passe d'ordre.
 
+**Mesuré — HYP-005**
+- Lancée une fois : **réfutée**. 21 275 trades sur SI, PL, HG, CL, ES,
+  37,8 %, −0,096 R, témoin −0,104 R, p = 0,443. 5 étoiles p = 0,07,
+  balayage p = 0,36 : rien ne bat le hasard.
+
+**Erreur reconnue — DEC-043**
+- Les frais de l'exploration sur GC et de plusieurs lignes de HYP-005
+  étaient la constante supposée (0,05 R), pas les 4 ticks réels : une bougie
+  sans corps formait des OB de risque nul, et un seul suffisait à faire
+  retomber tout le groupe sur la constante. Le « premier signal positif frais
+  compris » annoncé à l'opérateur ne l'était pas. Repéré par une incohérence
+  du tableau (achats et ventes ne recomposaient pas « tous »). Corrigé et
+  testé ; verdict de HYP-005 inchangé.
+
 **Prochaine action**
-- **Opérateur** : `npm run hyp:005`, une seule fois. Le script annonce sa
-  durée après cinq tirages.
+- **Opérateur** : `git pull`, puis `npm run mesure:ob-bootcamp` avec les
+  frais réels. Ensuite, décider de la suite des OB sur cette base.
 
 ---
 

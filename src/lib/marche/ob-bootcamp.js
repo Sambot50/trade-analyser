@@ -35,10 +35,17 @@
 //     plus haut depuis : `discountALEntree` (etoiles.js), appelée par le
 //     backtest une fois l'entrée connue.
 
-import { estHaussiere, estBaissiere } from './bougies.js';
 import { pivots, cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER } from './structure.js';
 import { atrJusqua } from './etoiles.js';
 import { MARGE_STOP } from './orderblocks.js';
+
+// Une bougie « inverse » a un CORPS. `estHaussiere` de bougies.js compte la
+// bougie sans corps (clôture = ouverture) comme haussière : une bougie plate
+// d'heure creuse devenait à elle seule un OB baissier de hauteur nulle, au
+// risque nul et aux frais incalculables (DEC-043). Ici, les deux sens sont
+// stricts, et une bougie sans corps n'appartient ni à l'OB ni au mouvement.
+const corpsHaussier = (b) => b.cloture > b.ouverture;
+const corpsBaissier = (b) => b.cloture < b.ouverture;
 
 export const PARAMETRES_OB_BOOTCAMP = Object.freeze({ periodeAtr: 14, fenetrePivots: 5, accumulationMax: 10 });
 
@@ -96,15 +103,15 @@ export function detecterBootcamp(bougies, { seuilAtr, seulementEnTendance = true
 
   for (let i = 1; i < bougies.length - 1; i++) {
     const b = bougies[i];
-    const haussier = estBaissiere(b);
-    if (!haussier && !estHaussiere(b)) continue;
+    const haussier = corpsBaissier(b);
+    if (!haussier && !corpsHaussier(b)) continue;
     const sens = haussier ? HAUSSIER : BAISSIER;
-    const dansLeSens = haussier ? estHaussiere : estBaissiere;
+    const dansLeSens = haussier ? corpsHaussier : corpsBaissier;
     if (!dansLeSens(bougies[i + 1])) continue;
 
     const atr = atrJusqua(bougies, i, p.periodeAtr);
     if (atr === null) continue;
-    const memeCouleur = haussier ? estBaissiere : estHaussiere;
+    const memeCouleur = haussier ? corpsBaissier : corpsHaussier;
     let debut = i;
     while (debut - 1 >= 1 && i - debut + 1 < p.accumulationMax && memeCouleur(bougies[debut - 1])) debut--;
     const accumulation = bougies.slice(debut, i + 1);

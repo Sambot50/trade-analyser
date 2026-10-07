@@ -71,6 +71,8 @@ export function mesurerSeuil(fines, base, seuilAtr, { unite = '15m', tirages = T
     bas: a.intervalle?.bas ?? null,
     haut: a.intervalle?.haut ?? null,
     esperance: a.esperance,
+    // Affichés pour qu'un coût supposé ne passe plus inaperçu (DEC-043).
+    coutEnR: a.coutEnR,
     temoinMediane: resumeDistribution(temoin)?.mediane ?? null,
     p: valeurP(a.esperance, temoin)?.p ?? null,
   };
@@ -99,10 +101,10 @@ async function main() {
   console.log(`${lecture.bougies.length} bougies 1 min`);
   for (const l of avertissementsLecture(lecture)) console.log(`  ⚠  ${l}`);
 
-  const entete = `  ${'Unité'.padEnd(7)}${'Seuil'.padEnd(12)}${'OB'.padStart(7)}${'Tranchés'.padStart(10)}${'Réussite'.padStart(11)}${'IC 95 %'.padStart(19)}${'Espérance'.padStart(12)}${'Témoin'.padStart(12)}${'p'.padStart(8)}`;
+  const entete = `  ${'Unité'.padEnd(7)}${'Seuil'.padEnd(12)}${'OB'.padStart(7)}${'Tranchés'.padStart(10)}${'Réussite'.padStart(11)}${'IC 95 %'.padStart(19)}${'Frais'.padStart(9)}${'Espérance'.padStart(12)}${'Témoin'.padStart(12)}${'p'.padStart(8)}`;
   const ligneTexte = (l) => {
     const ic = l.bas === null ? '—' : `${pct(l.bas)} – ${pct(l.haut)}`;
-    return `  ${l.unite.padEnd(7)}${`≥ ${l.seuilAtr} ATR`.padEnd(12)}${String(l.orderBlocks).padStart(7)}${String(l.tranchees).padStart(10)}${pct(l.taux).padStart(11)}${ic.padStart(19)}${r3(l.esperance).padStart(12)}${r3(l.temoinMediane).padStart(12)}${(l.p === null ? '—' : l.p.toFixed(2)).padStart(8)}`;
+    return `  ${l.unite.padEnd(7)}${`≥ ${l.seuilAtr} ATR`.padEnd(12)}${String(l.orderBlocks).padStart(7)}${String(l.tranchees).padStart(10)}${pct(l.taux).padStart(11)}${ic.padStart(19)}${(l.coutEnR === null || l.coutEnR === undefined ? '—' : `${l.coutEnR.toFixed(3)} R`).padStart(9)}${r3(l.esperance).padStart(12)}${r3(l.temoinMediane).padStart(12)}${(l.p === null ? '—' : l.p.toFixed(2)).padStart(8)}`;
   };
 
   const lignes = [];

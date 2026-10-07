@@ -21,7 +21,9 @@ sur 100. Réplication pré-enregistrée (DEC-037), pas encore lancée.
 Côté mesure, rien n'a encore payé ses frais : la règle des order blocks est
 close (DEC-025, DEC-029), le volume prédit l'amplitude et jamais la direction
 (DEC-031), et l'effet des métaux (HYP-001, HYP-002) rétrécit à chaque mesure
-plus juste (DEC-033). La friction vaut 0,08 R par trade (DEC-034).
+plus juste (DEC-033). La friction vaut 0,08 R par trade (DEC-034). L'OB du
+bootcamp en 5 min est réfuté sur cinq marchés neufs (HYP-005, p = 0,443) ; son
+exploration sur l'or comptait des frais supposés (DEC-043).
 
 Ne jamais présenter cet outil comme validé. Il sait lire un axe de prix. Il ne
 sait pas encore raisonner dessus.
@@ -78,7 +80,7 @@ Deux invariants du socle de mesure relèvent du même principe :
 ```bash
 npm ci
 npm run dev                      # http://localhost:5173
-npm test                         # 1 329 tests (2026-10-07), dont le pont MT5 en Python
+npm test                         # 1 332 tests (2026-10-07), dont le pont MT5 en Python
 npm run build
 node scripts/bench-vision.mjs    # classe les modèles Ollama installés
 

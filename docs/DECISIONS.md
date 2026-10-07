@@ -3393,3 +3393,86 @@ Une lecture secondaire favorable devient une hypothèse à part, testée sur
   les frais, ni l'objectif.
 - Une réfutation ne s'efface pas en essayant 3 ATR ou le 1 h sur ces données.
 
+### HYP-005 — Résultat, 2026-10-07
+
+Lancée une fois par l'opérateur sur `donnees/marches/` (33 min). Empreintes :
+SI `5b39c242a15d…`, PL `3b3add5a2993…`, HG `4200cef879a4…`, CL
+`92dc0a09d5f9…`, ES `b0e228ac901e…`. Pas lus : 0,005 · 0,1 · 0,0005 · 0,01 ·
+0,25. Résultat dans `donnees/hyp-005.json`.
+
+| Groupe | OB | Tranchés | Réussite | Espérance | Témoin | p |
+|---|---|---|---|---|---|---|
+| **tous les OB** | 27 005 | 21 275 | 37,8 % | **−0,096 R** | −0,104 R | **0,443** |
+| 5 étoiles | 4 145 | 3 887 | 39,9 % | −0,042 R | −0,119 R | 0,070 |
+| balayage avant | 8 721 | 6 729 | 36,1 % | −0,117 R | −0,128 R | 0,358 |
+| 5 étoiles + balayage | 1 797 | 1 711 | 37,6 % | −0,319 R | −0,141 R | 1,000 |
+
+**RÉFUTÉE**, selon la règle écrite d'avance : 21 275 trades (≥ 300), mais
+espérance négative et p = 0,443 (seuil 0,01). Sur cinq marchés neufs, l'OB du
+bootcamp en 5 min ne fait pas mieux que les mêmes bougies mélangées.
+
+**Défaut découvert à la lecture — DEC-043.** Les frais de ce tableau ne sont
+pas tous mesurés : sur SI, PL et HG, et dans plusieurs groupes, ils sont
+retombés sur la constante supposée de 0,05 R. Le défaut **sous-estime** les
+frais, donc **flatte** l'OB : le verdict n'en devient que plus sûr. Les lignes
+« par marché » (SI +0,121 R, HG +0,080 R, PL +0,012 R, CL −0,447 R,
+ES −0,310 R) et « achats / ventes » (−0,428 R / −0,116 R) mêlent frais réels et
+frais supposés : **elles ne se lisent pas**. HYP-005 ne se relance pas.
+
+---
+
+## DEC-043 — Erratum : des frais supposés passaient pour des frais mesurés
+
+**2026-10-07 · Découvert en lisant HYP-005**
+
+### Le défaut
+
+1. `estHaussiere` (`bougies.js`) compte une bougie sans corps (clôture =
+   ouverture) comme haussière. Dans `ob-bootcamp.js`, une bougie plate d'heure
+   creuse (ouverture = haut = bas = clôture) pouvait former seule un **OB
+   baissier de hauteur nulle** : entrée = stop, risque nul, coût en R
+   incalculable (`null`). Le même biais rendait le détecteur asymétrique : un
+   doji prolongeait un mouvement haussier, jamais un mouvement baissier.
+2. `agreger` (`backtest.mjs`) : dès qu'un seul trade d'un groupe n'avait pas
+   de coût, la moyenne retombait **en silence** sur `coutParDefaut` (0,05 R)
+   pour tout le groupe. Le drapeau `coutMesure` le signalait, mais aucun des
+   scripts de mesure de l'OB du bootcamp ne l'affichait.
+
+### Ce qu'il a faussé
+
+- **L'exploration `mesure:ob-bootcamp` sur GC 2023-2024.** Sur les quatre
+  lignes 5 min, les frais déduits valent exactement 0,05 R (ex. 2 ATR :
+  39,7 % → 2 × 0,397 − 0,603 = +0,191 R brut, affiché +0,140 R). Les
+  « +0,08 à +0,16 R **frais compris** » ne l'étaient pas : avec 4 ticks réels,
+  le 5 min est probablement négatif. Le fait de **battre le témoin** reste
+  valable : réel et témoin passaient par le même défaut. Le 1 h (frais
+  déduits 0,09 R à 2 ATR) semble avoir eu ses frais réels.
+- **Les lignes secondaires de HYP-005** (voir son résultat). Le verdict
+  principal tient : le défaut jouait en faveur de l'hypothèse.
+- **Pas touchés** : HYP-004 et DEC-041 (frais réels, 0,22 à 0,25 R), qui
+  portent sur l'OB de structure en 15 min.
+
+### La correction
+
+- `ob-bootcamp.js` : une bougie inverse a un **corps**, dans les deux sens ;
+  une bougie sans corps n'appartient ni à l'OB ni au mouvement.
+- `evaluer` : un plan dont l'entrée égale le stop est rejeté, jamais résolu.
+- `agreger` : frais **tout ou rien** ; une mesure partielle arrête le calcul
+  avec un message, au lieu de retomber sur la constante.
+- `mesure:ob-bootcamp` affiche désormais les frais de chaque ligne.
+- Tests : le défaut reproduit avant correction, puis corrigé.
+
+### Ce qui reste
+
+- `orderblocks.js` (OB de structure) garde `estHaussiere` : un OB baissier
+  de structure peut encore naître d'un doji. Un plan à risque nul y est
+  maintenant rejeté par `evaluer`, mais la définition n'est pas changée : ses
+  mesures (DEC-025 à DEC-041, HYP-004) ont été faites avec elle.
+- `mesure:ob-bootcamp` est relancée par l'opérateur sur GC 2023-2024 : c'est
+  une exploration, la relancer après un correctif est permis. HYP-005, non.
+
+### La leçon
+
+Un drapeau que personne n'affiche ne protège de rien. Un coût supposé doit
+arrêter le calcul, pas se glisser dans une moyenne.
+
