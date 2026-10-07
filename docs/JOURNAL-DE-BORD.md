@@ -80,9 +80,24 @@ renvoie.
   volatilité, dégradation, Monte Carlo en E8 ; bonnes et mauvaises pertes,
   règles d'arrêt en E9 ; quatre filtres dans PISTES.md.
 
+**Mesuré — OB du bootcamp, exploration (GC 2023-2024, 16 configurations)**
+- 5 min : positif aux quatre seuils, frais compris, +0,078 à +0,156 R sur
+  958 à 5 079 trades, aucun des 20 mélanges aussi bon (p = 0,05). 1 h :
+  positif à 1,5 et 2 ATR. 15 min : négatif partout. Premier OB qui bat le
+  hasard frais compris, mais en exploration.
+
+**Décidé**
+- Configuration figée par l'opérateur : **5 min, ≥ 2 ATR**.
+- HYP-005 pré-enregistrée et codée (`npm run hyp:005`) : cinq marchés neufs,
+  p < 0,01 sur 200 mélanges. `GC_2025_2026.csv` gardé en réserve.
+
+- Vidéo « 15 hacks » de Casper analysée : la séance de New York renforce
+  la piste 14 (deux sources) ; l'optimisation automatique et le connecteur
+  TradingView tiers vont dans « Ce qu'on ne prend pas ».
+
 **Prochaine action**
-- **Opérateur** : `npm run mesure:ob-bootcamp`, puis on fige le seuil et on
-  pré-enregistre HYP-005.
+- **Opérateur** : `npm run hyp:005`, une seule fois. Le script annonce sa
+  durée après cinq tirages.
 
 ---
 

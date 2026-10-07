@@ -3297,3 +3297,99 @@ précisions de l'opérateur, intégrées avant toute mesure de l'OB du bootcamp 
   haut atteint avant que le prix revienne dans l'OB (`discountALEntree`). Rien
   n'est lu après l'entrée. L'OB de structure garde sa définition d'origine.
 
+---
+
+## HYP-005 — L'order block du bootcamp, sur cinq marchés neufs. Gelée le 2026-10-07
+
+**Pré-enregistrement, écrit avant toute exécution.**
+
+### D'où vient la configuration
+
+Exploration sur GC 2023-2024 (`npm run mesure:ob-bootcamp`, lancée par
+l'opérateur le 2026-10-07) : 4 seuils de mouvement fort × 4 unités, soit
+**16 configurations**. En 5 min, les quatre seuils ont une espérance positive
+frais compris (+0,078 à +0,156 R) et aucun des 20 mélanges ne fait aussi bien
+(p = 0,05, le plancher). La progression avec le seuil est régulière. Le 1 h
+est positif à 1,5 et 2 ATR ; le 15 min est négatif partout.
+
+**Configuration figée par l'opérateur : 5 min, mouvement fort ≥ 2 ATR**
+(2 084 trades, 39,7 %, +0,140 R, témoin −0,180 R). C'est le meilleur
+compromis entre la taille de l'effet et le nombre de trades. 3 ATR rapporte un
+peu plus, sur deux fois moins de trades.
+
+Ce résultat d'exploration ne prouve rien : 16 essais, entrée à la mèche, et
+une hausse de l'or de 1 850 à 2 700 $ sur la période, pendant laquelle
+« toujours en tendance » a surtout pris des achats.
+
+### La question
+
+L'OB du bootcamp (`ob-bootcamp.js` : dernière bougie inverse plus
+accumulation, mouvement immédiat ≥ 2 ATR, toujours en tendance) a-t-il, en
+5 min, une espérance **positive frais compris** qui **bat le hasard**, sur des
+marchés où il n'a jamais été regardé ?
+
+### Les données
+
+`donnees/marches/` : **SI** (argent), **PL** (platine), **HG** (cuivre), **CL**
+(pétrole), **ES** (S&P 500), Databento 1 min, 2023-01-01 → 2026-09-01.
+**Jamais utilisés pour une question d'order block** : HYP-002 et DEC-031 y
+ont mesuré le volume, rien d'autre. **L'or est exclu**, parce que le seuil y a
+été choisi. Le panel compte des marchés qui ont baissé (le pétrole), ce qui
+répond au biais haussier de l'exploration. Les empreintes SHA-256 sont
+enregistrées au lancement. Le script refuse de tourner si un des cinq marchés
+manque.
+
+`GC_2025_2026.csv` reste **en réserve**, intact pour les OB : c'est là que se
+testera une lecture secondaire prometteuse (HYP suivante).
+
+### Le protocole (`scripts/hyp-005.mjs`, objet `GEL`)
+
+Chaîne identique à la mesure (`optionsDeMesure`, partagée) : OB en 5 min,
+issue lue en 1 min, horizon 192 bougies (16 h), plan à 2 R, entrée à la
+mèche, ambigus exclus, contrat par contrat. Frais : **4 ticks aller-retour**,
+le pas de cotation étant **lu dans les données** de chaque marché, comme dans
+HYP-003. Les trades des cinq marchés sont **mis en commun**.
+
+Témoin : **200 mélanges** de chaque marché (graine 20261007). Chaque tirage
+mélange les cinq marchés et met leurs trades en commun, exactement comme le
+réel.
+
+### La règle de décision (critère principal : tous les OB, cinq marchés)
+
+**Confirmée** si et seulement si :
+
+1. au moins **300 trades** tranchés ;
+2. espérance **> 0 R**, frais compris ;
+3. elle **bat le témoin** : **p < 0,01** (au plus un mélange sur 200 fait
+   aussi bien).
+
+Moins de 300 trades : **non concluante**. Sinon : **réfutée**. Le seuil est
+plus sévère que pour HYP-004 (0,05), parce que la configuration a été choisie
+parmi 16.
+
+### Les lectures secondaires, annoncées d'avance. Elles ne décident de rien.
+
+Calculées sur les mêmes trades et, pour les trois premières, sur les mêmes
+200 tirages (p affiché à partir de 30 trades) :
+
+- **5 étoiles** (`etoiles.js`, paramètres figés le 2026-10-07) ;
+- **balayage avant l'OB** (`balayageAvant`), condition d'entrée chez deux
+  formateurs ;
+- **5 étoiles + balayage** : la méthode complète ;
+- **achats / ventes**, séparément : un gain porté par un seul sens serait la
+  tendance du marché, pas l'OB ;
+- **par marché** : un gain porté par un seul marché ne serait pas une
+  propriété des OB.
+
+Une lecture secondaire favorable devient une hypothèse à part, testée sur
+`GC_2025_2026.csv`. Elle ne se confirme jamais sur ces données-ci.
+
+### Ce que HYP-005 ne fera pas
+
+- Elle ne se lance qu'**une fois** : le script écrit `donnees/hyp-005.json`
+  et refuse de tourner si ce fichier existe. Aucun chiffre ne s'affiche avant
+  la fin. Une exécution interrompue ne montre rien et peut se relancer.
+- Aucun réglage ne change après le lancement : ni l'unité, ni le seuil, ni
+  les frais, ni l'objectif.
+- Une réfutation ne s'efface pas en essayant 3 ATR ou le 1 h sur ces données.
+

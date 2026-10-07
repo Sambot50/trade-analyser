@@ -223,9 +223,10 @@ vérifie.
 - [x] Toujours en tendance : un OB contre la tendance n'est pas détecté ; étoile 3 lue à l'entrée, Fibonacci du bas de la structure au plus haut depuis (DEC-042)
 - [x] Mesure `npm run mesure:ob-bootcamp` : 4 seuils de « fort mouvement » (1 ; 1,5 ; 2 ; 3 ATR) × 4 unités (5 min, 15 min, 1 h, 4 h), chacun face à 20 mélanges ; 1 min, jour et semaine déclarés non mesurables sur ces données, avec la raison
 - [ ] Jour et semaine mesurés sur la série continue de MT5 (E5) : les contrats GC changent tous les deux mois
-- [ ] **Opérateur** — lancer `npm run mesure:ob-bootcamp` sur GC 2023-2024 ; le seuil retenu est **figé** ici
+- [x] **Opérateur** — `npm run mesure:ob-bootcamp` lancé sur GC 2023-2024 (2026-10-07) : 5 min positif aux 4 seuils (+0,08 à +0,16 R, p = 0,05), 1 h positif à 1,5-2 ATR, 15 min négatif ; **figé : 5 min, ≥ 2 ATR** (HYP-005)
 - [x] Balayage de liquidité avant l'OB calculé pour chaque OB (`balayageAvant`), hors des cinq étoiles : condition d'entrée chez deux formateurs, à inclure dans HYP-005
-- [ ] HYP-005 pré-enregistrée puis lancée une fois : OB bootcamp 5 étoiles et balayage avant l'OB, sur des données jamais utilisées pour les OB
+- [x] HYP-005 pré-enregistrée (DECISIONS.md) : OB bootcamp 5 min ≥ 2 ATR sur SI, PL, HG, CL, ES, jamais utilisés pour les OB ; frais 4 ticks ; 200 mélanges ; confirmée si ≥ 300 trades, espérance > 0 et p < 0,01 ; 5 étoiles, balayage, achats/ventes et marchés en lectures secondaires ; `npm run hyp:005`, qui refuse de tourner deux fois
+- [ ] **Opérateur** — lancer `npm run hyp:005` **une seule fois**
 
 *Affichage*
 - [ ] Noyau toujours affiché : contexte multi-unités, OB, FVG, liquidité ; par unité, seulement les plus proches du prix
@@ -381,7 +382,7 @@ hasard (DEC-025, DEC-029)
 **OB « bootcamp »** — La dernière bougie inverse d'un fort mouvement, avec
 l'accumulation de bougies inverses qui la précède ; le mouvement doit partir
 immédiatement. Pas de cassure de structure exigée, contrairement à l'OB de
-`orderblocks.js`. → `ob-bootcamp.js` · E4 · ✅ calcul · ⬜ seuil, puis HYP-005
+`orderblocks.js`. → `ob-bootcamp.js` · E4 · ✅ calcul · ✅ seuil figé (5 min, 2 ATR) · ⬜ HYP-005 à lancer
 
 **OB « 5 étoiles »** — La note d'un OB selon cinq critères (méthode du
 bootcamp) : imbalance, tendance, premium / discount, pas de liquidité
