@@ -3231,3 +3231,34 @@ pour l'or en 15 min.
 - Une réfutation ne s'efface pas en essayant une autre unité de temps sur les
   mêmes données. Une autre question se pré-enregistre à part.
 
+### HYP-004 — Résultat, 2026-10-07
+
+Lancée une fois par l'opérateur, sur `GC_2020_2022.csv` (SHA-256
+`034302760a2c…`, 1 048 172 bougies 1 min). Résultat dans
+`donnees/hyp-004.json`.
+
+Répartition des OB par étoiles : 0★ 0 · 1★ 59 · 2★ 918 · 3★ 1 431 · 4★ 550 ·
+5★ 95. Les OB 5 étoiles sont rares : 3,1 % des OB.
+
+| Groupe | OB | Tranchés | Réussite | IC 95 % | Espérance |
+|---|---|---|---|---|---|
+| 5 étoiles | 95 | 78 | 43,6 % | 33,1 – 54,6 % | +0,054 R |
+| 0-2 étoiles | 977 | 884 | 36,9 % | 33,8 – 40,1 % | −0,115 R |
+
+Témoin (groupe 5 étoiles sur 200 mélanges) : médiane −0,075 R, **p = 0,184**.
+
+**RÉFUTÉE pour l'or en 15 min**, selon la règle écrite d'avance : conditions 1
+(78 ≥ 30) et 2 (+0,054 > −0,115) remplies, condition 3 non (p = 0,184 ≥ 0,05).
+
+**Ce que le résultat dit.** Les cinq étoiles vont dans le bon sens — plus de
+réussite, espérance positive, frais compris — mais l'écart reste à la portée du
+hasard : près d'un mélange sur cinq fait aussi bien. Sur 78 trades, un
+avantage de cette taille ne se distingue pas du bruit. Le « 70 à 80 % » annoncé
+par le bootcamp est loin : 43,6 %, intervalle 33-55 %.
+
+**Ce qu'il ne dit pas.** Ni que les étoiles ne valent rien, ni qu'elles valent
+quelque chose. Le sens observé est une piste (PISTES.md), pas un résultat : il
+ne se confirme que par un nouveau test pré-enregistré, sur des données jamais
+utilisées pour les OB, avec assez de trades. Il ne se cherche pas en regardant
+les 3 ou 4 étoiles sur ces mêmes données.
+

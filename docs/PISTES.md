@@ -200,3 +200,15 @@ Pour mémoire, afin que la barre reste visible.
 | COMEX | **Par décision, pas par son déclencheur** — celui-ci s'était éteint avec DEC-025 | DEC-027 — devient la source du dernier test de la règle mécanique |
 | Volume comme critère de détection | Exploration BTC, puis pré-enregistrement | DEC-028 puis **DEC-029 — réfutée** : −0,4 point sur l'or, p = 0,579 |
 | **Volume de l'impulsion** (`OBVolume`) | Nommée d'avance dans les excuses écartées de DEC-028 | **Close sans test** — c'est la variante que la clause de clôture interdit de repêcher |
+
+## OB 5 étoiles : le sens observé par HYP-004 (2026-10-07)
+
+**Rencontré, pas éprouvé.** Sur GC 2020-2022 en 15 min, les OB à 5 étoiles
+font 43,6 % et +0,054 R (78 trades) contre 36,9 % et −0,115 R aux 0-2 étoiles ;
+p = 0,184 face au témoin, donc réfutée. Le sens est favorable, la taille de
+l'échantillon insuffisante : 5 étoiles = 3,1 % des OB.
+
+**Ce qui la ferait sortir de la file :** un test pré-enregistré sur des données
+jamais utilisées pour les OB, avec assez de trades à 5 étoiles pour qu'un écart
+de cette taille se voie — plusieurs marchés réunis, ou les données MT5 à venir.
+
