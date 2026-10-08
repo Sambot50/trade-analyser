@@ -5,6 +5,19 @@ soit sur XAUUSD, il faut un fichier. Ce document dit lequel, où, et quel piège
 évite de décaler toute la série de cinq heures sans qu'aucune erreur ne le
 signale.
 
+## Le dossier `donnees/`
+
+Toutes les commandes `npm run …` lisent et écrivent dans `donnees/`, à la
+racine du projet. Git l'ignore : il contient l'historique du compte et ne
+quitte jamais la machine.
+
+```
+donnees/
+  GC_2023_2024.csv  GC_2025_2026.csv    bougies Databento
+  rejeu-gc/  rejeu-gc-2025/             journaux de rejeu (DEC-036, DEC-037)
+  mt5/                                  export du pont MT5 (DEC-038)
+```
+
 ## Un seul fichier suffit
 
 Télécharge du **1 minute**, et rien d'autre. Le backtest en déduit les bougies
@@ -46,12 +59,73 @@ plutôt que de produire un chiffre.
 Si tu as MT4 ou MT5 chez Vantage, ses propres bougies valent mieux que celles
 d'un agrégateur : ce sont les prix auxquels tu aurais été exécuté.
 
-MT5 → Outils → Centre d'historique → XAUUSD → M1 → Exporter.
+**Le plus simple : le pont MT5** (DEC-038), terminal ouvert :
+
+```
+pip install MetaTrader5
+npm run mt5:export -- --bougies XAUUSD --depuis 2026-01-01
+```
+
+Il écrit `donnees/mt5/bougies/XAUUSD_M1.csv` **déjà converti en UTC**, au
+format que lisent tous les scripts : pas de `--decalage-heures` à passer. Il
+exporte aussi l'historique du compte, pour `npm run journal`.
+
+À la main, dans MT5 : Affichage → Symboles (Ctrl+U) → onglet Barres →
+symbole, M1, dates → Demander → Exporter les barres. *L'ancien chemin
+« Outils → Centre d'historique » est celui de MT4 : il n'existe pas dans MT5.*
 
 Le fichier sort en `<DATE>,<TIME>,<OPEN>,...`, avec un en-tête et un volume de
 ticks réel. Il est lu directement, sans option. Son horodatage est celui du
 serveur du courtier, souvent UTC+2 ou UTC+3 : vérifie, et corrige avec
-`--decalage-heures`.
+`--decalage-heures`. Un horodatage qui porte déjà son fuseau (`Z`, `+02:00`, ou un
+compte Unix) refuse ce décalage : il serait appliqué deux fois.
+
+### Export TradingView — pour résoudre sur le flux de la capture
+
+Quand un plan vient d'une capture TradingView, les bougies qui doivent le juger
+sont celles **du même flux** : `OANDA:XAUUSD` n'est pas `FX:XAUUSD`, et aucun
+des deux n'est le XAUUSD de Vantage. L'export du graphique les donne
+exactement.
+
+Depuis le graphique : menu de la disposition (la flèche à côté de son nom) →
+**Exporter les données du graphique**. Réservé aux offres payantes, et
+l'emplacement du menu peut changer d'une version à l'autre — ce chemin est
+décrit de mémoire, pas relevé sur une capture.
+
+- **Unité : 1 minute** si possible, comme partout ailleurs. Une résolution en
+  15 minutes laisse plus de bougies ambiguës.
+- **Heure : les deux options sont lues** — ISO avec son décalage
+  (`2026-09-21T09:30:00-04:00`) ou secondes Unix. L'une et l'autre portent
+  leur fuseau : **ne passe jamais `--decalage-heures`**, il est refusé.
+- **Le fichier ne contient que les bougies chargées sur le graphique.** Fais
+  défiler vers la gauche jusqu'à couvrir l'instant de l'analyse, sinon le
+  script refuse le fichier en le disant.
+- **La dernière ligne est écartée d'office** : c'était la bougie en cours au
+  moment de l'export, ses prix sont provisoires. `--garder-derniere` la
+  conserve, pour un export fait marché fermé.
+
+Les colonnes d'indicateurs que TradingView ajoute sont ignorées ; `Volume`
+est lu s'il y figure.
+
+```bash
+node scripts/resoudre-plan.mjs --csv "OANDA_XAUUSD, 1.csv" \
+  --le 2026-09-22T18:48:55Z --direction BUY \
+  --entree 2650 --stop 2645 --tp1 2655 --tp2 2660
+
+node scripts/backtest.mjs --csv "OANDA_XAUUSD, 1.csv" --spread 0.25
+```
+
+**Non vérifié sur un export réel.** Le format a été reconnu d'après un fichier
+construit sur sa description. Le premier export réel doit rejoindre
+`fixtures/`, comme la capture `tradingview-clair.png` avant lui.
+
+### L'unité déclarée est contrôlée
+
+`--ut-csv` vaut `1m` par défaut. Un fichier dont les lignes sont espacées
+autrement est **refusé** : lu dans la mauvaise unité, chaque fermeture de
+bougie serait datée de travers, et un fichier 15 minutes lu comme du 1 minute
+ferait lire le futur à toute la chaîne. L'espacement retenu est le plus
+fréquent ; les week-ends et les pauses de séance ne le trompent pas.
 
 ### Ce qu'aucune de ces sources ne donnera : le volume
 

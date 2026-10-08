@@ -344,6 +344,41 @@ export function definitionAlternative(bougies, ob) {
 }
 
 /** Tous les qualificatifs d'un order block, en un seul objet plat. */
+/**
+ * La force du mouvement qui suit l'order block, en ATR.
+ *
+ * « Fort mouvement » est la condition de base de la méthode des cinq étoiles,
+ * jamais chiffrée par ceux qui l'enseignent. On la mesure ici : l'ampleur de
+ * l'impulsion — du bord proximal de la zone à la clôture de la bougie qui casse
+ * — divisée par l'ATR des `periode` bougies qui finissent sur l'order block.
+ *
+ * L'ATR est pris AVANT l'impulsion : mesuré pendant, il grossirait avec elle
+ * et un mouvement fort se jugerait lui-même ordinaire.
+ */
+export function forceDuMouvement(bougies, ob, periode = 14) {
+  const fin = ob.index;
+  const debut = Math.max(1, fin - periode + 1);
+  let somme = 0;
+  let n = 0;
+  for (let i = debut; i <= fin; i++) {
+    const b = bougies[i];
+    const precedente = bougies[i - 1];
+    somme += Math.max(
+      b.plusHaut - b.plusBas,
+      Math.abs(b.plusHaut - precedente.cloture),
+      Math.abs(b.plusBas - precedente.cloture),
+    );
+    n++;
+  }
+  if (!n) return null;
+  const atr = somme / n;
+  if (!(atr > 0)) return null;
+
+  const depart = ob.sens === HAUSSIER ? ob.zone.haut : ob.zone.bas;
+  const ampleur = Math.abs(bougies[ob.indexCassure].cloture - depart);
+  return arrondir(ampleur / atr);
+}
+
 export function qualifier(bougies, ob) {
   const visibles = fenetreAutorisee(bougies, ob);
   const ouverture = new Date(bougies[ob.indexCassure].fermetureMs);
@@ -384,6 +419,7 @@ export function qualifier(bougies, ob) {
     bougiesDepuisDerniereVisite: vierge?.bougiesDepuisDerniereVisite ?? null,
 
     zoneSurAtr: zoneSurAtr(visibles, ob),
+    mouvementEnAtr: forceDuMouvement(visibles, ob),
 
     definitionAlternativeIdentique: alternative.identique,
     definitionAlternativeEcart: alternative.ecartEnBougies,

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { HAUSSIER, BAISSIER } from './structure.js';
 import {
   qualifier, fvgDeLImpulsion, priseDeLiquidite, deplacement, significativiteDuNiveau,
-  premiumDiscount, fraicheur, virginiteNiveau, zoneSurAtr, definitionAlternative,
+  premiumDiscount, fraicheur, virginiteNiveau, zoneSurAtr, definitionAlternative, forceDuMouvement,
 } from './qualificatifs.js';
 
 const MINUTE = 60_000;
@@ -296,5 +296,38 @@ describe('qualifier — virginité et retour, deux champs distincts', () => {
     expect(q).toHaveProperty('niveauVierge');
     expect(q).toHaveProperty('visitesAnterieures');
     expect(q).not.toHaveProperty('zoneIntacte');
+  });
+});
+
+describe('forceDuMouvement — le « fort mouvement », en ATR', () => {
+  it('rapporte l’impulsion à l’ATR pris avant elle', () => {
+    // Impulsion : du haut de la zone (100,0) à la clôture de la cassure
+    // (102,9), soit 2,9. ATR des bougies 1 à 12 : 0,8917. Rapport 3,2523.
+    expect(forceDuMouvement(BOUGIES, OB)).toBe(3.2523);
+  });
+
+  it('ne dépend pas du niveau de prix', () => {
+    const fois10 = BOUGIES.map((b) => ({
+      ...b, ouverture: b.ouverture * 10, plusHaut: b.plusHaut * 10, plusBas: b.plusBas * 10, cloture: b.cloture * 10,
+    }));
+    const ob = { ...OB, zone: { bas: 990, haut: 1000, hauteur: 10 } };
+    expect(forceDuMouvement(fois10, ob)).toBe(3.2523);
+  });
+
+  it('mesure un OB baissier depuis le bas de sa zone', () => {
+    const miroir = BOUGIES.map((b) => ({
+      ...b, ouverture: 200 - b.ouverture, plusHaut: 200 - b.plusBas, plusBas: 200 - b.plusHaut, cloture: 200 - b.cloture,
+    }));
+    const ob = { ...OB, sens: BAISSIER, zone: { bas: 100, haut: 101, hauteur: 1 } };
+    expect(forceDuMouvement(miroir, ob)).toBe(3.2523);
+  });
+
+  it('se tait sur des bougies plates', () => {
+    const plates = BOUGIES.map((b) => ({ ...b, ouverture: 100, plusHaut: 100, plusBas: 100, cloture: 100 }));
+    expect(forceDuMouvement(plates, OB)).toBeNull();
+  });
+
+  it('figure parmi les qualificatifs', () => {
+    expect(qualifier(BOUGIES, OB).mouvementEnAtr).toBe(3.2523);
   });
 });

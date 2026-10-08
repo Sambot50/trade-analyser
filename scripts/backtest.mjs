@@ -20,14 +20,17 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 
 import { recuperer, dureeUnite, nombreDeRequetes, UNITES } from '../src/lib/marche/bougies.js';
-import { analyser as analyserCsv, agreger as agregerBougies, decrire } from '../src/lib/marche/csv.js';
+import { analyser as analyserCsv, agreger as agregerBougies, decrire, avertissementsLecture } from '../src/lib/marche/csv.js';
 import { coutEnRDuPlan, distributionDesStops, seuilDeRentabilite } from '../src/lib/marche/couts.js';
 import { generateurAleatoire, melangerBougies, valeurP, resumeDistribution } from '../src/lib/marche/controle.js';
 import { decouperParContrat, minimumPourResoudre } from '../src/lib/marche/contrats.js';
 import { qualifier } from '../src/lib/marche/qualificatifs.js';
+import { etoiles, discountALEntree } from '../src/lib/marche/etoiles.js';
 import { calculerExcursions, enUnitesDeRisque } from '../src/lib/journal/excursion.js';
 import { cassures, tendanceAuFilDuTemps, tendanceA, HAUSSIER, BAISSIER, INDETERMINE } from '../src/lib/marche/structure.js';
 import { detecterEnDetail, anomalieVolume } from '../src/lib/marche/orderblocks.js';
+import { detecterBootcamp } from '../src/lib/marche/ob-bootcamp.js';
+import { agregerSeance } from '../src/lib/marche/seance.js';
 import { intervalleWilson, conclusionPossible, esperanceEnR } from '../src/lib/marche/statistiques.js';
 import { resoudreIssue, gainEnR, OBJECTIFS, REMPLISSAGES, TRAITEMENTS_AMBIGU, reglageObjectif } from '../src/lib/journal/resolve.js';
 
@@ -106,6 +109,11 @@ export function validerOptions(args) {
     if (!Number.isFinite(n) || Math.abs(n) > 14) erreurs.push('--decalage-heures doit être un nombre d’heures entre -14 et 14');
     else o.decalageHeures = n;
   }
+
+  // La dernière bougie d'un export TradingView est écartée par défaut : elle
+  // était en cours au moment de l'export. À garder si l'export a été fait
+  // marché fermé.
+  o.garderDerniere = args.garderDerniere === true;
 
   for (const [cle, option] of [['spread', '--spread'], ['commission', '--commission']]) {
     if (args[cle] === undefined) continue;
@@ -199,6 +207,12 @@ export function validerOptions(args) {
   }
 
   o.sansFiltreBiais = Boolean(args.sansFiltreBiais);
+  o.detecteur = args.detecteur ?? 'structure';
+  if (!['structure', 'bootcamp'].includes(o.detecteur)) erreurs.push(`--detecteur "${args.detecteur}" inconnu (structure, bootcamp)`);
+  if (o.detecteur === 'bootcamp') {
+    o.seuilAtr = Number(args.seuilAtr);
+    if (!(o.seuilAtr > 0)) erreurs.push('--seuil-atr : un nombre positif est requis avec --detecteur bootcamp');
+  }
   o.baseUrl = typeof args.baseUrl === 'string' ? args.baseUrl : undefined;
   if (o.csv && o.baseUrl) erreurs.push('--csv et --base-url désignent deux sources : choisis-en une.');
 
@@ -216,10 +230,30 @@ export function validerOptions(args) {
 }
 
 /** Applique le filtre de biais et résout chaque order block. */
-export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesResolution, horizonBougies, sansFiltreBiais, objectif, remplissage, spread = 0, commission = 0 }) {
+/**
+ * Premier indice dont l'ouverture est ≥ `ms`, ou −1. Dichotomie : les bougies
+ * sont triées, et une recherche linéaire par order block rendait la chaîne
+ * quadratique (une minute par passage en 5 min sur deux ans de 1 min).
+ */
+export function premierIndexAPartirDe(bougies, ms) {
+  let lo = 0;
+  let hi = bougies.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (bougies[mid].ouvertureMs < ms) lo = mid + 1; else hi = mid;
+  }
+  return lo < bougies.length ? lo : -1;
+}
+
+export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesResolution, horizonBougies, sansFiltreBiais, objectif, remplissage, spread = 0, commission = 0, evenementsDetection = [] }) {
   const resultats = [];
 
   for (const ob of orderBlocks) {
+    // Un plan dont l'entrée est le stop n'est pas un plan : rejeté, jamais
+    // résolu. Il n'a pas de coût en R, et un seul suffisait à faire retomber
+    // tout le groupe sur le coût supposé (DEC-043).
+    if (!(Math.abs(ob.plan.prixEntree - ob.plan.prixStopLoss) > 0)) continue;
+
     // Le biais s'apprécie à l'instant où l'on pourrait agir — la cassure
     // connue — et non à la formation de l'order block, antérieure.
     const biais = tendanceA(serieBiais, ob.valideAPartirDeMs);
@@ -227,7 +261,7 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
     if (!sansFiltreBiais && !aligne) continue;
 
     // Le prix ne peut revenir chercher l'order block qu'après la cassure.
-    const depart = bougiesResolution.findIndex((b) => b.ouvertureMs >= ob.valideAPartirDeMs);
+    const depart = premierIndexAPartirDe(bougiesResolution, ob.valideAPartirDeMs);
     if (depart === -1) continue;
 
     const suite = bougiesResolution.slice(depart, depart + horizonBougies);
@@ -252,6 +286,14 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
       ms: ob.ms, sens: ob.sens, typeCassure: ob.typeCassure, biais, aligne,
       plan: ob.plan, statut, detail, excursions,
       qualificatifs: qualifier(bougiesDetection, ob),
+      // OB du bootcamp : l'étoile 3 se lit à l'entrée (Fibonacci du bas de la
+      // structure au plus haut depuis). Sans entrée, pas de trade, et l'étoile
+      // n'a pas à être jugée. L'OB de structure garde sa définition (HYP-004).
+      etoiles: ob.definition === 'bootcamp'
+        ? etoiles(bougiesDetection, ob, {
+            discount: detail.declencheLe ? discountALEntree(bougiesDetection, ob, evenementsDetection, detail.declencheLe)?.enZoneFavorable === true : false,
+          })
+        : etoiles(bougiesDetection, ob),
       delaiEntreeMs: detail.declencheLe ? detail.declencheLe - ob.valideAPartirDeMs : null,
       volume: anomalieVolume(bougiesDetection, ob.index, 20),
       // Le coût dépend du plan : un stop serré paie le même spread sur un
@@ -277,7 +319,14 @@ export function evaluer({ orderBlocks, bougiesDetection, serieBiais, bougiesReso
  */
 function chaineDUnSegment(fines, o) {
   const memeUnite = (unite) => dureeUnite(unite) === dureeUnite(o.uniteFine);
-  const vers = (unite) => (memeUnite(unite) ? fines : agregerBougies(fines, unite));
+  // Au-delà d'une heure, l'OB du bootcamp se lit sur des bougies découpées
+  // comme à l'écran : séance de 17 h New York (seance.js). L'OB de structure
+  // garde l'agrégation d'origine, sur laquelle ses mesures ont été faites.
+  const vers = (unite) => {
+    if (memeUnite(unite)) return fines;
+    if (o.detecteur === 'bootcamp' && dureeUnite(unite) > 3_600_000) return agregerSeance(fines, unite);
+    return agregerBougies(fines, unite);
+  };
 
   const biaisBougies = vers(o.utBiais);
   const detectionBougies = vers(o.utDetection);
@@ -285,13 +334,18 @@ function chaineDUnSegment(fines, o) {
 
   const serieBiais = tendanceAuFilDuTemps(cassures(biaisBougies, o.fenetre));
   const evenements = cassures(detectionBougies, o.fenetre);
-  const { retenus: orderBlocks, rejetes } = detecterEnDetail(detectionBougies, evenements, { volume: o.volume });
+  // Deux définitions de l'order block, une même chaîne : celle de la
+  // structure (par défaut) et celle du bootcamp (`ob-bootcamp.js`).
+  const { retenus: orderBlocks, rejetes } = o.detecteur === 'bootcamp'
+    ? { retenus: detecterBootcamp(detectionBougies, { seuilAtr: o.seuilAtr }), rejetes: [] }
+    : detecterEnDetail(detectionBougies, evenements, { volume: o.volume });
 
   const horizonBougies = Math.round((o.horizonHeures * 3_600_000) / dureeUnite(o.utResolution));
   const resultats = evaluer({
     orderBlocks, bougiesDetection: detectionBougies, serieBiais,
     bougiesResolution: resolutionBougies, horizonBougies, sansFiltreBiais: o.sansFiltreBiais,
     objectif: o.objectif, remplissage: o.remplissage, spread: o.spread ?? 0, commission: o.commission ?? 0,
+    evenementsDetection: evenements,
   });
 
   return {
@@ -404,6 +458,12 @@ export function agreger(resultats, coutParDefaut, objectif = '2r', ambigu = 'exc
   // Coût mesuré quand le spread est connu, constante supposée sinon. La
   // moyenne suffit : l'espérance est linéaire en coût.
   const couts = tranchees.map((r) => r.coutEnR).filter((c) => typeof c === 'number');
+  // Tout ou rien. Des frais mesurés sur une partie des trades et supposés sur
+  // l'ensemble, c'est une estimation qui se fait passer pour une mesure : la
+  // moyenne retombait en silence sur `coutParDefaut` (DEC-043).
+  if (couts.length && couts.length !== tranchees.length) {
+    throw new Error(`Frais mesurés sur ${couts.length} trades sur ${tranchees.length} : un plan sans coût calculable s'est glissé dans la mesure. Rien n'est agrégé.`);
+  }
   const coutEnR = couts.length === tranchees.length && couts.length
     ? Number((couts.reduce((a, c) => a + c, 0) / couts.length).toFixed(4))
     : coutParDefaut;
@@ -538,10 +598,13 @@ async function chargerFichier(o) {
   o.uniteFine = o.utCsv;
   process.stdout.write(`\n  lecture de ${basename(o.csv)}… `);
   const contenu = await readFile(o.csv, 'utf8');
-  const { bougies, volumeExploitable, separateur } = analyserCsv(contenu, {
+  const lecture = analyserCsv(contenu, {
     unite: o.utCsv, decalageHeures: o.decalageHeures,
+    exclureDerniere: o.garderDerniere ? false : 'auto',
   });
+  const { bougies, volumeExploitable, separateur } = lecture;
   console.log(`${bougies.length} bougies ${o.utCsv} (séparateur "${separateur === '\t' ? '\\t' : separateur}")`);
+  for (const ligne of avertissementsLecture(lecture)) console.log(`  ⚠  ${ligne}`);
 
   const retenues = bougies.filter((b) =>
     (o.depuisMs === undefined || b.ouvertureMs >= o.depuisMs)

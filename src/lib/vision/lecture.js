@@ -18,6 +18,7 @@ import { normaliser as normaliserTrouvaille, duType } from '../marche/trouvaille
 import {
   priseDeLiquidite, fvgDeLImpulsion, premiumDiscount, fraicheur, virginiteNiveau,
 } from '../marche/qualificatifs.js';
+import { etoilesEnDirect } from '../marche/etoiles.js';
 
 const echec = (etape, probleme, suite = {}) => ({ ok: false, etape, probleme, ...suite });
 
@@ -29,6 +30,9 @@ export function analyser(bougies, { fenetre = 5 } = {}) {
   const p = pivots(bougies, fenetre);
   const evenements = cassures(bougies, fenetre);
   const { retenus, rejetes } = detecterEnDetail(bougies, evenements);
+  // L'instant de lecture : la fermeture de la dernière bougie. Elle peut être
+  // encore en cours sur la capture ; `mitigeDepuisLaCassure` l'exclut donc.
+  const aMs = bougies[bougies.length - 1].fermetureMs;
 
   // Chaque order block devient une TROUVAILLE : même forme que toute analyse
   // à venir — un type, un rang, une zone, des qualificatifs. Ce qui change
@@ -44,6 +48,7 @@ export function analyser(bougies, { fenetre = 5 } = {}) {
       premiumDiscount: sansCasse(() => premiumDiscount(bougies, ob)),
       fraicheur: sansCasse(() => fraicheur(bougies, ob)),
       virginite: sansCasse(() => virginiteNiveau(bougies, ob)),
+      etoiles: sansCasse(() => etoilesEnDirect(bougies, ob, aMs)),
     },
   })).filter(Boolean);
 

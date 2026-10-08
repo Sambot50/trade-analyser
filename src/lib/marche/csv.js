@@ -9,8 +9,14 @@
 //   HistData M1   20240102 000000;2062.51;2063.11;2062.19;2062.65;0
 //   MetaTrader    2024.01.02,00:00,2062.51,2063.11,2062.19,2062.65,12
 //   générique     2024-01-02T00:00:00Z,2062.51,2063.11,2062.19,2062.65,12
+//   TradingView   time,open,high,low,close[,indicateurs…][,Volume]
+//                 heure en ISO avec décalage (2026-09-21T09:30:00-04:00)
+//                 ou en secondes Unix (1789997400), selon l'option d'export
+//
+// Le format TradingView est reconnu d'après un fichier CONSTRUIT à partir de
+// la description de son export, pas d'après un export réel. Voir docs/ETAT.md.
 
-import { dureeUnite } from './bougies.js';
+import { dureeUnite, UNITES } from './bougies.js';
 
 const SEPARATEURS = [';', '\t', ','];
 
@@ -42,6 +48,21 @@ export function lireHorodatage(champs, decalageHeures = 0) {
   const b = champs[1]?.trim() ?? '';
   const decalageMs = decalageHeures * 3_600_000;
 
+  // Un horodatage qui porte son propre fuseau — `Z`, `-04:00`, ou un compte
+  // depuis l'époque, qui est UTC par définition — est déjà absolu. Lui
+  // appliquer un décalage le fausserait une seconde fois, et toute la série
+  // glisserait sans qu'aucune ligne ne paraisse anormale. Refusé, jamais
+  // corrigé en silence.
+  const absolu = (ms) => {
+    if (decalageMs) {
+      throw new Error(
+        `"${a}" porte déjà son fuseau : un décalage horaire de ${decalageHeures} h le fausserait. ` +
+        'Retire --decalage-heures pour ce fichier.',
+      );
+    }
+    return { ms, colonnesUtilisees: 1, fuseauExplicite: true };
+  };
+
   // HistData : AAAAMMJJ HHMMSS dans un seul champ
   const histData = /^(\d{4})(\d{2})(\d{2})[ T](\d{2})(\d{2})(\d{2})$/.exec(a);
   if (histData) {
@@ -72,12 +93,16 @@ export function lireHorodatage(champs, decalageHeures = 0) {
   }
 
   // Millisecondes ou secondes depuis l'époque
-  if (/^\d{10}$/.test(a)) return { ms: Number(a) * 1000 - decalageMs, colonnesUtilisees: 1 };
-  if (/^\d{13}$/.test(a)) return { ms: Number(a) - decalageMs, colonnesUtilisees: 1 };
+  if (/^\d{10}$/.test(a)) return absolu(Number(a) * 1000);
+  if (/^\d{13}$/.test(a)) return absolu(Number(a));
 
-  // ISO 8601
+  // ISO 8601. Une date nue (« 2024-01-02 ») est lue en UTC par `Date.parse` :
+  // elle ne dit rien de son fuseau, et le décalage reste permis.
   const iso = Date.parse(a);
-  if (!Number.isNaN(iso)) return { ms: iso - decalageMs, colonnesUtilisees: 1 };
+  if (!Number.isNaN(iso)) {
+    if (/(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(a)) return absolu(iso);
+    return { ms: iso - decalageMs, colonnesUtilisees: 1 };
+  }
 
   throw new Error(`Horodatage illisible : "${a}"${b ? ` (suivant : "${b}")` : ''}`);
 }
@@ -155,6 +180,49 @@ export function contratDe(champs, colonnes) {
   return null;
 }
 
+/**
+ * Un export TradingView : ses cinq premières colonnes s'appellent exactement
+ * `time, open, high, low, close`, dans cet ordre. Les colonnes suivantes sont
+ * les tracés des indicateurs affichés sur le graphique, puis `Volume` si
+ * l'indicateur de volume y était.
+ *
+ * Un faux positif ne coûte qu'une bougie, retirée en le disant.
+ */
+export function estExportTradingView(noms) {
+  const premiers = (noms ?? []).slice(0, 5).map(normaliser);
+  return ['time', 'open', 'high', 'low', 'close'].every((n, i) => premiers[i] === n);
+}
+
+/**
+ * L'écart le plus fréquent entre deux bougies consécutives, en millisecondes.
+ *
+ * Le mode et non le minimum ni la moyenne : les fermetures du week-end, les
+ * pauses de séance et les minutes sans transaction creusent des trous, jamais
+ * des écarts plus courts. Un écart nul — deux contrats cotés à la même minute
+ * dans un export Databento — ne dit rien de l'unité et n'est pas compté.
+ *
+ * @returns null s'il n'y a pas deux horodatages distincts
+ */
+export function espacementDominant(bougies) {
+  const comptes = new Map();
+  for (let i = 1; i < bougies.length; i++) {
+    const ecart = bougies[i].ouvertureMs - bougies[i - 1].ouvertureMs;
+    if (ecart > 0) comptes.set(ecart, (comptes.get(ecart) ?? 0) + 1);
+  }
+  let meilleur = null;
+  let meilleurCompte = 0;
+  for (const [ecart, compte] of comptes) {
+    if (compte > meilleurCompte || (compte === meilleurCompte && ecart < meilleur)) {
+      meilleur = ecart;
+      meilleurCompte = compte;
+    }
+  }
+  return meilleur;
+}
+
+const nommerDuree = (ms) => Object.entries(UNITES).find(([, d]) => d === ms)?.[0]
+  ?? `${Math.round(ms / 60_000)} min`;
+
 const estEntete = (ligne) => /[a-zA-Z<]/.test(ligne.split(/[;,\t]/)[0]?.replace(/[TZ:.\- ]/g, '') ?? '');
 
 /**
@@ -164,7 +232,7 @@ const estEntete = (ligne) => /[a-zA-Z<]/.test(ligne.split(/[;,\t]/)[0]?.replace(
  *              information indispensable, faute de quoi toute la chaîne
  *              daterait les évènements à l'ouverture et lirait le futur.
  */
-export function analyser(contenu, { unite, decalageHeures = 0 } = {}) {
+export function analyser(contenu, { unite, decalageHeures = 0, exclureDerniere = 'auto' } = {}) {
   const duree = dureeUnite(unite);
 
   const lignes = contenu.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -175,7 +243,9 @@ export function analyser(contenu, { unite, decalageHeures = 0 } = {}) {
   if (!corps.length) throw new Error("Fichier sans données : il n'y a qu'un en-tête.");
 
   const sep = detecterSeparateur(corps);
-  const colonnes = aEntete ? repererColonnes(lignes[0].split(sep)) : null;
+  const nomsColonnes = aEntete ? lignes[0].split(sep) : null;
+  const colonnes = aEntete ? repererColonnes(nomsColonnes) : null;
+  const format = estExportTradingView(nomsColonnes) ? 'tradingview' : colonnes ? 'nomme' : 'positionnel';
   const bougies = [];
   let sansVolume = 0;
 
@@ -223,8 +293,32 @@ export function analyser(contenu, { unite, decalageHeures = 0 } = {}) {
 
   bougies.sort((a, b) => a.ouvertureMs - b.ouvertureMs);
 
+  // L'unité déclarée doit être celle des lignes. Sinon `fermetureMs` est faux :
+  // un fichier 15 minutes lu comme du 1 minute date chaque fermeture quatorze
+  // minutes trop tôt, et toute la chaîne lit le futur sans le savoir. Le seul
+  // indice était un taux de remplissage de 0,067, qu'on prendrait pour des
+  // trous dans les données.
+  const espacement = espacementDominant(bougies);
+  if (espacement !== null && espacement !== duree) {
+    throw new Error(
+      `Unité déclarée ${unite}, mais les lignes sont espacées de ${nommerDuree(espacement)}. ` +
+      'Déclare l\'unité réelle du fichier (--ut-csv) : la lire autrement daterait les fermetures de travers.',
+    );
+  }
+
+  // La dernière ligne d'un export TradingView est la bougie EN COURS au moment
+  // de l'export : son plus haut, son plus bas et sa clôture sont provisoires.
+  // Lue comme une bougie fermée, elle peut trancher une issue sur des prix qui
+  // n'ont pas fini d'exister.
+  const exclure = exclureDerniere === 'auto' ? format === 'tradingview' : Boolean(exclureDerniere);
+  const derniereExclue = exclure && bougies.length > 1 ? bougies.pop() : null;
+
   return {
     bougies,
+    format,
+    // Rendue pour être annoncée : une donnée écartée en silence est une donnée
+    // dont personne ne saura qu'elle manque.
+    derniereExclue,
     // Proportion de lignes sans volume : au-delà de la moitié, toute analyse
     // de volume est sans objet et l'appelant doit le dire.
     volumeExploitable: sansVolume / bougies.length < 0.5,
@@ -276,6 +370,24 @@ export function agreger(bougies, uniteCible) {
   }
 
   return agregees;
+}
+
+/**
+ * Ce qu'une lecture a écarté ou supposé, en phrases à afficher. Partagé par
+ * les scripts : un même fichier doit être annoncé de la même façon partout.
+ */
+export function avertissementsLecture({ format, derniereExclue }) {
+  const lignes = [];
+  if (format === 'tradingview') {
+    lignes.push('export TradingView reconnu — format vérifié sur un fichier construit, pas encore sur un export réel');
+  }
+  if (derniereExclue) {
+    lignes.push(
+      `dernière bougie (${new Date(derniereExclue.ouvertureMs).toISOString()}) écartée : ` +
+      "en cours au moment de l'export, ses prix sont provisoires — --garder-derniere pour la conserver",
+    );
+  }
+  return lignes;
 }
 
 /** Une somme dont un seul terme manquant suffit à rendre le total inconnu. */
