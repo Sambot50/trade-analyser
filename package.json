@@ -15,6 +15,7 @@
     "samples": "node scripts/make-samples.mjs",
     "assets:ocr": "node scripts/assets-ocr.mjs",
     "postinstall": "node scripts/assets-ocr.mjs",
+    "predev": "node scripts/liberer-port.mjs",
     "rejeu:036": "node scripts/rejouer.mjs --csv donnees/GC_2023_2024.csv --symbole GC --sortie donnees/rejeu-gc --protocole DEC-036",
     "temoin:036": "node scripts/temoin.mjs --journal donnees/rejeu-gc --symbole GC --csv donnees/GC_2023_2024.csv",
     "rejeu:037": "node scripts/rejouer.mjs --csv donnees/GC_2025_2026.csv --symbole GC --sortie donnees/rejeu-gc-2025 --protocole DEC-037",
