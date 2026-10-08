@@ -212,7 +212,7 @@ vérifie.
 - [x] Étoile 3, premium / discount : OB haussier sous le 0,5 de Fibonacci de la jambe, OB baissier au-dessus
 - [x] Étoile 4, liquidité : pas de plus hauts ou plus bas égaux non pris à moins de 2 ATR devant l'OB (égaux à 0,1 ATR près) — paramètres figés le 2026-10-07
 - [x] Étoile 5, mitigation : pas de retour dans l'OB avant la cassure ; en direct, pas de retour depuis la cassure jusqu'à l'instant de lecture
-- [ ] Chaque OB affiche ses étoiles et la liste des critères remplis ou manquants
+- [x] Chaque OB affiche ses étoiles et la liste des critères remplis ou manquants — lecture de capture (`etoilesEnDirect`) : l'étoile 5 tombe aussi si l'OB a été retouché depuis la cassure ; la note est présentée comme un compte, jamais comme une réussite (HYP-004). Vérifié dans Chromium sur `fixtures/tradingview-clair.png` (2026-10-08)
 - [ ] Confirmation d'entrée : bougie englobante en 1 min, dans l'OB, dans le bon sens (analyse nouvelle)
 - [ ] Stop sous l'OB, ou sous les OB empilés
 - [x] HYP-004 pré-enregistrée (DECISIONS.md) : 5 étoiles contre 0-2 étoiles, GC 2020-2022 jamais utilisé pour les OB, 200 mélanges témoins, règle de décision écrite ; `npm run hyp:004`, qui refuse de tourner deux fois

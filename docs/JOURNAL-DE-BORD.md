@@ -10,6 +10,31 @@ renvoie.
 
 ---
 
+## 2026-10-08 — étoiles affichées
+
+**Fait**
+- E4 : chaque OB lu sur une capture affiche ses étoiles et les cinq critères,
+  remplis ou manquants, chacun avec sa phrase (`etoilesEnDirect`). En direct,
+  l'étoile 5 tombe aussi si l'OB a été retouché depuis la cassure. Rappel à
+  l'écran : la note est un compte de critères, HYP-004 n'y a trouvé aucun
+  avantage. Le qualificatif « FVG » devient « FVG dans l'impulsion » : ce
+  n'est pas l'étoile 1 (FVG qui part de l'OB lui-même), et les deux se
+  contredisaient en apparence. 1 336 tests, build, essai dans Chromium.
+
+**Mesuré**
+- Rien. Sur la capture de référence, les 4 OB étaient tous retouchés depuis
+  la cassure : d'anciens OB, que l'écran ne note plus 5 / 5.
+
+**Bloqué**
+- Rien côté développement.
+
+**Prochaine action**
+- **Opérateur** : `git pull`, puis `npm run mesure:ob-bootcamp` avec les
+  frais réels (toujours en attente).
+- Case suivante d'E4 indépendante de cette mesure : sur feu vert.
+
+---
+
 ## 2026-10-07 — catalogue des analyses, fin d'E0
 
 **Fait**
