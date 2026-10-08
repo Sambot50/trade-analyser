@@ -1053,7 +1053,7 @@ function InstrumentCard({ instrument, onChange, resolu }) {
           <input
             value={instrument.symbole ?? ''}
             onChange={(e) => onChange({ ...instrument, symbole: e.target.value })}
-            placeholder="BTCUSD"
+            placeholder="ex. BTCUSD"
             className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[12px] text-slate-200 font-mono
                        focus:outline-none focus:border-indigo-600"
           />
@@ -1063,7 +1063,7 @@ function InstrumentCard({ instrument, onChange, resolu }) {
           <input
             value={instrument.unite ?? ''}
             onChange={(e) => onChange({ ...instrument, unite: e.target.value })}
-            placeholder="15m"
+            placeholder="ex. 15m"
             className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-[12px] text-slate-200 font-mono
                        focus:outline-none focus:border-indigo-600"
           />
@@ -1074,6 +1074,19 @@ function InstrumentCard({ instrument, onChange, resolu }) {
         {ligne('Retenu pour le journal', resolu.symbole)}
         {ligne('Horizon', resolu.unite)}
       </div>
+
+      {/* Un champ vide affichant « BTCUSD » en exemple se lit comme un champ
+          rempli : la ligne de résolution disait « non résolu » juste en
+          dessous, et l'avertissement d'enregistrement répétait qu'aucun
+          symbole n'était connu — sans que ni l'un ni l'autre ne soit cru,
+          puisque la valeur semblait là. On le dit donc à l'endroit où
+          l'erreur se commet, pas seulement en aval. */}
+      {!instrument.symbole && (
+        <p className="text-[11px] text-amber-400 leading-relaxed">
+          Le champ est <strong>vide</strong> — « ex. BTCUSD » n’est qu’un exemple. Tape
+          le symbole de ta capture pour qu’il serve.
+        </p>
+      )}
 
       <p className="text-[11px] text-slate-600 leading-relaxed">
         Sans symbole, le journal ne sait pas quelles bougies aller chercher : l’issue
