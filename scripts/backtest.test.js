@@ -80,12 +80,11 @@ describe('agreger — coûts', () => {
     expect(agr.coutEnR).toBe(0.03);
   });
 
-  it('ne se fie pas à une mesure partielle', () => {
-    // Un seul trade chiffré sur deux : la moyenne serait fausse, on garde la
-    // constante et on continue de l'annoncer comme supposée.
-    const agr = agreger([resultat('tp2', 0.02), resultat('stop')], 0.05);
-    expect(agr.coutMesure).toBe(false);
-    expect(agr.coutEnR).toBe(0.05);
+  it('refuse une mesure partielle au lieu de retomber sur la constante (DEC-043)', () => {
+    // Un seul trade chiffré sur deux : retomber sur 0,05 R remplaçait en
+    // silence les frais réels de tout le groupe. Les scripts de mesure
+    // n'affichaient pas `coutMesure` : l'estimation passait pour une mesure.
+    expect(() => agreger([resultat('tp2', 0.02), resultat('stop')], 0.05)).toThrow(/Frais mesurés sur 1 trades sur 2/);
   });
 
   it('ignore les issues hors statistiques dans le calcul du coût', () => {
@@ -381,5 +380,26 @@ describe('le roulement ne fabrique pas de structure', () => {
     const r = chaine(sans, reglages);
     expect(r.segments).toHaveLength(1);
     expect(r.segments[0].symbole).toBeNull();
+  });
+});
+
+describe('evaluer — un plan à risque nul n’est pas un plan (DEC-043)', () => {
+  it('le rejette au lieu de le résoudre', async () => {
+    const { evaluer } = await import('./backtest.mjs');
+    const MIN = 60_000;
+    const t0 = Date.UTC(2024, 0, 2);
+    const bougies = Array.from({ length: 30 }, (_, i) => ({
+      ouvertureMs: t0 + i * MIN, fermetureMs: t0 + (i + 1) * MIN - 1,
+      ouverture: 100, plusHaut: 100.5, plusBas: 99.5, cloture: 100, volume: 1,
+    }));
+    const plan = (stop) => ({ direction: 'SELL', prixEntree: 100, prixStopLoss: stop, prixTp1: 100 - (stop - 100), prixTp2: 100 - 2 * (stop - 100), risque: stop - 100 });
+    const ob = (stop) => ({ index: 5, indexCassure: 7, ms: bougies[5].ouvertureMs, sens: 'baissier', typeCassure: null, definition: 'test', zone: { bas: 100, haut: stop, hauteur: stop - 100 }, valideAPartirDeMs: bougies[7].fermetureMs, plan: plan(stop) });
+    const r = evaluer({
+      orderBlocks: [ob(100), ob(101)], bougiesDetection: bougies, serieBiais: [], bougiesResolution: bougies,
+      horizonBougies: 20, sansFiltreBiais: true, objectif: '2r', remplissage: 'meche', spread: 0.1,
+    });
+    expect(r).toHaveLength(1);
+    expect(r[0].plan.prixStopLoss).toBe(101);
+    expect(typeof r[0].coutEnR).toBe('number');
   });
 });

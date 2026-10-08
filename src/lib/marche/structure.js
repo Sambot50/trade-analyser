@@ -64,6 +64,35 @@ export function pivots(bougies, fenetre = 5) {
  * après son sommet. Ne pas en tenir compte reviendrait à lire le futur.
  */
 export function cassures(bougies, fenetre = 5) {
+  return parcourir(bougies, fenetre).evenements;
+}
+
+/**
+ * L'état de la structure APRÈS la dernière bougie fournie : tendance, dernier
+ * évènement, et niveau d'invalidation.
+ *
+ * L'invalidation est le dernier pivot opposé encore intact : en tendance
+ * haussière, le dernier creux confirmé, dont la cassure en clôture serait un
+ * CHoCH baissier ; en tendance baissière, le dernier sommet. Il vaut null tant
+ * qu'aucun pivot opposé n'est confirmé depuis la dernière cassure.
+ *
+ * Même parcours que `cassures`, donc mêmes garanties : seuls les pivots déjà
+ * confirmés comptent, rien n'est lu au-delà de la dernière bougie.
+ */
+export function etatStructure(bougies, fenetre = 5) {
+  const { evenements, tendance, dernierHaut, dernierBas } = parcourir(bougies, fenetre);
+  const invalidation = tendance === HAUSSIER ? dernierBas : tendance === BAISSIER ? dernierHaut : null;
+  return {
+    tendance,
+    dernierEvenement: evenements.at(-1) ?? null,
+    invalidation: invalidation ? { prix: invalidation.prix, index: invalidation.index, ms: invalidation.ms } : null,
+    dernierHaut: dernierHaut ? { prix: dernierHaut.prix, index: dernierHaut.index } : null,
+    dernierBas: dernierBas ? { prix: dernierBas.prix, index: dernierBas.index } : null,
+    evenements,
+  };
+}
+
+function parcourir(bougies, fenetre) {
   const { tous } = pivots(bougies, fenetre);
   const evenements = [];
 
@@ -94,7 +123,7 @@ export function cassures(bougies, fenetre = 5) {
     }
   }
 
-  return evenements;
+  return { evenements, tendance, dernierHaut, dernierBas };
 }
 
 function creerCassure(bougies, index, sens, tendanceAvant, niveauCasse, origine) {
@@ -142,4 +171,37 @@ export function tendanceA(serie, ms) {
   }
 
   return trouve?.tendance ?? INDETERMINE;
+}
+
+/**
+ * Les points structurels nommés : chaque pivot confirmé comparé au précédent
+ * du même côté.
+ *
+ *   HH  sommet plus haut   ·  LH  sommet plus bas
+ *   HL  creux plus haut    ·  LL  creux plus bas
+ *
+ * Le premier sommet et le premier creux n'ont pas de précédent : ils sont
+ * nommés H et L. Un pivot égal au précédent (rare, la comparaison des pivots
+ * est stricte) est compté comme plus bas pour un sommet, plus haut pour un
+ * creux — il n'a pas dépassé.
+ *
+ * Chaque point est daté de sa CONFIRMATION, `fenetre` bougies après le
+ * sommet : avant, on ne pouvait pas savoir que c'en était un.
+ */
+export function pointsStructurels(bougies, fenetre = 5) {
+  const { tous } = pivots(bougies, fenetre);
+  let haut = null;
+  let bas = null;
+  return tous.map((p) => {
+    let type;
+    if (p.sens === 'haut') {
+      type = haut === null ? 'H' : p.prix > haut.prix ? 'HH' : 'LH';
+      haut = p;
+    } else {
+      type = bas === null ? 'L' : p.prix < bas.prix ? 'LL' : 'HL';
+      bas = p;
+    }
+    const confirmation = bougies[p.index + fenetre];
+    return { type, prix: p.prix, index: p.index, ms: p.ms, confirmeMs: confirmation.fermetureMs ?? confirmation.ouvertureMs };
+  });
 }

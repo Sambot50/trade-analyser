@@ -200,3 +200,101 @@ Pour mémoire, afin que la barre reste visible.
 | COMEX | **Par décision, pas par son déclencheur** — celui-ci s'était éteint avec DEC-025 | DEC-027 — devient la source du dernier test de la règle mécanique |
 | Volume comme critère de détection | Exploration BTC, puis pré-enregistrement | DEC-028 puis **DEC-029 — réfutée** : −0,4 point sur l'or, p = 0,579 |
 | **Volume de l'impulsion** (`OBVolume`) | Nommée d'avance dans les excuses écartées de DEC-028 | **Close sans test** — c'est la variante que la clause de clôture interdit de repêcher |
+
+## OB 5 étoiles : le sens observé par HYP-004 (2026-10-07)
+
+**Rencontré, pas éprouvé.** Sur GC 2020-2022 en 15 min, les OB à 5 étoiles
+font 43,6 % et +0,054 R (78 trades) contre 36,9 % et −0,115 R aux 0-2 étoiles ;
+p = 0,184 face au témoin, donc réfutée. Le sens est favorable, la taille de
+l'échantillon insuffisante : 5 étoiles = 3,1 % des OB.
+
+**Ce qui la ferait sortir de la file :** un test pré-enregistré sur des données
+jamais utilisées pour les OB, avec assez de trades à 5 étoiles pour qu'un écart
+de cette taille se voie — plusieurs marchés réunis, ou les données MT5 à venir.
+
+## Order blocks : ce que les vidéos du bootcamp ajoutent (2026-10-07)
+
+**Rencontré, pas éprouvé.** Relevé dans trois vidéos de Casper (bootcamp),
+transcrites par l'opérateur. Chaque piste se teste **seule**, pré-enregistrée,
+sur des données jamais regardées pour les OB — jamais toutes ensemble, ce qui
+multiplierait les essais (garde-fou 7). Aucun chiffre n'y est mesuré : « 30 000 €
+par mois », « 80 % du temps », « 6 % en risquant 1 % » sont des affirmations.
+
+1. **Fort mouvement = bougie ≥ 2 fois la précédente.** Définition chiffrée
+   donnée par Casper pour l'imbalance. Alternative au seuil en ATR de
+   `mesure:ob-bootcamp` : **candidate n° 1** si cette mesure ne désigne pas de
+   seuil net.
+2. **OB d'une seule bougie.** La vidéo « SMC » trace l'OB sur la seule
+   dernière bougie inverse ; la diapo retenue par l'opérateur prend
+   l'accumulation. Autre candidate si l'accumulation déçoit.
+3. **Stop sous le plus bas protégé, objectif sur le dernier plus haut.**
+   « Entrer dans la liquidité interne, viser la liquidité externe. » Règle de
+   sortie distincte du 2 R fixe : une seule règle de sortie par plan
+   (garde-fou 6).
+4. **Sortie partielle à 1 R, puis objectif final sur la liquidité.** Même
+   remarque : une règle de sortie à part entière, à pré-enregistrer comme telle.
+5. **Deux CHoCH d'affilée = range, pas de trade.** Filtre d'indécision ; le
+   moteur détecte déjà les CHoCH.
+6. **Confirmation d'entrée par une bougie** : englobante (vidéo « 5 étoiles »)
+   ou doji (vidéo « SMC ») sur l'OB, en petite unité.
+7. **Balayage de liquidité AVANT l'OB** (la manipulation : plus bas égaux
+   balayés par une mèche, puis le dernier sell avant le buy). Bon signe, à ne
+   pas confondre avec l'étoile 4 (liquidité non prise DEVANT l'OB, piège).
+   Mesurable : `priseDeLiquidite`.
+   **Renforcée le 2026-10-07** : chez Interquity (vidéo sur l'or), c'est une
+   condition d'entrée — « pas de liquidity block, pas d'entrée » : une zone
+   ne se trade que si un plus bas a été balayé avant la poussée qui l'a créée,
+   et que des vendeurs ont été piégés (« inducement »). Deux formateurs
+   distincts la posent : **la piste la plus solide à éprouver après HYP-005.**
+8. **Emboîtement d'unités.** OB repéré en 4 h, affiné en 1 h, 30 min, 15 min,
+   5 min : un OB de petite unité à l'intérieur d'un OB de grande unité ; entrée
+   sur le petit, stop sous le grand.
+9. **Liquidité de trendline** (trois touches), en plus des plus hauts et plus
+   bas égaux de l'étoile 4.
+10. **Zone OTE 0,62–0,786** comme zone d'entrée (vidéo « SMC »), là où la
+    vidéo « 5 étoiles » prend le 0,5. Déjà au catalogue (§ 7, entrée OTE).
+11. **Plus haut et plus bas de la veille** (Interquity ; le trader « price
+    action » marque aussi ceux du jour). Une source de liquidité de plus : le
+    plus haut de la veille balayé, viser son plus bas. Calculable comme les
+    sessions (`sessions.js`).
+12. **Pas de trade les jours fériés** (Interquity). Filtre de calendrier ; à
+    mesurer comme les autres avant de l'imposer.
+13. **Pas de trade les jours d'annonces fortes** (NFP, CPI — Gian Luca : sa
+    stratégie y perd). Rejoint la piste 12 ; les fenêtres d'annonces existent
+    déjà (`anomalies.js`).
+14. **Session de New York contre Londres** (Gian Luca : New York meilleure
+    pour lui). À ventiler sur nos mesures avant d'en faire un filtre.
+    **Renforcée le 2026-10-07** : la checklist de Casper (vidéo « 15 hacks »)
+    est « en tendance, 15 min, **session américaine**, retour sur l'OB ». Deux
+    sources. À éprouver **après HYP-005**, sur des données qu'elle n'a pas
+    touchées (`GC_2025_2026.csv` ou la série MT5) : OB du bootcamp limités à la
+    séance de New York, contre les autres heures. À noter : son 15 min est
+    l'unité qui sort **négative** dans `mesure:ob-bootcamp` ; le filtre de
+    séance est peut-être ce qui la sépare de notre mesure, ou ne l'est pas.
+15. **Participation minimale** (Chris : un plancher de volume par bougie de
+    5 min, en dessous il ne trade pas). Possible sur les contrats à terme, qui
+    portent le volume ; pas sur un CSV de CFD.
+16. **La « bougie valide »** (Gian Luca) : corps plus grand que la plus longue
+    mèche ; le bas de structure est la bougie valide la plus proche de la
+    cassure. Définition sans interprétation, à comparer à nos pivots.
+
+### Ce qu'on ne prend pas (2026-10-07)
+
+- **Les rendements de compétition** (104 % en un trimestre, 254 %, 100 % en
+  un mois) : tailles de compétition, et le gagnant parmi des milliers est aussi
+  celui qui a pris le plus de risque.
+- **Le gamma des options et le carnet d'ordres** (Chris) : données d'options
+  payantes, transactions absentes des CFD. Une autre stratégie que la nôtre.
+- **L'optimisation automatique de stratégie** (skill « autoresearch », vidéo
+  « 15 hacks » de Casper : « si ce n'est pas rentable, il l'optimise ») :
+  essayer jusqu'à ce que ça passe, c'est fabriquer le résultat (garde-fou 7,
+  DEC-018). Sur les données passées, ça finit toujours par passer.
+- **Le connecteur qui pilote TradingView Desktop** (vidéo « 15 hacks »,
+  `tradesdontlie/tradingview-mcp`) : il ouvre un port de débogage par lequel
+  tout programme de la machine peut prendre la main sur la session connectée,
+  et l'automatisation est hors des conditions de TradingView. Remplacé par
+  Claude dans Chrome, en lecture seule (feuille de route, E4).
+- **`atilaahmettaner/tradingview-mcp`**, lu le 2026-10-07 : aucun code
+  dangereux trouvé, compte TradingView jamais utilisé, mais rien pour nous —
+  pas d'order blocks, pas de 1 min sur des années, des backtests sans témoin.
+

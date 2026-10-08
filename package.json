@@ -15,7 +15,20 @@
     "samples": "node scripts/make-samples.mjs",
     "assets:ocr": "node scripts/assets-ocr.mjs",
     "postinstall": "node scripts/assets-ocr.mjs",
-    "predev": "node scripts/liberer-port.mjs"
+    "predev": "node scripts/liberer-port.mjs",
+    "rejeu:036": "node scripts/rejouer.mjs --csv donnees/GC_2023_2024.csv --symbole GC --sortie donnees/rejeu-gc --protocole DEC-036",
+    "temoin:036": "node scripts/temoin.mjs --journal donnees/rejeu-gc --symbole GC --csv donnees/GC_2023_2024.csv",
+    "rejeu:037": "node scripts/rejouer.mjs --csv donnees/GC_2025_2026.csv --symbole GC --sortie donnees/rejeu-gc-2025 --protocole DEC-037",
+    "temoin:037": "node scripts/temoin.mjs --journal donnees/rejeu-gc-2025 --symbole GC --csv donnees/GC_2025_2026.csv",
+    "mt5:export": "python pont-mt5/exporter.py --sortie donnees/mt5",
+    "journal": "node scripts/journal-mt5.mjs --dossier donnees/mt5",
+    "structure": "node scripts/structure.mjs",
+    "ob": "node scripts/ob.mjs",
+    "feuille": "node scripts/feuille-de-route.mjs",
+    "mesure:mouvement": "node scripts/mesure-mouvement.mjs --csv donnees/GC_2023_2024.csv --spread 0.4",
+    "hyp:004": "node scripts/hyp-004.mjs --csv donnees/metaux-2020/GC_2020_2022.csv",
+    "hyp:005": "node scripts/hyp-005.mjs --dossier donnees/marches",
+    "mesure:ob-bootcamp": "node scripts/mesure-ob-bootcamp.mjs --csv donnees/GC_2023_2024.csv --spread 0.4"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",
