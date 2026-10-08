@@ -1170,7 +1170,7 @@ function LectureCard({ lecture }) {
             const q = ob.qualificatifs;
             const marques = [
               q.priseDeLiquidite && 'prise de liquidité',
-              q.fvg && 'FVG',
+              q.fvg && 'FVG dans l’impulsion',
               q.premiumDiscount?.enZoneFavorable && 'zone favorable',
               q.premiumDiscount?.ote && 'OTE',
             ].filter(Boolean);
@@ -1182,12 +1182,33 @@ function LectureCard({ lecture }) {
                 <p className="text-[11px] text-slate-500">
                   {marques.length ? marques.join(' · ') : 'aucun qualificatif'}
                 </p>
+                {q.etoiles ? (
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-[11px] text-amber-300 tabular-nums">
+                      {'★'.repeat(q.etoiles.nombre)}{'☆'.repeat(5 - q.etoiles.nombre)}{' '}
+                      <span className="text-slate-400">{q.etoiles.nombre} / 5 critères</span>
+                    </p>
+                    <ul className="text-[11px] leading-snug">
+                      {q.etoiles.criteres.map((c) => (
+                        <li key={c.cle} className={c.rempli ? 'text-emerald-400' : 'text-slate-500'}>
+                          {c.rempli ? '✓' : '✗'} {c.libelle} — {c.phrase}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-600">étoiles non calculables sur cette série</p>
+                )}
               </div>
             );
           })}
           {obs.length > 4 && (
             <p className="text-[11px] text-slate-600">et {obs.length - 4} autre(s)</p>
           )}
+          <p className="text-[10px] text-slate-600 leading-relaxed">
+            Les étoiles comptent des critères, elles ne mesurent rien : HYP-004 n’a trouvé
+            aucun avantage aux OB 5 étoiles face au hasard (p = 0,184).
+          </p>
         </div>
       )}
 

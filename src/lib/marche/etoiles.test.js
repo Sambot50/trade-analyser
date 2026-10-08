@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { HAUSSIER, BAISSIER } from './structure.js';
 import {
-  etoiles, imbalanceDepuisOB, liquiditeDevant, mitigeDepuisLaCassure, atrJusqua, PARAMETRES_ETOILES,
+  etoiles, etoilesEnDirect, CRITERES_ETOILES, imbalanceDepuisOB, liquiditeDevant, mitigeDepuisLaCassure, atrJusqua,
+  PARAMETRES_ETOILES,
 } from './etoiles.js';
 
 const MINUTE = 60_000;
@@ -102,6 +103,37 @@ describe('mitigation en direct', () => {
     const b = scenario();
     expect(mitigeDepuisLaCassure(b, OB, b[35].ouvertureMs)).toBe(false);
     expect(mitigeDepuisLaCassure(b, OB, b[35].fermetureMs + 1)).toBe(true);
+  });
+});
+
+describe('étoiles en direct — pour l’affichage', () => {
+  it('liste les cinq critères dans l’ordre de la méthode, remplis ou manquants', () => {
+    const b = scenario();
+    const e = etoilesEnDirect(b, OB, b[34].fermetureMs + 1);
+    expect(e.criteres.map((c) => c.cle)).toEqual(CRITERES_ETOILES.map((c) => c.cle));
+    expect(e.criteres.map((c) => c.rempli)).toEqual([true, true, true, false, true]);
+    expect(e.criteres[3].phrase).toBe('égaux non pris devant l’OB');
+    expect(e.nombre).toBe(4);
+  });
+  it('rend la même note que `etoiles` tant que l’OB n’est pas retouché', () => {
+    const b = scenario();
+    const e = etoilesEnDirect(b, OB, b[35].ouvertureMs);
+    expect(e.retoucheDepuisLaCassure).toBe(false);
+    expect(e.nombre).toBe(etoiles(b, OB).nombre);
+  });
+  it('retire l’étoile 5 à un OB retouché depuis la cassure, et le dit', () => {
+    const b = scenario();
+    const e = etoilesEnDirect(b, OB, b[35].fermetureMs + 1);
+    expect(e.retoucheDepuisLaCassure).toBe(true);
+    expect(e.nonMitige).toBe(false);
+    expect(e.nombre).toBe(3);
+    expect(e.criteres[4]).toMatchObject({ rempli: false, phrase: 'retouché depuis la cassure' });
+  });
+  it('dit « déjà retouché » quand le retour précède la cassure', () => {
+    const b = scenario();
+    b[33] = { ...b[33], plusBas: 99.3 }; // sorti en 32, revenu dans l'OB en 33, avant la cassure
+    const e = etoilesEnDirect(b, OB, b[34].fermetureMs + 1);
+    expect(e.criteres[4]).toMatchObject({ rempli: false, phrase: 'déjà retouché' });
   });
 });
 
