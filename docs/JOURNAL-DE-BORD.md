@@ -43,12 +43,43 @@ renvoie.
   Legion était lancé sans connexion claude.ai (facturation API) : `/chrome`
   inconnu. Piste retenue : onglet Code de Claude Desktop, session locale.
 
+**Fait, suite — travaux ouverts replacés dans la feuille de route**
+- Quatre jours de travail (2026-10-04 → 08) menés sur des branches que la
+  feuille de route ne mentionnait pas : ranges, figures de bougies,
+  rapprochement des prix, libération du port, champs d'instrument. Elles sont
+  désormais inscrites au § 5, « Travaux ouverts », chacune à son étape, avec
+  la décision attendue. Rien ne se fusionne avant que sa case existe
+  (règle 3 du § 6).
+- `analyse/ranges` remise sur le `main` du jour : conflit de `DECISIONS.md`
+  résolu, conflit de `package.json` résolu pour `outil/liberer-port` (les
+  douze commandes gardées). 1 397 tests, build, CI verte sur Node 20 et 22.
+
+**Mesuré, suite**
+- Ranges sur l'or en 15 min : **rien d'établi**. 32,0 % contre 28,3 % au
+  témoin par blocs corrigé, +3,70 points, p = 0,029 brut / 0,080 corrigé,
+  intervalles qui se recouvrent. Le détecteur reste non branché (DEC-044).
+- Le même écart mesuré contre un témoin en 1 min donnait −4,70 points :
+  **signe inversé**, et significatif des deux côtés. Un témoin partage
+  l'unité de temps du réel.
+
+**Décidé, suite**
+- La décision des ranges, écrite comme DEC-035 le 2026-10-04, devient
+  **DEC-044** : ce numéro avait été pris le 2026-10-05 par le témoin des
+  plans, dans l'autre travail du même jour. Les deux ne se recouvrent pas et
+  le préambule de DEC-044 le dit. Une collision d'identifiants de plus : la
+  cause est le travail hors feuille de route, pas le numéro.
+
 **Prochaine action**
 - **Opérateur** : `git pull`, puis `npm run mesure:ob-bootcamp` avec les
   frais réels (toujours en attente).
 - **Opérateur** : session locale (Claude Desktop, onglet Code) reliée à
   Chrome ; export M1 XAUUSD couvrant le 2026-09-13 → 2026-09-25 ; puis les
   10 relevés du contrôle visuel.
+- **Opérateur** : trancher les six travaux ouverts du § 5 de la feuille de
+  route (fusionner #50, #51, #79 ; revoir ensemble #45 et les figures ;
+  essayer `vision/montrer-la-bande` sur la capture or).
+- **Opérateur** : supprimer les cinq branches déjà fusionnées (le proxy de la
+  session cloud refuse l'écriture de références).
 
 ---
 

@@ -47,6 +47,7 @@ Quatre principes, non négociables :
 | 2026-09-25 → 30 | Le volume sur les contrats à terme | Le volume prédit **l'amplitude, jamais la direction** (DEC-031). Erreur type fausse d'un facteur 3,7 (DEC-032). Dénominateur creux d'un seul côté (DEC-033). **Frais : 0,08 R par trade** (DEC-034). Stop annoncé ≠ stop mesuré (ERRATUM-001). |
 | 2026-10-03 | Lecture géométrique d'une capture, sans IA | L'OCR n'avait jamais tourné malgré des tests verts (moteur simulé). → **Tester sur une vraie capture.** Les dessins de l'utilisateur étaient lus comme des bougies. |
 | 2026-10-05 | Témoin des plans, rejeu pré-enregistré | Le modèle a fait +0,110 R contre −0,138 R au témoin : **p = 0,049**, un passage d'un millième. Il a **vendu 99 fois sur 100**. Un TP2 était crédité 2 R quelle que soit sa distance : corrigé avant toute lecture. |
+| 2026-10-08 | Ranges mesurés, et quatre jours de travail mené en parallèle de la feuille de route | La compression ne rend rien d'établi : 32,0 % contre 28,3 % au témoin corrigé, p = 0,080 (DEC-044). Un témoin en 1 min face à du réel en 15 min **inversait le signe** du résultat. Et un même numéro, DEC-035, écrit deux fois le même jour par deux travaux qui s'ignoraient. → Une branche qui ne figure pas dans la feuille de route finit par la contredire (§ 5, « Travaux ouverts »). |
 | 2026-10-06 | Référence du bootcamp, puis pont MT5 et journal de performances | Leur ergonomie est bonne ; leurs performances affichées ne sont pas mesurées (profit factor 56, Sharpe 74 sur 31 trades, « exécution idéale »). → On reprend la forme, pas les chiffres (DEC-038). |
 
 ### Les leçons, en une ligne chacune
@@ -139,6 +140,31 @@ l'erreur s'écrit au journal.
 | E3 Moteur multi-unités de temps | ⏸ | 10 points de contrôle relevés sur TradingView (opérateur) |
 | **E4 Écran Décision** | 🔵 en cours | tout (cases ci-dessous) |
 | E5 → E10 | ⬜ | — |
+| **Travaux ouverts** | ⏸ | 4 demandes de fusion et 2 branches à placer ou à clore (ci-dessous) |
+
+---
+
+### Travaux ouverts, hors étapes
+
+Écrit le 2026-10-08. Du travail a été mené en parallèle de cette feuille de
+route, sur des branches qu'elle ne mentionnait pas. La règle 3 du § 6 dit
+l'inverse : une idée vient ici d'abord. Ces branches sont donc **placées ici
+avant d'être fusionnées**, chacune à l'étape dont elle relève, ou closes.
+Aucune ne se fusionne sans que sa case existe.
+
+| Branche | Ce qu'elle apporte | Étape | Décision attendue |
+|---|---|---|---|
+| `analyse/ranges` (#50) | Détection des ranges sans lecture du futur, rééchantillonnage par blocs, DEC-044 | E8 | fusionner pour garder la mesure et sa leçon ; le détecteur reste non branché |
+| `outil/liberer-port` (#51) | `predev` qui libère le port au lieu d'échouer dessus | E0 | fusionner |
+| `corr/placeholder-instrument` (#79) | Un champ vide ne ressemble plus à un champ rempli | E4 | fusionner |
+| `marche/rapprochement` (#45) | Prix lus confrontés aux prix réels, par un export TradingView | E4 | à revoir ensemble |
+| `analyse/figures-bougies` | Marteau, doji, englobante, inside bar ; non branchée dans l'analyse | E4 | à revoir ensemble (opérateur, 2026-10-07 : « attends que l'on check ensemble ») |
+| `vision/montrer-la-bande` | Aperçu de la bande d'axe lue, pour voir ce que l'OCR voit | E4 | à essayer sur la capture or avant de fusionner |
+
+Cinq branches déjà fusionnées restent à supprimer, côté opérateur :
+`analyse/contrat-trouvailles`, `fixtures/capture-reelle`,
+`journal/jugement-order-blocks`, `vision/dessins-utilisateur`,
+`vision/souder-par-recouvrement`.
 
 ---
 
@@ -154,6 +180,7 @@ l'erreur s'écrit au journal.
 - [x] **Opérateur** — lancer `outils/creer-raccourcis.ps1` et vérifier les deux raccourcis (2026-10-06)
 - [x] **Opérateur** — poser le tag `v2026.10.06-journal-mt5` (2026-10-07)
 - [x] **Opérateur** — retirer l'ancienne copie `Documents\trade-analyser` une fois les données déplacées (2026-10-07 : CSV et rejeux dans `donnees\`, fichiers personnels dans `donnees\ancienne-copie\`)
+- [ ] `npm run dev` ne doit plus échouer sur un port déjà pris : `predev` libère le port avant de démarrer (`outil/liberer-port`, #51) — attend la fusion
 
 ### E1 — Pont MT5 + journal de performances ⏸
 
@@ -213,7 +240,7 @@ vérifie.
 - [x] Étoile 4, liquidité : pas de plus hauts ou plus bas égaux non pris à moins de 2 ATR devant l'OB (égaux à 0,1 ATR près) — paramètres figés le 2026-10-07
 - [x] Étoile 5, mitigation : pas de retour dans l'OB avant la cassure ; en direct, pas de retour depuis la cassure jusqu'à l'instant de lecture
 - [x] Chaque OB affiche ses étoiles et la liste des critères remplis ou manquants — lecture de capture (`etoilesEnDirect`) : l'étoile 5 tombe aussi si l'OB a été retouché depuis la cassure ; la note est présentée comme un compte, jamais comme une réussite (HYP-004). Vérifié dans Chromium sur `fixtures/tradingview-clair.png` (2026-10-08)
-- [ ] Confirmation d'entrée : bougie englobante en 1 min, dans l'OB, dans le bon sens (analyse nouvelle)
+- [ ] Confirmation d'entrée : bougie englobante en 1 min, dans l'OB, dans le bon sens (analyse nouvelle). Les figures de bougies sont écrites et testées sur `analyse/figures-bougies` (marteau, marteau inversé, doji, englobante, inside bar) mais **non branchées dans l'analyse** : l'opérateur a demandé le 2026-10-07 qu'on les regarde ensemble avant. Une figure n'entre dans l'analyse qu'avec sa mesure face au témoin (garde-fou 8)
 - [ ] Stop sous l'OB, ou sous les OB empilés
 - [x] HYP-004 pré-enregistrée (DECISIONS.md) : 5 étoiles contre 0-2 étoiles, GC 2020-2022 jamais utilisé pour les OB, 200 mélanges témoins, règle de décision écrite ; `npm run hyp:004`, qui refuse de tourner deux fois
 - [x] HYP-004 lancée une fois (2026-10-07) : **réfutée** pour l'or en 15 min, **OB de structure seulement** (DEC-042) — 5 étoiles 43,6 %, +0,054 R sur 78 trades, contre −0,115 R aux 0-2 étoiles, mais p = 0,184 face au témoin
@@ -237,8 +264,9 @@ vérifie.
 *Entrée*
 - [ ] Dépôt d'une capture + notes facultatives (actif, unité, contexte)
 - [ ] Checklist « bonne capture » vérifiée automatiquement : unité de temps lue, axe lisible (au moins 3 graduations), 50 à 100 bougies, symbole reconnu ; chaque point manquant dit quoi corriger
-- [ ] Axe lu même en petits chiffres (cas BTC du 2026-10-07 : une seule graduation lue sur un axe pourtant lisible)
+- [ ] Axe lu même en petits chiffres (cas BTC du 2026-10-07 : une seule graduation lue sur un axe pourtant lisible). La capture or échoue encore sur « Aucune graduation lue ». L'aperçu de la bande effectivement lue est écrit sur `vision/montrer-la-bande` — il n'a jamais tourné sur le `main` actuel ni sur cette capture : à essayer avant d'écrire une cause
 - [ ] OB anormalement haut signalé (cas BTC : une zone de 1 600 points)
+- [ ] Prix lus confrontés aux prix réels, sur un export TradingView de la même fenêtre (`marche/rapprochement`, #45) : l'écart de lecture est mesuré, pas supposé — à revoir ensemble avant fusion
 - [ ] TradingView en direct via **Claude dans Chrome** (extension officielle, lecture seule, aucun ordre — règle 7) : l'opérateur et Claude regardent le même graphique
 - [ ] Contrôle visuel des OB : les OB détectés par le moteur sur les bougies MT5 sont comparés à ceux que l'opérateur voit sur TradingView, au même instant ; chaque écart est noté. C'est un **contrôle de détection**, jamais une mesure de rendement : celle-ci se fait sur les bougies, face au témoin — procédure écrite ci-dessous (« Procédure — contrôle visuel des OB »)
 - [x] Prérequis de la procédure : `npm run ob -- --csv <bougies 1 min> --a <instant>` liste les OB du moteur à un instant, sans rien lire après lui (dernière bougie, sens, haut, bas, accumulation, heure de validation, retouché ou non) et donne l'ATR de la tolérance ; réglages figés, sans option. Les étoiles n'y figurent pas : le contrôle porte sur la détection, et l'étoile 3 du bootcamp se lit à l'entrée, qui n'existe pas à l'instant. Testé sur données construites (2026-10-08) ; jamais lancé sur l'export MT5 réel
@@ -360,6 +388,10 @@ mesuré en plus.
 ### E8 — Labo par signal ⬜
 
 - [ ] Statistiques mesurées par type de signal, avec témoin et frais réels
+- [x] Ranges : compression `hauteur / (amplitude moyenne × √fenêtre)`, bornes figées à l'ouverture, sortie lue à la clôture, aucune bougie future (`src/lib/marche/range.js`, `node scripts/ranges.mjs --csv <bougies> --ut 15m` — branche `analyse/ranges`)
+- [x] Témoin par blocs : la série de l'opérateur rééchantillonnée par blocs de bougies consécutives, forme et grappes de volatilité conservées, ordre détruit (`bootstrap.js`) ; facteur de dispersion mesuré (×1,03), jamais supposé
+- [x] Ranges mesurés sur l'or en 15 min : **rien d'établi** — 32,0 % contre 28,3 % au témoin corrigé, +3,70 points, p = 0,029 brut / 0,080 corrigé, intervalles qui se recouvrent (DEC-044). Le détecteur reste **non branché** dans l'analyse
+- [x] Leçon DEC-044 : **un témoin partage l'unité de temps du réel**. En 1 min face à du réel en 15 min, le même écart passait de +3,70 à −4,70 points — signe inversé, et significatif des deux côtés
 - [ ] Les « étoiles » et les probabilités remplacées par ces chiffres
 - [ ] Plus aucune note non mesurée à l'écran
 - [ ] Régimes de volatilité (Gian Luca, champion Robbins 2025-2026) : rang de l'ATR(14) sur 200 bougies → faible 0-25, moyen 26-50, élevé 51-75, extrême 76-100 ; chaque résultat ventilé par régime, régime du jour affiché
