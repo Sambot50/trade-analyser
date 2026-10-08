@@ -3476,3 +3476,112 @@ frais supposés : **elles ne se lisent pas**. HYP-005 ne se relance pas.
 Un drapeau que personne n'affiche ne protège de rien. Un coût supposé doit
 arrêter le calcul, pas se glisser dans une moyenne.
 
+
+## DEC-044 — Un témoin d'une autre unité de temps inverse le signe d'un résultat
+
+**2026-10-04 · renumérotée le 2026-10-08.** Écrite comme DEC-035 avant que ce
+numéro ne soit pris par le témoin des plans, elle devient DEC-044. Les deux
+décisions portent sur des témoins et ne se recouvrent pas : DEC-035 rejoue la
+géométrie d'un plan à un instant tiré au sort, celle-ci rééchantillonne une
+série par blocs. La leçon ci-dessous — un témoin doit partager l'unité de
+temps du réel — vaut pour les deux.
+
+Première mesure sur les ranges, et elle a produit deux
+résultats contraires avant qu'on ne touche aux données. La leçon ne porte pas
+sur les ranges : elle porte sur le témoin, et elle vaut pour toute mesure
+future de ce dépôt.
+
+### La question, écrite avant de regarder
+
+> Quand le prix sort d'un range, continue-t-il ou revient-il ?
+
+Une sortie « continue » si le prix va chercher une hauteur de range au-delà
+avant de refermer à l'intérieur. Détection causale — à chaque bougie on ne
+regarde que les précédentes — et un test le prouve en remplaçant tout le futur
+par des prix absurdes.
+
+Données : `GC_2023_2024`, bougies de 15 minutes, fenêtre 20, seuil de
+compression 0,6, horizon 20 bougies. **1 276 ranges, 1 260 issues tranchées.**
+
+### Le même réel, contre deux témoins
+
+Le générateur `serieAleatoire` produit des bougies d'**une minute**. Les
+données réelles sont en **quinze**. La première mesure a comparé les deux sans
+que personne ne le remarque.
+
+| témoin | taux du témoin | écart | z | p |
+|---|---|---|---|---|
+| bougies 1 min | 36,7 % | **−4,70 pts** | −1,99 | **0,023** |
+| bougies 15 min | 28,3 % | **+3,70 pts** | +1,89 | **0,029** |
+
+Le réel vaut 32,0 % dans les deux cas. **Seul le témoin change, et le signe de
+la conclusion s'inverse.** Les deux paraissent significatifs au seuil de cinq
+pour cent.
+
+Le taux de continuation dépend de l'unité de temps parce que la question en
+dépend : « aller chercher une hauteur de range » n'a pas la même difficulté
+selon la granularité des bougies qui composent ce range.
+
+### Ce qu'on en retient
+
+**Un témoin mal construit ne rend pas un résultat affaibli — il en fabrique un
+faux, aussi convaincant que le vrai, et pointant où il veut.** C'est pire
+qu'une absence de témoin : l'absence laisse prudent, la fausse présence rend
+confiant.
+
+La règle, désormais : **le témoin se construit dans les mêmes conditions que le
+réel, et l'unité est rendue avec le résultat.** `scripts/ranges.mjs` fixe
+l'unité une seule fois pour les deux séries et avertit en cas de désaccord.
+
+Ce qui vaut pour l'unité de temps vaut pour le reste : période, instrument,
+horaires de séance, frais. Toute dimension sur laquelle réel et témoin
+diffèrent est une explication possible de l'écart mesuré, et il n'y a aucun
+moyen de la distinguer après coup.
+
+### Le résultat, corrigé
+
+```
+réel     32,0 %  [29,5 – 34,6]   n = 1 260
+témoin   28,3 %  [25,6 – 31,3]   n =   974
+         +3,70 points · p = 0,029 brut
+```
+
+Le facteur de dispersion, mesuré sur huit blocs de temps disjoints, vaut
+**1,03** — la formule usuelle a raison ici, contrairement à DEC-032.
+L'explication tient à la détection : un seul range est suivi à la fois, le
+suivant ne s'ouvre qu'après la sortie du précédent. Les observations ne se
+chevauchent donc presque pas, là où HYP-001 faisait partager 95 bougies sur 96
+à deux signaux voisins. **Le facteur se mesure, il ne se suppose pas** — ni à
+1, ni à 3,8.
+
+Corrigé de la dispersion du témoin (×1,3 entre graines, dans le bruit de
+l'instrument), le p passe à **0,080**.
+
+**Rien n'est établi.** Les intervalles se recouvrent, et l'écart ne survit pas
+à la correction. La direction est favorable — les sorties continuent un peu
+plus souvent que le hasard — mais c'est tout ce qu'on peut en dire.
+
+### L'instrument a été vérifié avant de servir
+
+Sur des groupes tirés d'une binomiale, donc indépendants par construction, le
+facteur de dispersion rend **0,94** en moyenne — pas 1,00, l'écart type d'un
+petit échantillon sous-estimant la vraie dispersion. Sur des groupes dont le
+taux dérive, il rend plus de 2.
+
+Sans cette vérification, un facteur de 3 sur des données réelles n'aurait rien
+prouvé : il aurait pu venir de l'instrument.
+
+### Le piège immédiat
+
+`--balayage` essaie plusieurs seuils de compression. **La ligne au plus grand
+z n'est pas un résultat.** Retenir le meilleur de six seuils, c'est choisir
+parmi six tirages, et le meilleur paraîtra significatif par arithmétique.
+DEC-025 a vu ainsi un effet de 21,8 points s'évaporer à −0,2 sur des données
+fraîches.
+
+Le balayage sert à voir si l'écart est **stable**, pas où il est le plus grand.
+Un écart qui tient sur toute la plage mériterait d'être gelé puis éprouvé sur
+`GC_2025_2026`, encore vierge de toute mesure de ce type. Un écart qui
+n'existe qu'à un seuil est un accident.
+
+**2023-2024 est désormais ouvert pour cette question.**
