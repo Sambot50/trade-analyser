@@ -22,6 +22,7 @@
     "mt5:export": "python pont-mt5/exporter.py --sortie donnees/mt5",
     "journal": "node scripts/journal-mt5.mjs --dossier donnees/mt5",
     "structure": "node scripts/structure.mjs",
+    "ob": "node scripts/ob.mjs",
     "feuille": "node scripts/feuille-de-route.mjs",
     "mesure:mouvement": "node scripts/mesure-mouvement.mjs --csv donnees/GC_2023_2024.csv --spread 0.4",
     "hyp:004": "node scripts/hyp-004.mjs --csv donnees/metaux-2020/GC_2020_2022.csv",

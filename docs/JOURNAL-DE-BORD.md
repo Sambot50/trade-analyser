@@ -28,10 +28,27 @@ renvoie.
 **Bloqué**
 - Rien côté développement.
 
+**Fait, suite — contrôle visuel des OB préparé**
+- Procédure écrite **avant tout relevé** (feuille de route, E4) : OB du
+  bootcamp 5 min ≥ 2 ATR, 10 instants fixés d'avance (jours ouvrés du
+  2026-09-14 au 2026-09-25, 14:00 UTC), relevé de l'opérateur à l'aveugle en
+  mode Replay, tolérance 0,1 ATR, une cause par écart. Un écart de définition
+  ne change pas la règle sur place (garde-fou 7).
+- `npm run ob` : les OB du moteur à un instant, sans lecture du futur,
+  réglages figés. Testé sur données construites ; jamais lancé sur l'export
+  MT5 réel.
+
+**Bloqué**
+- Claude dans Chrome ne se relie pas à une session cloud. Le Claude Code du
+  Legion était lancé sans connexion claude.ai (facturation API) : `/chrome`
+  inconnu. Piste retenue : onglet Code de Claude Desktop, session locale.
+
 **Prochaine action**
 - **Opérateur** : `git pull`, puis `npm run mesure:ob-bootcamp` avec les
   frais réels (toujours en attente).
-- Case suivante d'E4 indépendante de cette mesure : sur feu vert.
+- **Opérateur** : session locale (Claude Desktop, onglet Code) reliée à
+  Chrome ; export M1 XAUUSD couvrant le 2026-09-13 → 2026-09-25 ; puis les
+  10 relevés du contrôle visuel.
 
 ---
 
