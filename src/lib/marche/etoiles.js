@@ -185,3 +185,46 @@ export function mitigeDepuisLaCassure(bougies, ob, aMs) {
   return bougies.some((b) => b.ouvertureMs > depuis && b.fermetureMs < aMs
     && b.plusBas <= ob.zone.haut && b.plusHaut >= ob.zone.bas);
 }
+
+/**
+ * Libellés et ordre d'affichage des cinq critères. L'ordre est celui de la
+ * méthode ; il ne classe rien.
+ */
+export const CRITERES_ETOILES = Object.freeze([
+  { cle: 'imbalance', libelle: 'Imbalance', rempli: 'un FVG part de l’OB', manque: 'aucun FVG ne part de l’OB lui-même' },
+  { cle: 'tendance', libelle: 'Tendance', rempli: 'né dans la tendance (BOS)', manque: 'né d’un retournement (CHoCH)' },
+  { cle: 'discount', libelle: 'Premium / discount', rempli: 'du bon côté du 0,5 de la jambe', manque: 'du mauvais côté du 0,5 de la jambe' },
+  { cle: 'sansLiquiditeDevant', libelle: 'Liquidité', rempli: 'pas d’égaux non pris devant', manque: 'égaux non pris devant l’OB' },
+  { cle: 'nonMitige', libelle: 'Mitigation', rempli: 'jamais retouché', manque: 'déjà retouché' },
+]);
+
+/**
+ * Les étoiles d'un OB pour l'AFFICHAGE en direct, à l'instant `aMs`.
+ *
+ * Seule différence avec `etoiles` : l'étoile 5 tombe aussi si l'OB a été
+ * retouché depuis la cassure (bougies fermées avant `aMs`). Ne sert jamais
+ * dans une mesure : le backtest prend le premier retour, non mitigé par
+ * construction.
+ *
+ * `criteres` : la liste ordonnée, chaque critère rempli ou manquant, avec sa
+ * phrase. La note reste un compte ; HYP-004 l'a éprouvée et réfutée sur l'OB
+ * de structure (2026-10-07), elle ne dit rien de la réussite.
+ */
+export function etoilesEnDirect(bougies, ob, aMs) {
+  const e = etoiles(bougies, ob);
+  const retouche = mitigeDepuisLaCassure(bougies, ob, aMs);
+  const valeurs = { ...e, nonMitige: e.nonMitige && !retouche };
+  const criteres = CRITERES_ETOILES.map((c) => ({
+    cle: c.cle,
+    libelle: c.libelle,
+    rempli: valeurs[c.cle] === true,
+    phrase: valeurs[c.cle] === true ? c.rempli
+      : c.cle === 'nonMitige' && e.nonMitige ? 'retouché depuis la cassure' : c.manque,
+  }));
+  return {
+    ...valeurs,
+    retoucheDepuisLaCassure: retouche,
+    nombre: criteres.filter((c) => c.rempli).length,
+    criteres,
+  };
+}

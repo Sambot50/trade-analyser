@@ -60,6 +60,8 @@ describe('lireGraphique — la chaîne complète', () => {
     expect(ob.qualificatifs).toHaveProperty('priseDeLiquidite');
     expect(ob.qualificatifs).toHaveProperty('fvg');
     expect(ob.qualificatifs.premiumDiscount).toHaveProperty('position');
+    expect(ob.qualificatifs.etoiles.criteres).toHaveLength(5);
+    expect(ob.qualificatifs.etoiles.nombre).toBe(ob.qualificatifs.etoiles.criteres.filter((c) => c.rempli).length);
   });
 
   it('retrouve les prix à moins de deux pixels, bout en bout', async () => {
