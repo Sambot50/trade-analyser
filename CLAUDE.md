@@ -104,6 +104,7 @@ npm run mt5:export               # historique du compte MT5 (Axi) → donnees/mt
 npm run mt5:export -- --bougies XAUUSD --depuis 2026-01-01   # + bougies M1
 npm run journal                  # journal de performances depuis l'export MT5
 npm run structure -- --csv donnees/GC_2025_2026.csv --a 2026-07-15T12:30:00Z   # tableau multi-UT
+npm run ob -- --csv donnees/mt5/bougies/XAUUSD_M1.csv --a 2026-09-14T14:00:00Z   # OB du moteur à un instant (contrôle visuel)
 npm run rejeu:037                # réplication DEC-037 ; npm run temoin:037 ensuite
 npm run mesure:mouvement         # OB : réussite par force du mouvement (1-3 ATR), face au témoin
 npm run hyp:004                  # HYP-004 : les OB 5 étoiles, UNE seule fois (refuse de se relancer)

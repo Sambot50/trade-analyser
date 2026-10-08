@@ -241,7 +241,7 @@ vérifie.
 - [ ] OB anormalement haut signalé (cas BTC : une zone de 1 600 points)
 - [ ] TradingView en direct via **Claude dans Chrome** (extension officielle, lecture seule, aucun ordre — règle 7) : l'opérateur et Claude regardent le même graphique
 - [ ] Contrôle visuel des OB : les OB détectés par le moteur sur les bougies MT5 sont comparés à ceux que l'opérateur voit sur TradingView, au même instant ; chaque écart est noté. C'est un **contrôle de détection**, jamais une mesure de rendement : celle-ci se fait sur les bougies, face au témoin — procédure écrite ci-dessous (« Procédure — contrôle visuel des OB »)
-- [ ] Prérequis de la procédure : une commande qui liste les OB du moteur à un instant donné, sans rien lire après lui (bougie, sens, haut, bas, étoiles) — elle n'existe pas encore
+- [x] Prérequis de la procédure : `npm run ob -- --csv <bougies 1 min> --a <instant>` liste les OB du moteur à un instant, sans rien lire après lui (dernière bougie, sens, haut, bas, accumulation, heure de validation, retouché ou non) et donne l'ATR de la tolérance ; réglages figés, sans option. Les étoiles n'y figurent pas : le contrôle porte sur la détection, et l'étoile 3 du bootcamp se lit à l'entrée, qui n'existe pas à l'instant. Testé sur données construites (2026-10-08) ; jamais lancé sur l'export MT5 réel
 
 *Rapport — tous les niveaux viennent du moteur*
 - [ ] Vue d'ensemble : tendance, dernier BOS / CHoCH, points HH, HL, LH, LL
