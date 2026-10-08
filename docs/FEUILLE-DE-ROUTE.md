@@ -240,7 +240,8 @@ vérifie.
 - [ ] Axe lu même en petits chiffres (cas BTC du 2026-10-07 : une seule graduation lue sur un axe pourtant lisible)
 - [ ] OB anormalement haut signalé (cas BTC : une zone de 1 600 points)
 - [ ] TradingView en direct via **Claude dans Chrome** (extension officielle, lecture seule, aucun ordre — règle 7) : l'opérateur et Claude regardent le même graphique
-- [ ] Contrôle visuel des OB : les OB détectés par le moteur sur les bougies MT5 sont comparés à ceux que l'opérateur voit sur TradingView, au même instant ; chaque écart est noté. C'est un **contrôle de détection**, jamais une mesure de rendement : celle-ci se fait sur les bougies, face au témoin
+- [ ] Contrôle visuel des OB : les OB détectés par le moteur sur les bougies MT5 sont comparés à ceux que l'opérateur voit sur TradingView, au même instant ; chaque écart est noté. C'est un **contrôle de détection**, jamais une mesure de rendement : celle-ci se fait sur les bougies, face au témoin — procédure écrite ci-dessous (« Procédure — contrôle visuel des OB »)
+- [ ] Prérequis de la procédure : une commande qui liste les OB du moteur à un instant donné, sans rien lire après lui (bougie, sens, haut, bas, étoiles) — elle n'existe pas encore
 
 *Rapport — tous les niveaux viennent du moteur*
 - [ ] Vue d'ensemble : tendance, dernier BOS / CHoCH, points HH, HL, LH, LL
@@ -254,6 +255,79 @@ vérifie.
 - [ ] Plan avec **stop obligatoire**, cibles à 1:2 et 1:3 (l'opérateur choisit et gère), taille de position, coût en R
 - [ ] Bouton « Je prends » relié au journal
 - [ ] Le même écran fonctionne avec chacune des IA ; sans IA, le rapport du moteur s'affiche quand même, sans texte rédigé
+
+#### Procédure — contrôle visuel des OB
+
+Écrite le 2026-10-08, **avant** tout relevé. Elle se suit telle quelle ; une
+modification se fait avant le premier relevé, jamais après en avoir vu un.
+
+**Ce qu'on contrôle, et ce qu'on ne contrôle pas.** La question est : le
+moteur voit-il les OB que l'opérateur voit, et seulement ceux-là ? C'est un
+contrôle de **détection**. Il ne dit rien de ce que rapporte un OB : le
+rendement se mesure sur les bougies, face au témoin (garde-fou 8). Un
+contrôle réussi ne réhabilite pas HYP-005.
+
+**Détecteur contrôlé.** L'OB du bootcamp (`ob-bootcamp.js`) dans la
+configuration figée par l'opérateur : **5 min, mouvement ≥ 2 ATR, toujours en
+tendance**, paramètres `PARAMETRES_OB_BOOTCAMP`. L'OB de structure
+(`orderblocks.js`) n'est pas contrôlé ici.
+
+**Même donnée des deux côtés.** Le moteur lit les bougies M1 de MT5 (Axi,
+`XAUUSD`), regroupées en 5 min. Sur TradingView, afficher le même flux si
+Axi y est proposé ; sinon un flux spot `XAUUSD`, et l'écrire sur la fiche.
+**Jamais `GC1!`** : le contrat à terme cote avec un écart sur le spot, et ses
+bougies ne sont pas les mêmes. Un écart dû au flux est un écart de donnée,
+pas de détection.
+
+**Les 10 instants, fixés d'avance.** Dix jours ouvrés consécutifs, du
+2026-09-14 au 2026-09-25, à **14:00 UTC** (séance de New York ouverte). On
+ne choisit pas les instants en regardant le graphique : on choisirait ceux où
+les OB sont nets. Un jour sans donnée MT5 est noté « absent » et n'est pas
+remplacé.
+
+**Fenêtre.** Les **100 dernières bougies 5 min** fermées avant l'instant
+(environ 8 h 20). Un OB compte s'il est validé dans cette fenêtre.
+
+**Déroulé, pour chaque instant.**
+1. **TradingView, en mode Replay**, arrêté à l'instant : rien d'après n'est
+   visible. Unité 5 min.
+2. **L'opérateur relève ses OB d'abord, à l'aveugle** : sans avoir vu la
+   sortie du moteur. Sinon, on ne contrôle plus rien, on recopie. Pour chacun :
+   heure d'ouverture de la dernière bougie de l'OB (UTC), sens, haut, bas.
+3. Claude regarde le même écran via l'extension Chrome, **en lecture seule**
+   (règle 7 : aucun ordre, aucun réglage modifié), et note ce qu'il lit à
+   l'écran pour vérifier le relevé. Il ne propose pas d'OB.
+4. **Ensuite seulement**, la commande du moteur à cet instant.
+5. Chaque OB est classé, sans discussion préalable :
+   - **identique** : même dernière bougie, même sens, bornes à moins de
+     **0,1 ATR** (ATR 14 en 5 min, celui que rend le moteur) ;
+   - **bornes différentes** : même bougie, même sens, bornes au-delà de
+     0,1 ATR ;
+   - **manqué** : vu par l'opérateur, absent du moteur ;
+   - **en trop** : rendu par le moteur, non vu par l'opérateur.
+6. Pour chaque écart, une cause, et une seule : **donnée** (le flux diffère),
+   **définition** (la règle écrite ne dit pas ce que fait l'œil), **défaut**
+   (le code ne fait pas ce que dit la règle), ou **inconnue**.
+
+**Fiche.** Un fichier par séance de relevé,
+`donnees/controle-ob/AAAA-MM-JJ.md` (hors dépôt), une ligne par OB :
+instant · source TradingView · heure de la bougie · sens · haut · bas
+(opérateur) · haut · bas (moteur) · classement · cause. Le bilan (nombres par
+classement et par cause) va au journal de bord.
+
+**Ce qu'on fait des écarts.**
+- **Défaut** : se corrige, avec un test qui le reproduit, sans autre forme.
+- **Définition** : ne se corrige **pas** sur place. Changer la règle après
+  l'avoir vue échouer, c'est ajuster le détecteur aux instants contrôlés
+  (garde-fou 7). L'écart s'écrit dans `PISTES.md` ; un changement de règle
+  passe par une DEC, et le détecteur modifié est un **nouveau** détecteur, à
+  remesurer face au témoin sur des données jamais regardées. Le verdict de
+  HYP-005 ne s'applique qu'au détecteur d'origine.
+- **Donnée** : noter, ne rien corriger.
+
+**Fin du contrôle.** Les 10 instants relevés, classés et causés. Pas de seuil
+de réussite fixé : le résultat est la liste des écarts et leurs causes. C'est
+elle qui dit si le moteur détecte ce que l'opérateur appelle un OB.
 
 ### E5 — Sources interchangeables + direct MT5 ⬜
 
